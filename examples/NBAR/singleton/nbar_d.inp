@@ -1,0 +1,22 @@
+time_step 3e-13
+add NBAR nbound 1 outside
+load min.save
+planar_topology yes
+mesh planar.mesh
+bar_bond_k 0.01
+bar_theta_k 0.1
+bar_phi_k 0.1
+do_ld yes 
+o_lim 100
+nsteps 3000
+seed 2
+movie		yes	
+gamma_langevin 10000
+KA		0.2
+lipid	inner	DOPS	46
+lipid	inner	DOPE	30
+lipid	inner	DOPC	24
+lipid	outer	DOPS	46
+lipid	outer	DOPE	30
+lipid	outer	DOPC	24
+lipid_mc_period	100

@@ -1,0 +1,49 @@
+AUTOMAKE_OPTIONS = foreign subdir-objects
+
+EMAIL = alexander.sodt@nih.gov
+
+
+bin_PROGRAMS = hd.opt makeHexSquare.opt min.opt subdivide.opt scale.opt icosahedron.opt makeBud.opt makeBump.opt makeHexCylinder.opt  writeBiasPotential.opt writeCylRTraj.opt
+
+AM_CPPFLAGS = -include ../config.h -include ../src/local_config.h $(AM_INCLUDE) 
+AM_CFLAGS = -O2
+AM_CXXFLAGS = -O2
+
+vpath %.C ../src
+vpath %.c ../src
+vpath %.cpp ../src
+vpath %.h ../src
+
+
+complex_SRCS = NBAR.C dimer.C crowder.C
+util_SRCS    = mutil.C util.C
+
+interp_SRCS = interpLib.C grad.C pboxing.C irr_kernel.C uv_map.C gauss.C modes.C write_structures.C min_distance.cpp GJK.cpp gjk_gudrun.cpp GJK_min2.cpp functions.cpp NearestSimplexR2.cpp NearestSimplexR.cpp  subdivide3.C fast_mm.C random_global.C height.C pcomplex.C minimize.C gsl_random_globals.C dynamics.C restart.C p_p.C sparse.C global_boxing.C lipid_density.C tachyon.C npt.C lipid_composition.C vpass.C get_regions.C parallel.C input.C l-bfgs.C srd.C alignSet.C compilation_time.C
+
+hull_SRCS = dovoronoi.c clusterv.C
+
+hd_opt_SOURCES        = hd.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
+min_opt_SOURCES       = min.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
+subdivide_opt_SOURCES = subdivide.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
+scale_opt_SOURCES	  = scale.C  $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
+icosahedron_opt_SOURCES = icosahedron.C $(util_SRCS)
+makeBud_opt_SOURCES   = makeBud.C $(hull_SRCS) $(util_SRCS)
+makeBump_opt_SOURCES  = makeBump.C $(hull_SRCS) $(util_SRCS)
+makeHexCylinder_opt_SOURCES = makeHexCylinder.C $(hull_SRCS) $(util_SRCS)
+makeHexSquare_opt_SOURCES = makeHexSquare.C $(hull_SRCS) $(util_SRCS)
+writeBiasPotential_opt_SOURCES = writeBiasPotential.C $(util_SRCS)
+writeCylRTraj_opt_SOURCES      = writeCylRTraj.C $(util_SRCS) 
+
+hd_opt_LDADD              = $(AM_LDADD) -lstdc++
+min_opt_LDADD             = $(AM_LDADD) -lstdc++
+subdivide_opt_LDADD       = $(AM_LDADD) -lstdc++
+scale_opt_LDADD           = $(AM_LDADD) -lstdc++
+icosahedron_opt_LDADD     = $(AM_LDADD) -lstdc++
+makeBud_opt_LDADD         = $(AM_LDADD) $(AM_QHULL) -lstdc++
+makeBump_opt_LDADD        = $(AM_LDADD) $(AM_QHULL) -lstdc++
+makeHexCylinder_opt_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
+makeHexSquare_opt_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
+writeBiasPotential_opt_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
+writeCylRTraj_opt_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
+
+

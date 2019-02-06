@@ -1,0 +1,141 @@
+\documentclass[11pt,notitlepage]{revtex4}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{comment}
+\usepackage{etoolbox}
+\usepackage{IEEEtrantools}
+\usepackage{tcolorbox}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage[scaled=1]{helvet}
+\usepackage{setspace}
+\usepackage{wrapfig}
+\usepackage{newfloat}
+\usepackage{cleveref}
+\usepackage{mdframed}
+\usepackage{calc}
+\usepackage{regexpatch}
+\usepackage{ifxetex,ifluatex}
+%\usepackage[resetlabels]{multibib}
+%\usepackage{filecontents}
+
+  \newenvironment{bcomment}[1]{%
+%    {\def\cl@bgcolor{gray!12}}
+    \mdfsetup{skipabove=12pt,frametitlealignment=\centering,skipbelow=12pt,frametitleaboveskip=12pt,frametitlebelowskip=12pt,innerbottommargin=12pt,hidealllines=true,frametitlefont=\bfseries\color{darkgray}}
+    \begin{mdframed}
+	[frametitle=\MakeUppercase{#1},
+	backgroundcolor=gray!12]
+%      \setlist[itemize]{label=$\Box$,leftmargin=*}
+  }{\end{mdframed}}
+
+\newcommand{\vek}[1]{\boldsymbol{#1}}          % vector symbol
+\newcommand{\code}[1]{\texttt{#1}}
+
+%%%%%%%%%
+\newcounter{command}
+\renewcommand\thecommand{C\,\arabic{command}}
+\setcounter{command}{0}
+\newenvironment{command}[1][]{\refstepcounter{command}\ttfamily \\  >~}{\hfill\commandfmt\\}
+\newcommand{\commandfmt}{(\thecommand)}
+%%%%%%
+
+%%%%%%%%%
+%\newenvironment{icommand}[1][]{\refstepcounter{icommand}\ttfamily \\  \%~}{\hfill\icommandfmt\\}
+%%%%%%
+  
+%\newcounter{icommand}
+%\renewcommand\theicommand{I\,\arabic{icommand}}
+%\setcounter{icommand}{0}
+%\newenvironment{icommand}[1][]{%
+%   \mdfsetup{skipabove=12pt,innertopmargin=6pt,innerbottommargin=6pt,skipbelow=12pt,hidealllines=true}
+%    \refstepcounter{icommand} \ttfamily
+%    \begin{mdframed}[backgroundcolor=blue!5]
+%  }
+%{\hfill
+%\icommandfmt
+%\end{mdframed}
+%}
+%\newcommand{\icommandfmt}{(\theicommand)}
+
+\tcbset{parskip/.style={before={\par\pagebreak[0]\smallskip\parindent=0pt}, after={}}}
+
+\newcounter{icommand}
+\renewcommand\theicommand{I\,\arabic{icommand}}
+\setcounter{icommand}{0}
+\newenvironment{icommand}[1][]{%
+    \refstepcounter{icommand} \ttfamily
+    \begin{tcolorbox}[before={\par\pagebreak[0]\smallskip\parindent=0pt},after={}]
+    \begin{minipage}{0.9\textwidth}
+  }
+{
+\end{minipage}
+\hfill
+\icommandfmt
+\end{tcolorbox}
+}
+\newcommand{\icommandfmt}{(\theicommand)}
+
+
+\usepackage[hmargin=0.75in,vmargin=0.75in,paperheight=11in,paperwidth=8.5in]{geometry}
+
+\usepackage{multirow}
+\usepackage{dcolumn}% Align table columns on decimal point
+\usepackage{bm}% bold math
+\usepackage{amssymb}   % for math
+\usepackage{float}
+%\usepackage[export]{adjustbox}
+
+\usepackage{etoolbox}
+\patchcmd{\section}
+  {\centering}
+  {\raggedright}
+  {}
+  {}
+\patchcmd{\subsection}
+  {\centering}
+  {\raggedright}
+  {}
+  {}
+
+\patchcmd{\subsubsection}
+  {\centering}
+  {\raggedright}
+  {}
+  {}
+
+\begin{document}
+
+\pagenumbering{roman}
+
+
+\title{ Documentation for UMCP continuum modeling software}
+
+\maketitle
+
+\tableofcontents
+
+\clearpage
+
+\pagenumbering{arabic}
+
+\input{preamble.tex}
+
+\input{introduction.tex}
+
+\input{running.tex}
+
+\input{lipid_composition.tex}
+
+
+\input{hamiltonian.tex}
+
+
+\input{npt.tex}
+
+\section{Bibliography}
+\bibliography{docs}
+
+\end{document}
+
+
+

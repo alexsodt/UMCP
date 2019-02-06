@@ -1,0 +1,211 @@
+
+\section{ Hamiltonian and Lagrangian dynamics } \label{sec:hamilton}
+
+\subsection{Lagrangian mechanics}
+
+This section is adapted from wikipedia.
+
+The Lagrangian $L$ is defined as:
+\begin{equation}
+L = T - V
+\end{equation}
+with $V$ the potential energy.
+The kinetic energy
+\begin{equation}
+T = \frac{1}{2} \sum m_k \nu_k^2
+\end{equation}
+is defined in terms of the real mass variables ($\nu_k$ and $r_k$). 
+It is computed for the generalized coordinates $q$ as:
+\begin{equation}
+\vek{\nu}_k = \sum_j{\frac{\partial \vek{r}_k}{\partial q_j} \dot{q}_j} + \frac{\partial \vek{r}_k}{\partial t}
+\end{equation}
+Here $\vek{\nu}_k$ is the velocity of particle $k$ and $m_k$ is its mass.
+In the case of the membrane itself the generalized coordinate is the control point.
+The mass variables are sections of the membrane corresponding to points on the surface.
+The quantities $\frac{\partial \vek{r}_k}{\partial q_j}$ are determined by the spline coefficients of the face, and each point is a linear combination of the (for regular faces) twelve control points.
+The quantity $\frac{\partial L}{\partial q_j}$ corresponds to the force, $\frac{\partial V}{\partial x}$.
+The differential equation of motion is 
+\begin{equation}
+\frac{\textrm{d}}{\textrm{d}t} {\huge (} \frac{\partial L}{\partial \dot{q}_j} {\huge )} = \frac{\partial L}{\partial q_j}
+\end{equation}
+Applied to the control points, the equation of motion is
+\begin{equation}
+M_{ij} \ddot{q}_j = \frac{\partial V}{\partial q_i}
+\end{equation}
+where 
+\begin{equation}
+M_{ij} = \sum_k m_k \frac{ \partial { \vek{r}_k } }{\partial q_j} \cdot \frac{\partial{\vek{r}_k}}{\partial q_i}
+\end{equation}
+This matrix is inverted to put the equations in form suitable for integration:
+\begin{equation}
+\ddot{q}_j = M^{-1}_{ij} \frac{\partial V}{\partial q_i}
+\end{equation}
+
+\subsection{Hamiltonian dynamics}
+
+In Hamiltonian dynamics a new variable is introduced, the momentum $p$:
+\begin{equation}
+p_i = \frac{\partial L}{\partial \dot{q}_i}
+\end{equation}
+This equation is then solved for $\dot{q}_i$ and substituted into the Hamiltonian $H$:
+\begin{equation}
+H = \sum \dot{q}_i p_i - L
+\label{eq:legendre}
+\end{equation}
+For the control points $p$ is to related to the set $q$ through:
+\begin{align}
+\label{eq:pqdot}
+p_i &= \sum_j{ M_{ij} \dot{q}_j } \\
+\label{eq:qdotp}
+\dot{q}_j &= \sum_i{ M^{-1}_{ij} p_i}
+\end{align}
+The equations of motion are then:
+\begin{align}
+\dot{p} &= - \frac{\partial H }{\partial q} \\
+\dot{q} &= + \frac{\partial H }{\partial p}
+\end{align} 
+
+\subsection{Particle on the membrane surface}
+
+The coordinates of a particle on the membrane's surface are determined by their internal coordinates $u$ and $v$ as well as the control points of the surrounding mesh:
+\begin{equation}
+\vek{r}_i = \sum_{l} \vek{q}_l s_l u^{a_l} v^{b_l}
+\end{equation}
+where here the generalized variable $q$ is shown in vector form.
+The powers $a_l$ and $b_l$ are non-negative integers less than five, and $s_l$ is the spline coefficient.
+To calculate $T$ the velocity $\vek{\nu}$ must be expressed in terms of the generalized coordinates and their time derivatives:
+\begin{equation}
+\vek{\nu} =  \sum_l \frac{\partial \vek{r}}{\partial q_l} \dot{q}_l + \frac{\partial \vek{r}}{\partial u} \dot{u} +
+\frac{\partial \vek{r}}{\partial v}\dot{v}
+\end{equation} 
+%Unlike the pure mesh model the particle coordinates couple multiple generalized coordinates ($q$, $u$, and $v$).
+
+The particle's attachment modifies the dynamics of the membrane as its mass adds to that of the membrane.
+The control point momenta are now determined as:
+\begin{equation}
+p_i = M_{ij} \dot{q}_j + m_p \frac{\partial \vek{r}}{\partial q_i} \cdot \frac{\partial \vek{r}}{\partial q_k} \dot{q}_k 
+  + m_p \frac{\partial \vek{r}}{\partial q_i} \cdot \frac{\partial \vek{r}}{\partial u} \dot{u} 
+  + m_p \frac{\partial \vek{r}}{\partial q_i} \cdot \frac{\partial \vek{r}}{\partial v} \dot{v} 
+\label{eq:pmesh}
+\end{equation}
+%\begin{align}
+%\vek{p}_i &= M_{ij} \dot{\vek{q}}_j + m_p \sum_{ik} (s_i u^{a_i} v^{b_i}) (s_k u^{a_k} v^{b_k}) \dot{\vek{q}}_k + \nonumber \\
+%    & + m_p \sum_{ik}  s_i u^{a_i} u^{b_i} \vek{q}_k s_k a_k u^{a_k-1} v^{b_k} \dot{u} + \nonumber \\ 
+%    & + m_p \sum_{ik}  s_i u^{a_i} u^{b_i} \vek{q}_k s_k b_k u^{a_k} v^{b_k-1} \dot{v}  
+%\label{eq:pmesh}
+%\end{align}
+where the sums for the attached particle are only over control points that are included in the spline.
+
+The attached particle's velocity depends on $\dot{q}_i$, $\dot{u}$ and $\dot{v}$, so all cross-terms in $T$ must be accounted for in the calculation of, for example, $\frac{\partial T}{\partial \dot{u}}$.
+\begin{equation}
+p_{u} = m_p [\frac{\partial \vek{r}}{\partial q_k} \cdot \vek{r}_u \dot{q}_k +  \vek{r}_u \cdot \vek{r}_u \dot{u}  +  \vek{r}_u \cdot \vek{r}_v \dot{v} ] 
+\label{eq:pu}
+\end{equation}
+and
+\begin{equation}
+p_{v} = m_[ [\frac{\partial \vek{r}}{\partial q_k} \cdot \vek{r}_v \dot{q}_k +  \vek{r}_v \cdot \vek{r}_u \dot{u}  +  \vek{r}_v \cdot \vek{r}_v \dot{v} ] 
+\label{eq:pv}
+\end{equation}
+The routines to evaluate these terms are \code{surface::ru} ($\vek{r}_u$), \code{surface::rv} ($\vek{r}_v$), and \code{surface::get\_pt\_coeffs} ($\frac{\partial \vek{r}}{\partial q_k}$), available in \code{uv\_map.C}.
+
+In theory, the $\dot{q}_i$, $\dot{u}$, and $\dot{v}$ are then substituted into Eq.~\ref{eq:legendre} to determine the new $H$.
+Setting aside briefly the momentum of the underlying mesh, $\dot{\vek{q}}$, the surface coordinates of the particle momentum can be cast as:
+\begin{align}
+\begin{bmatrix}
+p_{u} \\
+p_{v} 
+\end{bmatrix}
+= m_p \sum_{kl}{
+\begin{bmatrix}
+\vek{r}_u \cdot \vek{r}_u  & \vek{r}_u \cdot \vek{r}_v \\
+\vek{r}_v \cdot \vek{r}_u  & \vek{r}_v \cdot \vek{r}_v 
+\end{bmatrix}}
+\cdot
+\begin{bmatrix}
+\dot{u} \\
+\dot{v} 
+\end{bmatrix}
+\label{eq:pmat}
+\end{align} 
+or
+\begin{equation}
+p_\alpha = m_p g_{\alpha\beta} \dot{\beta}
+\end{equation}
+where $\alpha$, $\beta$ are $u$ or $v$.
+Conceptually, the factors act to slow down $\dot{u}$ as it approaches regions with high metrics.
+It does not do this with a force, rather, $\dot{u}$ is computed instantaneously from $p$, which is the variable being propagated.
+
+Unlike $g_{uv}$, the control point mass matrix $M_{ij}$ is determined only by network topology, if the masses represented by the mesh are not chosen to change. 
+Thus, in the absence of bound particles, its inverse does not need to be calculated at each dynamics step to evaluate $\dot{\vek{q}}$ from $\vek{p}$ using Eq.~\ref{eq:qdotp}.
+Eqs.~\ref{eq:pmesh},~\ref{eq:pu}, and~\ref{eq:pv} introduce state-dependent ($\vek{q}$, $u$, and $v$) coupling between $\dot{\vek{q}}$ and both the mesh and embedded particles.
+
+To solve for the complete set of coordinate time derivatives, including both control point momenta and particle momenta, with the eventual goal of their elimination requires solving:
+\begin{align}
+\begin{bmatrix}
+\vek{p}_i \\
+\vek{p}_j \\
+\vdots    \\
+p_u \\
+p_v
+\end{bmatrix}
+&=
+\Bigg(
+\begin{bmatrix}
+M_{ii} & M_{ij} & \cdots & 0 & 0\\
+M_{ji} & M_{jj} & \cdots & 0 & 0\\
+\vdots & \vdots & \ddots & \vdots \\
+0 & 0 & & m_p g_{uu} & m_p g_{uv} \\
+0 & 0 & & m_p g_{vu} & m_p g_{vv}
+\end{bmatrix}
+\nonumber \\
+&+ m_p 
+\begin{bmatrix}
+0 & \cdots & \frac{\partial \vek{r}}{\partial q_i} \cdot \vek{r}_u & \frac{\partial \vek{r}}{\partial q_i} \cdot \vek{r}_v \\
+\vdots & \ddots & \vdots & \vdots \\
+\vdots &        & \vdots & \vdots \\
+\frac{\partial \vek{r}}{\partial q_i} \cdot \vek{r}_u  & \cdots & 0 & 0 \\
+\frac{\partial \vek{r}}{\partial q_i} \cdot \vek{r}_v  & \cdots & 0 & 0 
+\end{bmatrix}
+\Bigg)
+\cdot 
+\begin{bmatrix}
+\dot{\vek{q}_i} \\
+\dot{\vek{q}_j} \\
+\vdots    \\
+\dot{u} \\
+\dot{v}
+\end{bmatrix}.
+\end{align}
+%where $P_{uv}(\{\vek{q}\},u,v)$ is the particle-particle coupling matrix defined in Eq.~\ref{eq:pmat} and $X_{iu}(\{\vek{q}\},u,v)$ is the mesh-particle coupling element defined in Eqs.~\ref{eq:pmesh},~\ref{eq:pu}, and~\ref{eq:pv}. 
+The inverse of a slightly perturbed matrix $A_0 + \delta A$ can be computed with the truncated series
+\begin{equation}
+(A_0+\delta A)^{-1} = A_0^{-1} - A_0^{-1} \delta A A_0^{-1} + \mathcal{O}[\delta A^2]
+\end{equation}
+because
+\begin{equation}
+(A_0^{-1} - A_0^{-1} \delta A A_0^{-1}) \cdot (A_0 + \delta A) = I - A_0^{-1} \delta A A_0^{-1} \delta A
+\end{equation}
+
+The kinetic energy $T$ now has position-dependent cross-terms between the particle and membrane that contribute to the time derivative of the momenta.
+
+\subsection{Propagating particle momenta $p$ }
+
+Particle momenta $p$ are propagated using the force, e.g., $\frac{\partial{H}}{\partial{u}}$.
+The kinetic energy now depends on $u$ through $\frac{\partial T}{\partial u}$ and $\frac{\partial T}{\partial v}$.
+%For example:
+%\begin{equation}
+%\frac{\partial \sum{ \{p\} \cdot \{ \dot{q} \} }}{\partial u} =  \frac{\partial}{\partial u} \{ p \}^{T} \cdot (M^{-1}_{ub} + C_{ub}) \cdot \{ p \} 
+%\end{equation}
+%where the superscript $T$ indicates transposition.
+
+\subsection{The effective mass matrix is banded; its inverse is short-ranged }
+
+
+%\section{Bibliography}
+%\bibliography{hamiltonian}
+%
+%\end{document}
+
+%document
+
+

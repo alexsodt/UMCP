@@ -1,0 +1,14 @@
+time_step 1e-12
+add NBAR nbound 1 outside
+planar_topology yes
+mesh planar.mesh
+do_ld yes
+nmin 5000
+nsteps 0
+lipid	inner	DOPS	46
+lipid	inner	DOPE	30
+lipid	inner	DOPC	24
+lipid	outer	DOPS	46
+lipid	outer	DOPE	30
+lipid	outer	DOPC	24
+lipid_mc_period	100

@@ -1,0 +1,31 @@
+Makefile
+autom4te.cache
+autoscan.log
+config.h
+config.log
+config.status
+m4
+m4/*
+stamp-h1
+optimized/*
+! optimize/Makefile.am
+debug/*
+! debug/Makefile.am
+bin/*
+docs/*
+! docs/*.tex
+! docs/Makefile
+! docs/*.bib
+.deps
+src/.deps
+src/fpr_subroutines/*.o
+*.xyz
+*.mesh
+*.psf
+*.err
+*.run
+*.txt
+*.out
+*.vmd
+*.o
+*.a

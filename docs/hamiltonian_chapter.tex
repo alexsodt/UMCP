@@ -1,0 +1,61 @@
+\documentclass[11pt,notitlepage]{revtex4}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{color}
+\usepackage{comment}
+\usepackage{IEEEtrantools}
+%$\usepackage{fontspec}
+\usepackage{setspace}
+\usepackage{wrapfig}
+%\usepackage[resetlabels]{multibib}
+%\usepackage{filecontents}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\vek}[1]{\boldsymbol{#1}}          % vector symbol
+
+\usepackage[hmargin=0.75in,vmargin=0.75in,paperheight=11in,paperwidth=8.5in]{geometry}
+
+\usepackage{multirow}
+\usepackage{dcolumn}% Align table columns on decimal point
+\usepackage{bm}% bold math
+\usepackage{amssymb}   % for math
+\usepackage{float}
+%\usepackage[export]{adjustbox}
+
+\usepackage{etoolbox}
+\patchcmd{\section}
+  {\centering}
+  {\raggedright}
+  {}
+  {}
+\patchcmd{\subsection}
+  {\centering}
+  {\raggedright}
+  {}
+  {}
+
+\patchcmd{\subsubsection}
+  {\centering}
+  {\raggedright}
+  {}
+  {}
+
+\begin{document}
+
+\pagenumbering{roman}
+
+\title{ Documentation for UMCP continuum modeling software}
+
+\maketitle
+
+\input{hamiltonian.tex}
+
+Placeholder~\cite{Lebowitz1965}
+
+\section{Bibliography}
+\bibliography{hamiltonian}
+
+\end{document}
+
+
+

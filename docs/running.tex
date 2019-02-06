@@ -1,0 +1,25 @@
+
+\section{ Running dynamics: \code{\MakeLowercase{hd}} }
+
+Dynamics are computed using the program \code{hd}, short for Hamiltonian dynamics. 
+
+\begin{bcomment}{Hamiltonian Dynamics}
+Hamiltonian dynamics is a convenient formalism for propagating Newtonian dynamics with generalized variables (equivalent to constraints). Constraints and generalized variables (i.e., not necessary particle coordinate variables) are an essential feature of continuum membrane simulations, because the mesh is represented by control points and particles are frequently constrained to be on the membrane. The theory of Hamiltonian dynamics is discussed in~\cref{sec:hamilton}. 
+\end{bcomment}
+
+All arguments to \code{hd} are optional.
+The first argument can be the name of an input file; this is the standard usage.
+Subsequent arguments override simple input file directives:
+\begin{command}
+hd run.inp nsteps=10
+\label{cmd:hd}
+\end{command}
+
+
+\subsection{Dynamics options and parameters }
+
+The choice of timestep is critical for computing proper ensembles. 
+If the timestep is too large, the system will be unstable and program execution will halt.
+The option \icommand{timestep\_analysis=yes} provides a rough estimate of a proper timescale for dynamics.
+
+
