@@ -8,14 +8,14 @@ m4
 m4/*
 stamp-h1
 optimized/*
-! optimize/Makefile.am
+!optimized/Makefile.am
 debug/*
-! debug/Makefile.am
+!debug/Makefile.am
 bin/*
 docs/*
-! docs/*.tex
-! docs/Makefile
-! docs/*.bib
+!docs/*.tex
+!docs/Makefile
+!docs/*.bib
 .deps
 src/.deps
 src/fpr_subroutines/*.o
