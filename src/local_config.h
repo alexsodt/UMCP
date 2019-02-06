@@ -1,6 +1,11 @@
 void printCompilationTime(void);
 
 #include "../config.h"
+
+#if defined(HAVE_FFTW3_H) && defined(HAVE_LIBFFTW3)
+#define FFTW
+#endif
+
 #ifdef PARALLEL
 #include "mpi.h"
 #endif
