@@ -211,6 +211,21 @@ int surface::getSphericalHarmonicModes( double *ro, int l_min, int l_max, double
 		}
 	}
 
+	// normalize them.
+
+	for( int v = 0; v < NQ; v++ )
+	{
+		double r2 = 0;
+
+		for( int x = 0; x < 3*nv; x++ )
+			r2 += (*gen_transform)[v*3*nv+x] * (*gen_transform)[v*3*nv+x];
+		double r = sqrt(r2);
+		for( int x = 0; x < 3*nv; x++ )
+			(*gen_transform)[v*3*nv+x] /= r;
+		 
+	}
+
+
 	free(Amat);
 	free(t_g_t);
 
@@ -1581,12 +1596,13 @@ void surface::getSparseEffectiveMass( force_set * theForceSet, int *use_map, int
 		dgemm( &transn, &transn, &nv, &ngen, &nv, &one, effective_mass, &ldb,  gen_xyz+1*nv, &lda, &zero, eff_m_sub+1*nv, &ldc );  
 		dgemm( &transn, &transn, &nv, &ngen, &nv, &one, effective_mass, &ldb,  gen_xyz+2*nv, &lda, &zero, eff_m_sub+2*nv, &ldc );  
 
-		memset( effective_mass, 0, sizeof(double)*ngen*ngen );
 
 		int lencoor =  3* nv;
 
 		if( ngen > nv )
 			effective_mass = (double *)realloc( effective_mass, sizeof(double) * ngen * ngen );
+		
+		memset( effective_mass, 0, sizeof(double)*ngen*ngen );
 
 		// EM_{IJ} = EMS_{jk}
 		dgemm( &transy, &transn, &ngen, &ngen, &lencoor, &one, gen_xyz, &lda,  eff_m_sub, &ldc, &zero, effective_mass, &ngen );  

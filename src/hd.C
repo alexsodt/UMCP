@@ -377,12 +377,14 @@ int temp_main( int argc, char **argv )
 //			NQ = sub_surface->getSphericalHarmonicModes( r, block.mode_min, block.mode_max, &gen_transform, &output_q );
 //			free(output_q);
 
+#if 1
 			gen_transform = ( double *)malloc( sizeof(double)*3*nv*3*nv);
 			memset( gen_transform, 0, sizeof(double) * 3 * nv * 3 * nv );
 	
 			for( int v = 0; v < nv*3; v++ )
-				gen_transform[v*(3*nv)+v] = 1.0;
+				gen_transform[v*(3*nv)+v] = 1000.0;
 			NQ=3*nv;
+#endif
 		}
 		else
 		{
