@@ -2646,8 +2646,6 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 			cross( dr2, dr1, cp );
 			double dp = cp[0] * r1[0] + cp[1] * r1[1] + cp[2] * r1[2];
 		
-			printf("cp: %le %le %le r1: %le %le %le\n", cp[0], cp[1], cp[2], r1[0], r1[1], r1[2] );
-			printf("order %d %d %d %d %d %d\n", theVertices[i].edges[0], theVertices[i].edges[1], theVertices[i].edges[2], theVertices[i].edges[3], theVertices[i].edges[4], theVertices[i].edges[5] );
 	
 	
 			if( dp > 0 )
@@ -2656,7 +2654,6 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 				flipOrientation();
 				sortFaces();
 			}
-			printf("order %d %d %d %d %d %d\n", theVertices[0].edges[0], theVertices[0].edges[1], theVertices[0].edges[2], theVertices[0].edges[3], theVertices[0].edges[4], theVertices[0].edges[5] );
 		}
 	
 		setEdgeRev();	
@@ -2669,7 +2666,6 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 	free(vals);
 	
 	int i = 0;		
-	printf("order %d %d %d %d %d %d\n", theVertices[i].edges[0], theVertices[i].edges[1], theVertices[i].edges[2], theVertices[i].edges[3], theVertices[i].edges[4], theVertices[i].edges[5] );
 	return 0;
 }
 

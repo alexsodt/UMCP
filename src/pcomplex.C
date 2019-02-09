@@ -218,7 +218,7 @@ void pcomplex::prepareForGradient( void )
 	memset( save_grad, 0, sizeof(double) * 3 * nsites );
 }
 
-double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *Minv, double *mesh_grad, double *meshp, double *mesh_qdot, double *mesh_qdot0, double time_step, double timestep_total)
+double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *mesh_grad, double *mesh_qdot, double *mesh_qdot0, double time_step, double timestep_total)
 {
 	double *alphas = rsurf+3*theSurface->nv;
 
@@ -528,9 +528,6 @@ double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *Minv,
 			for( int c2    = 0; c2   < ncoef;  c2++ )
 			for( int xyz = 0; xyz < 3; xyz++ )
 			{		// (-) signs cancel
-				//mesh_der_qdot[3*coef_list[c]+0] += qdot0[0] * mass[s] *( drdu[0] * dcoef[0*ncoef+c] + dcoef[0*ncoef+c] * drdu[0]) * C_Pinv[c2*3*2+0*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-				//mesh_der_qdot[3*coef_list[c]+1] += qdot0[0] * mass[s] *( drdu[1] * dcoef[0*ncoef+c] + dcoef[0*ncoef+c] * drdu[1]) * C_Pinv[c2*3*2+0*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-				//mesh_der_qdot[3*coef_list[c]+2] += qdot0[0] * mass[s] *( drdu[2] * dcoef[0*ncoef+c] + dcoef[0*ncoef+c] * drdu[2]) * C_Pinv[c2*3*2+0*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
 
 				mesh_grad[3*coef_list[c]+xyz] += (f1*cross_factor * 0.5 * qdot0[0] * mass[s] *( drdu[xyz] * dcoef[0*ncoef+c] + dcoef[0*ncoef+c] * drdu[xyz]) * C_Pinv[c2*3*2+0*3+0] * mesh_qdot0[coef_list[c2]*3+0])*frac_mult; 
 				mesh_grad[3*coef_list[c]+xyz] += (f1*cross_factor * 0.5 * qdot0[0] * mass[s] *( drdu[xyz] * dcoef[0*ncoef+c] + dcoef[0*ncoef+c] * drdu[xyz]) * C_Pinv[c2*3*2+0*3+1] * mesh_qdot0[coef_list[c2]*3+1])*frac_mult; 
@@ -647,7 +644,7 @@ double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *Minv,
 	return time_step;
 }
 
-void pcomplex::compute_qdot( surface *theSurface, double *rsurf, double *Minv, double *mesh_qdot0, double *mesh_qdot_temp, double *meshp, double frac_mult )
+void pcomplex::compute_qdot( surface *theSurface, double *rsurf, double *mesh_qdot0, double *mesh_qdot_temp, double frac_mult )
 {
 	double *alphas = rsurf+3*theSurface->nv;
 
@@ -729,22 +726,6 @@ void pcomplex::compute_qdot( surface *theSurface, double *rsurf, double *Minv, d
 				}
 			}
 
-#if 0			
-			double *Pcouple = (double *)malloc( sizeof(double) * nv * 2 * 3 );
-			memset( Pcouple, 0, sizeof(double) * nv * 3 * 2 );
-	
-			// left multiply by Pinv.
-			for( int c1 = 0; c1 < nv; c1++ )
-			{
-				for( int i = 0; i < 2; i++ )
-				for( int c = 0; c < ncoef; c++ )
-				{
-					Pcouple[c1*6+i*3+0] -= Minv[c1*nv+coef_list[c]] * C_Pinv[c*3*2+i*3+0];		
-					Pcouple[c1*6+i*3+1] -= Minv[c1*nv+coef_list[c]] * C_Pinv[c*3*2+i*3+1];		
-					Pcouple[c1*6+i*3+2] -= Minv[c1*nv+coef_list[c]] * C_Pinv[c*3*2+i*3+2];		
-				}
-			}
-#endif			
 			// COMPUTE qdot
 	
 			// Pcouple is now the piece of the matrix inverse coupling the mesh and particle at first order.	
@@ -1451,9 +1432,7 @@ void pcomplex::putBonds( int *bond_list )
 
 void pcomplex::debug_dynamics( surface *theSurface,
 		      double *rsurf,
-		      double *Minv,
 		
-		      double *mesh_p,
 		      double *mesh_qdot,
 		      double *mesh_qdot0,
 
@@ -1464,14 +1443,14 @@ void pcomplex::debug_dynamics( surface *theSurface,
 {	
 	// this retrieves dV_dq and dT_dq
 
-	compute_qdot( theSurface, rsurf, Minv, mesh_qdot0, mesh_qdot, mesh_p );	
+	compute_qdot( theSurface, rsurf, mesh_qdot0, mesh_qdot );	
 	debug = DEBUG_NO_V;
 	for( int s = 0; s < nattach; s++ )
 	{
 		save_grad[2*s+0] = 0;
 		save_grad[2*s+1] = 0;
 	}
-	update_dH_dq( theSurface, rsurf, Minv, dT_dmesh, mesh_p, mesh_qdot, mesh_qdot0 ); 
+	update_dH_dq( theSurface, rsurf, dT_dmesh, mesh_qdot, mesh_qdot0 ); 
 	for( int s = 0; s < nattach; s++ )
 	{
 		dT_dcomplex[2*s+0] += save_grad[2*s+0];
@@ -1484,14 +1463,14 @@ void pcomplex::debug_dynamics( surface *theSurface,
 		save_grad[2*s+0] = 0;
 		save_grad[2*s+1] = 0;
 	}
-	update_dH_dq( theSurface, rsurf, Minv, dV_dmesh, mesh_p, mesh_qdot, mesh_qdot0 ); 
+	update_dH_dq( theSurface, rsurf, dV_dmesh, mesh_qdot, mesh_qdot0 ); 
 	for( int s = 0; s < nattach; s++ )
 	{
 		dV_dcomplex[2*s+0] += save_grad[2*s+0];
 		dV_dcomplex[2*s+1] += save_grad[2*s+1];
 	}
 }
-
+/*
 void pcomplex::getMeshQxdot( surface *theSurface, double *rsurf, double *Minv, double *mesh_p, double *mesh_qdot, double *mesh_qdot0, double *mesh_der_qdot )
 {
 	if( nattach > 0  )
@@ -1642,23 +1621,7 @@ void pcomplex::getMeshQxdot( surface *theSurface, double *rsurf, double *Minv, d
 			for( int c2    = 0; c2   < ncoef;  c2++ )
 			{		// (-) signs cancel
 
-/*
-				mesh_grad[3*coef_list[c]+0] += f1*cross_factor * 0.5 * qdot0[0] * mass[s] *( drdu[0] * dcoef[0*ncoef+c] + dcoef[0*ncoef+c] * drdu[0]) * C_Pinv[c2*3*2+0*3+0] * mesh_qdot0[coef_list[c2]*3+0]; 
-				mesh_grad[3*coef_list[c]+1] += f1*cross_factor * 0.5 * qdot0[0] * mass[s] *( drdu[1] * dcoef[0*ncoef+c] + dcoef[0*ncoef+c] * drdu[1]) * C_Pinv[c2*3*2+0*3+1] * mesh_qdot0[coef_list[c2]*3+1]; 
-				mesh_grad[3*coef_list[c]+2] += f1*cross_factor * 0.5 * qdot0[0] * mass[s] *( drdu[2] * dcoef[0*ncoef+c] + dcoef[0*ncoef+c] * drdu[2]) * C_Pinv[c2*3*2+0*3+2] * mesh_qdot0[coef_list[c2]*3+2]; 
-				                                                                                                          
-				mesh_grad[3*coef_list[c]+0] += f1*cross_factor * 0.5 * qdot0[1] * mass[s] *( drdv[0] * dcoef[0*ncoef+c] + dcoef[1*ncoef+c] * drdu[0]) * C_Pinv[c2*3*2+0*3+0] * mesh_qdot0[coef_list[c2]*3+0]; 
-				mesh_grad[3*coef_list[c]+1] += f1*cross_factor * 0.5 * qdot0[1] * mass[s] *( drdv[1] * dcoef[0*ncoef+c] + dcoef[1*ncoef+c] * drdu[1]) * C_Pinv[c2*3*2+0*3+1] * mesh_qdot0[coef_list[c2]*3+1]; 
-				mesh_grad[3*coef_list[c]+2] += f1*cross_factor * 0.5 * qdot0[1] * mass[s] *( drdv[2] * dcoef[0*ncoef+c] + dcoef[1*ncoef+c] * drdu[2]) * C_Pinv[c2*3*2+0*3+2] * mesh_qdot0[coef_list[c2]*3+2]; 
-				                                                                                                          
-				mesh_grad[3*coef_list[c]+0] += f1*cross_factor * 0.5 * qdot0[0] * mass[s] *( drdu[0] * dcoef[1*ncoef+c] + dcoef[0*ncoef+c] * drdv[0]) * C_Pinv[c2*3*2+1*3+0] * mesh_qdot0[coef_list[c2]*3+0]; 
-				mesh_grad[3*coef_list[c]+1] += f1*cross_factor * 0.5 * qdot0[0] * mass[s] *( drdu[1] * dcoef[1*ncoef+c] + dcoef[0*ncoef+c] * drdv[1]) * C_Pinv[c2*3*2+1*3+1] * mesh_qdot0[coef_list[c2]*3+1]; 
-				mesh_grad[3*coef_list[c]+2] += f1*cross_factor * 0.5 * qdot0[0] * mass[s] *( drdu[2] * dcoef[1*ncoef+c] + dcoef[0*ncoef+c] * drdv[2]) * C_Pinv[c2*3*2+1*3+2] * mesh_qdot0[coef_list[c2]*3+2]; 
-				                                                                                                          
-				mesh_grad[3*coef_list[c]+0] += f1*cross_factor * 0.5 * qdot0[1] * mass[s] *( drdv[0] * dcoef[1*ncoef+c] + dcoef[1*ncoef+c] * drdv[0]) * C_Pinv[c2*3*2+1*3+0] * mesh_qdot0[coef_list[c2]*3+0]; 
-				mesh_grad[3*coef_list[c]+1] += f1*cross_factor * 0.5 * qdot0[1] * mass[s] *( drdv[1] * dcoef[1*ncoef+c] + dcoef[1*ncoef+c] * drdv[1]) * C_Pinv[c2*3*2+1*3+1] * mesh_qdot0[coef_list[c2]*3+1]; 
-				mesh_grad[3*coef_list[c]+2] += f1*cross_factor * 0.5 * qdot0[1] * mass[s] *( drdv[2] * dcoef[1*ncoef+c] + dcoef[1*ncoef+c] * drdv[2]) * C_Pinv[c2*3*2+1*3+2] * mesh_qdot0[coef_list[c2]*3+2]; 
-*/
+
 
 #ifdef PART_A
 				mesh_der_qdot[3*coef_list[c]+0] += qdot0[0] * mass[s] *( drdu[0] * dcoef[0*ncoef+c] + dcoef[0*ncoef+c] * drdu[0]) * C_Pinv[c2*3*2+0*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
@@ -1689,15 +1652,8 @@ void pcomplex::getMeshQxdot( surface *theSurface, double *rsurf, double *Minv, d
 #ifdef PART_B
 				mesh_der_qdot[3*coef_list[ci]+0] -= mass[s]* Minv[coef_list[ci]*nv+coef_list[cj]] * coefs[cj] * dcoef[(uv)*ncoef+ci] * qdot0[uv];
 #endif
-//				mesh_der_qdot[3*coef_list[ci]+1] += Minv[coef_list[ci]*nv+coef_list[ck]] * coefs[cj] * dcoef[(uv)*ncoef+ci] * qdot[uv];
-//				mesh_der_qdot[3*coef_list[ci]+2] += Minv[coef_list[ci]*nv+coef_list[ck]] * coefs[cj] * dcoef[(uv)*ncoef+ci] * qdot[uv];
 
 				
-/*
-				mesh_grad[3*coef_list[ck]+0] -= f2*0.5 * cross_factor * mass[s] * mesh_qdot0[coef_list[ci]*3+0] * coefs[ci] * dcoef[(uv)*ncoef+ck] * qdot0[uv];	
-				mesh_grad[3*coef_list[ck]+1] -= f2*0.5 * cross_factor * mass[s] * mesh_qdot0[coef_list[ci]*3+1] * coefs[ci] * dcoef[(uv)*ncoef+ck] * qdot0[uv];	
-				mesh_grad[3*coef_list[ck]+2] -= f2*0.5 * cross_factor * mass[s] * mesh_qdot0[coef_list[ci]*3+2] * coefs[ci] * dcoef[(uv)*ncoef+ck] * qdot0[uv];	
-*/
 			}
 
 			
@@ -1709,7 +1665,7 @@ void pcomplex::getMeshQxdot( surface *theSurface, double *rsurf, double *Minv, d
 		}
 	}
 }
-
+*/
 void pcomplex::applyLangevinFriction( surface *theSurface, double *rsurf, double dt, double gamma )
 {
 

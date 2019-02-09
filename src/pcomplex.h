@@ -90,16 +90,14 @@ struct pcomplex
 	void setrall( surface *theSurface, double *rsurf );
 	void base_init( void );
 	double T(surface *theSurface, double *rsurf);
-	double update_dH_dq( surface *theSurface, double *rsurf, double *Minv, double *mesh_grad, double *meshp, double *mesh_qdot, double *mesh_qdot0, double time_step=-1, double timestep_total=0 );
+	double update_dH_dq( surface *theSurface, double *rsurf, double *mesh_grad, double *mesh_qdot, double *mesh_qdot0, double time_step=-1, double timestep_total=0 );
 	void propagate_p( surface *theSurface, double *rsurf, double dt );
-	void compute_qdot( surface *theSurface, double *rsurf, double *Minv, double *mesh_qdot0, double *mesh_qdot, double *meshp, double frac_mult=1.0 );
+	void compute_qdot( surface *theSurface, double *rsurf, double *mesh_qdot0, double *mesh_qdot, double frac_mult=1.0 );
 	void propagate_surface_q( surface *theSurface, double *rsurf, double dt );
 
 	void debug_dynamics( surface *theSurface,
 		      double *rsurf,
-		      double *Minv,
 		
-		      double *mesh_p,
 		      double *mesh_qdot,
 		      double *mesh_qdot0,
 

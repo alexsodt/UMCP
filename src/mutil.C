@@ -697,4 +697,16 @@ double Mul22( double *A, double *B, double *out )
 	return 0;
 }
 
+void MatVec( double *a, double *b, double *c, int n, int m)
+{
+	// A:  m fast, n slow
+	// B: n
+	// C: m
+	
+	char transy='N';	
+	double one =1.0;
+	double zero = 0.0;
+	int incr = 1;
+	dgemv( &transy, &m, &n, &one, a, &m, b, &incr, &zero, c, &incr );
+}
 

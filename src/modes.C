@@ -71,12 +71,8 @@ void surface::project_grad_to_modes( double *r, double *g, double *mg )
 	}
 }
 
-int surface::setup_spherical_set( double *ro, int l_min, int l_max, double **output_qvals )
+void surface::getAMAT( double *Amat, double *ro, double *r0_pos)
 {
-	do_set = 1;
-	do_spherical = 1;
-
-	double *Amat = (double *)malloc( sizeof(double) * (nv) * (nv) );
 	memset( Amat, 0, sizeof(double) * (nv) * (nv ) );
 
 	for( int v = 0; v < nv; v++ )
@@ -94,6 +90,245 @@ int surface::setup_spherical_set( double *ro, int l_min, int l_max, double **out
 			Amat[(v)*nv+(j)] += w;
 		}
 	}
+	
+	for( int v = 0; v < nv; v++ )
+	{
+		// evaluate at the vertex center.
+	
+		double nrm[3];
+
+		int tri = theVertices[v].faces[0];
+	
+		int lowv = theTriangles[tri].ids[0];
+		int the_f = theTriangles[tri].f;
+		double the_u=0,the_v=0;
+		if( lowv == v )
+		{
+		} 
+		else
+		{
+			for( int e = 0; e < theVertices[lowv].valence; e++ )
+			{	
+				int ep1 = e+1;
+				if( ep1 >= theVertices[lowv].valence) ep1 -= theVertices[lowv].valence;
+				if( 
+					(theVertices[lowv].edges[e] == theTriangles[tri].ids[1] &&
+				    theVertices[lowv].edges[ep1] == theTriangles[tri].ids[2]) ||
+					(theVertices[lowv].edges[e] == theTriangles[tri].ids[2] &&
+				    theVertices[lowv].edges[ep1] == theTriangles[tri].ids[1])
+					 )
+				{
+					if( theVertices[lowv].edges[e] == v )
+						the_u = 1.0;
+					else
+						the_v = 0.0;
+				}
+			}
+		}	
+	
+		evaluateRNRM( the_f, the_u, the_v, r0_pos+3*v, nrm, ro );	
+	}
+}
+
+
+int surface::getSphericalHarmonicModes( double *ro, int l_min, int l_max, double **gen_transform, double **output_qvals )
+{
+	double *Amat = (double *)malloc( sizeof(double) * (nv) * (nv) );
+	double *r0_pos = (double *)malloc( sizeof(double) * 3 * nv );
+	getAMAT( Amat, ro, r0_pos );
+	
+// Count the number of modes (NQ)
+	int NQ = 0;
+
+	for( int pass = 0; pass < 2; pass++ )
+	{
+		if( pass == 1 ) *output_qvals = (double *)malloc( sizeof(double) * NQ );
+		NQ = 0;
+		for( int l = l_min; l <= l_max; l++ )
+		{
+			for( int m = -l; m <= l; m++ )
+			{
+				if( pass == 1 ) (*output_qvals)[NQ] = l;
+				NQ++;
+			}
+		}
+	}
+	
+	/* where we store gen_transform for its computation */
+
+	double *t_g_t = (double *)malloc( sizeof(double) * NQ * 3 * nv );
+
+	int m_cntr = 0;
+	for( int ql = l_min; ql <= l_max; ql++ )
+	for( int qm = -ql; qm <= ql; qm++, m_cntr++)
+	for( int j = 0; j < nv; j++ )
+	{		
+		int l = ql;
+		int m = qm;
+
+		int am = m;
+		if( m < 0 )
+			am = -m;
+	
+		double *ro = r0_pos+3*j;
+		double r = sqrt(ro[0]*ro[0]+ro[1]*ro[1]+ro[2]*ro[2]);
+		double rn[3] = { ro[0]/r, ro[1]/r, ro[2]/r };
+		double phi = acos( rn[2] );
+		double theta = atan2( rn[1], rn[0] );
+		double ylm = gsl_sf_legendre_sphPlm( l, am, rn[2] );
+
+		if( m < 0 )
+			ylm *= sqrt(2.0) * sin( am * theta );
+		else if( m > 0 )
+			ylm *= sqrt(2.0) * cos( m * theta );
+
+		double dr[3] = { ylm * ro[0], ylm * ro[1], ylm * ro[2] };
+
+		for( int v = 0; v < nv; v++ )
+		{		
+			// the parameter
+			for( int vc = 0; vc < 3; vc++ )	
+				t_g_t[m_cntr*3*nv+vc*nv+j] = dr[vc];
+		}
+	}
+
+	m_cntr=0;
+	char uplo = 'U';
+	int nrhs = 3*NQ;
+	int N = nv;
+	int info=0;
+	dposv( &uplo, &N, &nrhs, Amat, &N, t_g_t, &N, &info );
+	printf("DPOSV: %d\n", info );
+
+	(*gen_transform) = (double *)malloc( sizeof(double) * NQ * 3 * nv );
+
+	for( int vec = 0; vec < NQ; vec++ )
+	{
+		for( int vc = 0; vc < 3; vc++ )
+		for( int v = 0; v < nv; v++ )
+		{
+			(*gen_transform)[vec*(3*nv)+3*v+vc] = t_g_t[vec*3*nv+vc*nv+v];
+		}
+	}
+
+	free(Amat);
+	free(t_g_t);
+
+	return NQ;
+}
+
+int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_min, int l_max, double **gen_transform, double **output_qvals )
+{
+	double *Amat = (double *)malloc( sizeof(double) * (nv) * (nv) );
+	double *r0_pos = (double *)malloc( sizeof(double) * 3 * nv );
+	getAMAT( Amat, ro, r0_pos );
+	double Lx = PBC_vec[0][0]*ro[3*nv+0];
+	double Ly = PBC_vec[1][1]*ro[3*nv+1];
+
+// Count the number of modes (NQ)
+	int NQ = 0;
+
+	for( int pass = 0; pass < 2; pass++ )
+	{
+		if( pass == 1 ) *output_qvals = (double *)malloc( sizeof(double) * NQ );
+
+		NQ = 0;
+
+		for( int lx = 0; lx < (l_max+1); lx++ )
+		for( int ly = 0; ly < (l_max+1); ly++ )
+		for( int sc = 0; sc < 2; sc++ )
+		{
+			if( lx < l_min && ly < l_min )
+				continue;
+
+			if( mode_x >= 0 && lx != mode_x ) continue;
+			if( mode_y >= 0 && ly != mode_y ) continue;
+	
+			int lx_mag = lx;
+			int ly_mag = ly;
+			
+			if( lx_mag == 0 && ly_mag == 0 )
+				continue;
+	
+			if( pass == 1 ) (*output_qvals)[NQ] = sqrt(lx*lx+ly*ly);
+		
+			NQ++;
+		}
+	}
+	
+// where we store gen_transform for its computation 
+
+	double *t_g_t = (double *)malloc( sizeof(double) * NQ * 3 * nv );
+
+	int vec=0;	
+	for( int lx = 0; lx < (l_max+1); lx++ )
+	for( int ly = 0; ly < (l_max+1); ly++ )
+	for( int sc = 0; sc < 2; sc++ )
+	{
+		if( lx < l_min && ly < l_min )
+			continue;
+
+		int lx_mag = lx; 
+		int ly_mag = ly; 
+		
+		if( lx_mag == 0 && ly_mag == 0 )
+			continue;
+			
+		if( mode_x >= 0 && lx != mode_x ) continue;
+		if( mode_y >= 0 && ly != mode_y ) continue;
+
+		double qx = 2 * M_PI * lx_mag / Lx;
+		double qy = 2 * M_PI * ly_mag / Ly;
+
+		for( int j = 0; j < nv; j++ )
+		{		
+			// the spot
+			double rc[3] = { 0,0, cos(qx*ro[3*j+0]+qy*ro[3*j+1]) };
+			if( sc == 1 )
+				rc[2] = sin(qx*ro[3*j+0]+qy*ro[3*j+1]);
+
+			// h_q Exp( I q )
+			// h_q exp( I (n-q)
+
+			for( int vc = 0; vc < 3; vc++ )	
+				t_g_t[vec*3*nv+vc*nv+j] = rc[vc];
+		}
+		
+		vec++;
+	}
+
+	char uplo = 'U';
+	int nrhs = 3*NQ;
+	int N = nv;
+	int info=0;
+	dposv( &uplo, &N, &nrhs, Amat, &N, t_g_t, &N, &info );
+	printf("DPOSV: %d\n", info );
+
+	(*gen_transform) = (double *)malloc( sizeof(double) * NQ * 3 * nv );
+
+	for( int vec = 0; vec < NQ; vec++ )
+	{
+		for( int vc = 0; vc < 3; vc++ )
+		for( int v = 0; v < nv; v++ )
+		{
+			(*gen_transform)[vec*(3*nv)+3*v+vc] = t_g_t[vec*3*nv+vc*nv+v];
+		}
+	}
+
+	free(Amat);
+	free(t_g_t);
+
+	return NQ;
+
+}
+
+
+int surface::setup_spherical_set( double *ro, int l_min, int l_max, double **output_qvals )
+{
+	do_set = 1;
+	do_spherical = 1;
+
+	double *Amat = (double *)malloc( sizeof(double) * (nv) * (nv) );
 
 	int N = nv;
 	int LDA = nv;
@@ -1298,8 +1533,10 @@ double surface::evaluate_T( double *vq, double *pmesh, double *vq_m1, double *pm
 	return alt_T;
 }
 
-void surface::getSparseEffectiveMass( force_set * theForceSet, double *effective_mass, int *use_map, int *nuse, SparseMatrix **theMatrix )
+void surface::getSparseEffectiveMass( force_set * theForceSet, int *use_map, int *nuse, SparseMatrix **theMatrix, double *gen_transform, int ngen )
 {
+	int used_transform = 0;
+	double *effective_mass = (double *)malloc( sizeof(double)*nv*nv);
 	memset( effective_mass, 0, sizeof(double) * nv * nv );
 
 	for( int x = 0; x < theForceSet->npts; x++ )
@@ -1309,10 +1546,61 @@ void surface::getSparseEffectiveMass( force_set * theForceSet, double *effective
 			effective_mass[theForceSet->frc_coef_list[x*maxv+c1]*nv+theForceSet->frc_coef_list[x*maxv+c2]] += theForceSet->frc_coef[x*maxv+c1] * theForceSet->frc_coef[x*maxv+c2] * theForceSet->mass[x];
 	}	
 
+	int NQ = nv;
+
+	if( gen_transform && ngen > 0 )
+	{
+		used_transform = 1;
+		double *eff_m_sub = (double *)malloc( sizeof(double) * ngen * (3*nv) );
+		memset( eff_m_sub, 0, sizeof(double) * ngen * (3*nv) );
+
+		// first, gen_transform times x.
+
+		char transn = 'N';
+		char transy = 'T';
+		double one = 1.0;
+		double zero = 0.0;
+		int lda=3*nv;
+		int ldb=nv;
+		int ldc=3*nv;
+
+		double *gen_xyz = (double *)malloc( sizeof(double) * ngen * nv*3 );	
+		for( int x = 0; x < ngen; x++ )
+		{	
+			for( int v = 0; v < nv; v++ )
+			{
+				gen_xyz[x*nv*3+v] = gen_transform[x*3*nv+3*v+0];
+				gen_xyz[x*nv*3+nv+v] = gen_transform[x*3*nv+3*v+1];
+				gen_xyz[x*nv*3+2*nv+v] = gen_transform[x*3*nv+3*v+2];
+			}
+		}
+
+
+		// EMS_{Ik} = GT_{Ij} EM_{jk}
+		dgemm( &transn, &transn, &nv, &ngen, &nv, &one, effective_mass, &ldb,  gen_xyz+0*nv, &lda, &zero, eff_m_sub+0*nv, &ldc );  
+		dgemm( &transn, &transn, &nv, &ngen, &nv, &one, effective_mass, &ldb,  gen_xyz+1*nv, &lda, &zero, eff_m_sub+1*nv, &ldc );  
+		dgemm( &transn, &transn, &nv, &ngen, &nv, &one, effective_mass, &ldb,  gen_xyz+2*nv, &lda, &zero, eff_m_sub+2*nv, &ldc );  
+
+		memset( effective_mass, 0, sizeof(double)*ngen*ngen );
+
+		int lencoor =  3* nv;
+
+		if( ngen > nv )
+			effective_mass = (double *)realloc( effective_mass, sizeof(double) * ngen * ngen );
+
+		// EM_{IJ} = EMS_{jk}
+		dgemm( &transy, &transn, &ngen, &ngen, &lencoor, &one, gen_xyz, &lda,  eff_m_sub, &ldc, &zero, effective_mass, &ngen );  
+
+		free(gen_xyz);
+		free(eff_m_sub);
+
+		NQ = ngen;
+	}
+	
 	// invert it.
 
-	int N = nv;
-	int LDA = nv;
+	int N = NQ;
+	int LDA = NQ;
 	int info = 0;
 	char uplo = 'U';
 	
@@ -1332,48 +1620,73 @@ void surface::getSparseEffectiveMass( force_set * theForceSet, double *effective
 		exit(1);
 	}
 
-	for( int c1 = 0; c1 < nv; c1++ )
-	for( int c2 = c1+1; c2 < nv; c2++ )
+	for( int c1 = 0; c1 < NQ; c1++ )
+	for( int c2 = c1+1; c2 < NQ; c2++ )
 	{
-		effective_mass[c1*nv+c2] = effective_mass[c2*nv+c1];	
+		effective_mass[c1*NQ+c2] = effective_mass[c2*NQ+c1];	
 	}
 
 	
 #ifdef PARALLEL
-	ParallelBroadcast(effective_mass,nv*nv);
+	ParallelBroadcast(effective_mass,NQ*NQ);
 #endif
-
 
 	(*theMatrix) = new SparseMatrix;
 
-	(*theMatrix)->init( nv ); 
+	(*theMatrix)->init( NQ ); 
 
-	for( int v2 = 0; v2 < nv; v2++ )
+	if( used_transform )
 	{
-		int use_it = 0;
-		for( int v1x = 0; v1x < par_info.nv; v1x++ )
+		for( int v2 = 0; v2 < NQ; v2++ )
 		{
-			int v1 = par_info.verts[v1x];
+			int use_it = 0;
 
-
-
-			if( fabs(effective_mass[v1*nv+v2]) / sqrt(fabs(effective_mass[v1*nv+v1]*effective_mass[v2*nv+v2])) > rel_tol )
+			for( int v1x = 0; v1x < par_info.NQ; v1x++ )
 			{
-				(*theMatrix)->coupleParameters( v1, v2, effective_mass[v1*nv+v2] );
-				use_it=1;
+				int v1 = par_info.genQ[v1x];
+	
+				if( fabs(effective_mass[v1*NQ+v2]) / sqrt(fabs(effective_mass[v1*NQ+v1]*effective_mass[v2*NQ+v2])) > rel_tol )
+				{
+					(*theMatrix)->coupleParameters( v1, v2, effective_mass[v1*NQ+v2] );
+					use_it=1;
+				}
+			}
+					
+			if( use_it )
+			{
+				use_map[*nuse] = v2;
+				(*nuse)++;
 			}
 		}
-				
-		if( use_it )
+	}
+	else
+	{
+		for( int v2 = 0; v2 < NQ; v2++ )
 		{
-			use_map[*nuse] = v2;
-			(*nuse)++;
+			int use_it = 0;
+			for( int v1x = 0; v1x < par_info.nv; v1x++ )
+			{
+				int v1 = par_info.verts[v1x];
+	
+				if( fabs(effective_mass[v1*nv+v2]) / sqrt(fabs(effective_mass[v1*nv+v1]*effective_mass[v2*nv+v2])) > rel_tol )
+				{
+					(*theMatrix)->coupleParameters( v1, v2, effective_mass[v1*nv+v2] );
+					use_it=1;
+				}
+			}
+					
+			if( use_it )
+			{
+				use_map[*nuse] = v2;
+				(*nuse)++;
+			}
 		}
 	}
 	
 	(*theMatrix)->setNeedSource();
 	(*theMatrix)->compress();
 
+/*
 
 	printf("nuse: %d nv: %d\n", *nuse, par_info.nv );
 
@@ -1455,8 +1768,8 @@ void surface::getSparseEffectiveMass( force_set * theForceSet, double *effective
 	free(rms_node_hop);
 	free(nrms_node_hop);
 #endif
-
-	
+*/
+	free(effective_mass);	
 }
 
 void surface::getEffectiveMass( force_set * theForceSet, double *effective_mass )

@@ -64,7 +64,7 @@ void surface::fdiff_check_grad( double *r )
 void surface::grad( double *r, double *gr, double *puv, double *pg )
 {	
 	if( !setup_for_parallel )
-		setupParallel(this,NULL,0);
+		setupParallel(this,NULL,0,-1);
 
 	double alpha_x = r[3*nv];
 	double alpha_y = r[3*nv+1];
@@ -3374,7 +3374,7 @@ d_e_d_rvz += d_e_d_g * d_g_d_rvz;
 void surface::pgrad( double *r, double *gr, double *p_uv, double *pg )
 {
 	if( !setup_for_parallel )
-		setupParallel(this,NULL,0);
+		setupParallel(this,NULL,0,-1);
 
 	double alpha_x = r[3*nv];
 	double alpha_y = r[3*nv+1];
@@ -6247,7 +6247,7 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 void surface::igrad( double *r, double *gr )
 {	
 	if( !setup_for_parallel )
-		setupParallel(this,NULL,0);
+		setupParallel(this,NULL,0,-1);
 
 	double alpha_x = r[3*nv];
 	double alpha_y = r[3*nv+1];

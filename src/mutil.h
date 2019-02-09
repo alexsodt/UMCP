@@ -19,4 +19,5 @@ double Power( double, double );
 double Power( double, int );
 double Mul22( double *A, double *B, double *out );
 void CartMatVecIncrScale( double *vec_out, double *vec_in, double *Mat, double scale, int nv, double *alphas  );
+void MatVec( double *a, double *b, double *c, int m, int n);
 #endif

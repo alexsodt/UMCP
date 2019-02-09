@@ -351,6 +351,12 @@ struct surface
 	double totalArea( void );
 	double get_target_z( double x, double y );
 	double directFT( double *hq, double *hq2, double *r, int nx, int ny );
+
+	void getAMAT( double *AMAT, double *ro, double *r0_pos );
+	int getSphericalHarmonicModes( double *ro, int l_min, int l_max, double **gen_transform, double **output_qvals );
+	int getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int mode_min, int mode_max, double **gen_transform, double **output_qvals );
+
+
 	void mode_perturb( double *r, double *ro, int qi, int qj, int nx, int ny, double Lx, double Ly, double mag, int do_cosine);
 	void setup_mode_perturb( double *ro, int qi, int qj, int nx, int ny, double Lx, double Ly );
 	void setup_spherical_perturb( double *ro, int ql, int qm );
@@ -456,7 +462,7 @@ struct surface
 	void dKE_dx_and2( force_set *theForceSet, double *effM, double *vp, double *unit_f_vec, int f, double u, double v, double *dKEdx, double *d2KEdx2 );
 	void debug_dKE_dx_and2( force_set *theForceSet, double *effM, double *vp, double *unit_f_vec, int f, double u, double v );
 	void getEffectiveMass( force_set * theForceSet, double *effective_mass );
-	void getSparseEffectiveMass( force_set * theForceSet, double *effective_mass, int *use_map, int *nuse, SparseMatrix ** );
+	void getSparseEffectiveMass( force_set * theForceSet, int *use_map, int *nuse, SparseMatrix **, double *gen_transform=NULL, int NQ=-1 );
 	void applyForceAtPoint( int f, double u, double v, double *dp, double *force_vector, force_set *theForceSet );
 	void velocityAtPoint( int f, double u, double v, double *vp, double *velocity_out );
 	void fdiff_check_grad( double *r );

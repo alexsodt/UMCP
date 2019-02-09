@@ -131,7 +131,7 @@ void balanceWork( surface *theSurface, int *regions_for_tri )
 	
 }
 
-void setupParallel( surface *theSurface, pcomplex **allComplexes, int ncomplex )
+void setupParallel( surface *theSurface, pcomplex **allComplexes, int ncomplex, int NQ )
 {
 	if( setup_for_parallel )
 	{
@@ -296,6 +296,39 @@ void setupParallel( surface *theSurface, pcomplex **allComplexes, int ncomplex )
 		}
 	}
 
+	if( NQ == -1 ) //vertices are the general coordinates.
+	{
+		par_info.genQ = (int *)malloc( sizeof(int) * 3 * par_info.nv );
+
+		for( int vx = 0; vx < par_info.nv; vx++ )
+		{
+			int v = par_info.verts[vx];
+
+			par_info.genQ[3*vx+0] = 3*v+0;
+			par_info.genQ[3*vx+1] = 3*v+1;
+			par_info.genQ[3*vx+2] = 3*v+2;
+		}
+	}
+	else
+	{
+		for( int pass = 0; pass < 2; pass++ )
+		{
+			if( pass == 1 ) par_info.genQ = (int *)malloc( sizeof(int) * par_info.NQ );
+
+			par_info.NQ = 0;
+
+			for( int vq = 0; vq < NQ; vq++ )
+			{
+				if( vq % par_info.nprocs == par_info.my_id )
+				{
+					if( pass == 1 ) par_info.genQ[par_info.NQ] = vq;
+					par_info.NQ += 1;
+				}
+			}
+		}
+	}
+
+
 #ifdef PRINT_REGIONS
 		fclose(rfile);
 #endif	
@@ -313,7 +346,7 @@ void setupParallel( surface *theSurface, pcomplex **allComplexes, int ncomplex )
 
 }
 
-void setupSparseVertexPassing( SparseMatrix *EFFM, int nv )
+void setupSparseVertexPassing( SparseMatrix *EFFM, int nv, int do_gen_q )
 {
 #ifdef PARALLEL
 	MPI_Status status;	
@@ -321,13 +354,28 @@ void setupSparseVertexPassing( SparseMatrix *EFFM, int nv )
 		
 	int *need_list = (int *)malloc( sizeof(int) * nv );
 
+	// if generalized coordinates are being used, the base task needs information from all processors.
+
+	int *all_list = (int *)malloc( sizeof(int) * nv );
+	for( int v = 0; v < nv; v++ )
+		all_list[v] = v;
+
 	for( int pass = 0; pass < 2; pass++ )
 	{
 		int nsend_mat[np*np];
 		int nget_mat[np*np];
 	
 		// fetch what is needed from each processor.
-		const int *source_list = EFFM->source_list;
+		int *source_list = EFFM->source_list;
+		int nsrc = EFFM->nsource;
+ 
+		if( do_gen_q && par_info.my_id == BASE_TASK )
+		{
+			nsrc = nv;
+			source_list = all_list;
+		}	
+		else if( do_gen_q ) // supporting processors do not require any vertices.
+			nsrc = 0;
 
 		// in "parallel sum" mode, we pass whatever is in our source_list, figuring we are likely to compute this as part of our gradient.
 
@@ -356,7 +404,7 @@ void setupSparseVertexPassing( SparseMatrix *EFFM, int nv )
 				{	// this is what I need from you.
 	
 					int nneed = 0;
-					for( int x = 0; x < EFFM->nsource; x++ )
+					for( int x = 0; x < nsrc; x++ )
 					{
 						if( pass == 0 && par_info.proc_for_vert[source_list[x]] == p2 )
 						{ 	// pass only what we know it provides as its main vertex.
@@ -435,13 +483,13 @@ void setupSparseVertexPassing( SparseMatrix *EFFM, int nv )
 
 							int npass = 0;
 
-							for( int x = 0; x < EFFM->nsource; x++ )
+							for( int x = 0; x < nsrc; x++ )
 							{
 								int pass_it = 0;
 
 								for( int y = 0; y < nsend; y++ )
 								{
-									if( EFFM->source_list[x] == could_pass[y] )
+									if( source_list[x] == could_pass[y] )
 									{
 										pass_it = 1;
 										break;
@@ -450,7 +498,7 @@ void setupSparseVertexPassing( SparseMatrix *EFFM, int nv )
 
 								if( pass_it )
 								{
-									par_info.psum_send_to[p1][npass] = EFFM->source_list[x];
+									par_info.psum_send_to[p1][npass] = source_list[x];
 									npass++;
 								}
 							}
@@ -467,7 +515,8 @@ void setupSparseVertexPassing( SparseMatrix *EFFM, int nv )
 			}
 		}
 	}
-
+	
+	free(all_list);
 	free(need_list);
 #endif
 }
@@ -807,7 +856,34 @@ void SparseCartMatVecIncrScale( double *vec_out, double *vec_in, double *Mat, do
 	free(vout);
 }
 
-void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double scale, int nv, int *sparse_use, int nv_use, double *alphas  )
+void GenQMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double scale )
+{
+	double *mcopy = (double *)malloc( sizeof(double) * Mat->nsource );
+	double *vout  = (double *)malloc( sizeof(double) * Mat->nneed);
+	memset( vout, 0, sizeof(double)*Mat->nneed);
+	
+	Mat->compress_source_vector( vec_in, mcopy, 1 );
+	Mat->mult( vout, mcopy, 1 );
+	for( int v = 0; v < Mat->nneed; v++ )
+		vout[v] *= scale;
+	Mat->expand_target_vector( vec_out, vout,1 );
+	
+	free(mcopy);
+	free(vout);
+}
+
+void PartialSyncGenQ( double *pp )
+{
+	if( par_info.nprocs > 1 )
+	{
+		printf("sync of genq not implemented.\n");
+		MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Finalize();
+		exit(1);
+	}
+}
+
+void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double scale, double *alphas  )
 {
 #ifdef PARALLEL
 //	FullSyncVertices( vec_in );

@@ -266,11 +266,6 @@ int temp_main( int argc, char **argv )
 	double time_step = block.time_step; // one nanosecond.
 	double time_step_collision = block.time_step_collision; // one nanosecond.
 
-	// n / cubic angstrom
-	double fix_alpha = 0.0;
-
-	if( block.fix_alpha )
-		fix_alpha = 1.0;
 	
 	FILE *tFile = NULL;
 	if( block.movie && par_info.my_id == BASE_TASK )
@@ -384,6 +379,44 @@ int temp_main( int argc, char **argv )
 	
 	sub_surface->load_least_squares_fitting( theForceSet );
 	
+	double *gen_transform = NULL;
+	int NQ = 0;
+	int do_gen_q = 0;
+	if( block.mode_max >= 0 )
+	{
+		do_gen_q=1;
+		if( block.sphere )
+		{	
+			double *output_q=NULL;
+			NQ = sub_surface->getSphericalHarmonicModes( r, block.mode_min, block.mode_max, &gen_transform, &output_q );
+			free(output_q);
+		}
+		else
+		{
+			double *output_q=NULL;
+			NQ = sub_surface->getPlanarHarmonicModes( r, -1, -1, block.mode_min, block.mode_max, &gen_transform, &output_q );
+			free(output_q);
+		}
+	}
+	else if( block.mode_x >= 0 || block.mode_y >= 0 )
+	{
+		do_gen_q=1;
+		if( block.sphere )
+		{
+			printf("Single spherical harmonic NYI.\n");
+			exit(1);
+		}
+		else
+		{
+			double *output_q=NULL;
+			int max_l = block.mode_x;
+			if( block.mode_y > max_l ) max_l = block.mode_y;
+
+			NQ = sub_surface->getPlanarHarmonicModes( r, block.mode_x, block.mode_y, 0, max_l, &gen_transform, &output_q );
+			free(output_q);
+		}
+	}
+	
 	/*
 		Langevin/leapfrog dynamics:
 
@@ -400,30 +433,43 @@ int temp_main( int argc, char **argv )
 	// we need partial r partial q
 	// this is stored in the force set.
 	
-	double *pp_m1   = (double *)malloc( sizeof(double) * 3 * nv );
- 	double *qdot_m1 = (double *)malloc( sizeof(double) * 3 * nv );
+	double *pp=NULL;
+	double *next_pp=NULL;
+	int n_real_q = 3*nv;
+	if( do_gen_q )
+	{
+		n_real_q = NQ;
+		pp = (double *)malloc( sizeof(double) * NQ ); 
+		next_pp = (double *)malloc( sizeof(double) * NQ );
+	}
+	else
+	{	
+		pp = (double *)malloc( sizeof(double) * (3*nv+3) );
+		next_pp = (double *)malloc( sizeof(double) * (3*nv+3) );
+	}
 
-	double *pp = (double *)malloc( sizeof(double) * 3 * (nv+1) );
-	double *next_pp = (double *)malloc( sizeof(double) * 3 * nv );
+	double *QV = (double *)malloc( sizeof(double) * NQ );
+	memset( QV, 0, sizeof(double) * NQ );
+
 	double *qdot = (double *)malloc( sizeof(double) * 3 * nv );
 	double *qdot0 = (double *)malloc( sizeof(double) * 3 * nv );
-	double *qdot0_trial = (double *)malloc( sizeof(double) * 3 * nv );
+	
+	double *Qdot = (double *)malloc( sizeof(double) * NQ );
+	double *Qdot0 = (double *)malloc( sizeof(double) * NQ );
+	double *Qdot0_trial = (double *)malloc( sizeof(double) * NQ );
+	
 	double *qdot_temp = (double *)malloc( sizeof(double) * 3 * nv );
+
 	double *ap = (double *)malloc( sizeof(double) * 3 * nv );	
 
-	memset( pp, 0, sizeof(double) * 3 * nv );
+	memset( pp, 0, sizeof(double) * NQ );
 	memset( ap, 0, sizeof(double) * 3 * nv );	
 	memset( qdot, 0, sizeof(double) * 3 * nv );	
 	memset( qdot0, 0, sizeof(double) * 3 * nv );	
 	memset( qdot_temp, 0, sizeof(double) * 3 * nv );	
 
-	double KE = 0;
 
-	double *effective_mass = (double *)malloc( sizeof(double) * nv * nv );
-	double *sparse_effective_mass = (double *)malloc( sizeof(double) * nv * nv );
-	int *sparse_use = (int *)malloc( sizeof(int) * nv );
-	int n_vuse = 0;
-	sub_surface->getEffectiveMass( theForceSet, effective_mass );
+	double KE = 0;
 
 //#define PERTURB_START
 
@@ -512,7 +558,9 @@ int temp_main( int argc, char **argv )
 		for( int x = 0; x < nv+1; x++ )
 		{
 			getLine( xyzLoad, buffer );
-			int nr = sscanf( buffer, "%lf %lf %lf %lf %lf %lf", r+3*x+0, r+3*x+1, r+3*x+2, pp+3*x+0, pp+3*x+1, pp+3*x+2 );
+
+			double mom[3];
+			int nr = sscanf( buffer, "%lf %lf %lf %lf %lf %lf", r+3*x+0, r+3*x+1, r+3*x+2, mom, mom+1, mom+2 );
 
 			if( nr != 3 && nr != 6 )
 			{
@@ -520,21 +568,46 @@ int temp_main( int argc, char **argv )
 				printf("ERROR reading load file '%s'.\n", block.loadName );
 				exit(1);
 			}	
+
+			if( nr == 6 && ! do_gen_q )
+			{
+				pp[3*x+0] = mom[0];
+				pp[3*x+1] = mom[1];
+				pp[3*x+2] = mom[2];
+			}
 		}
 
 		for( int c = 0; c < ncomplex; c++ )
 			allComplexes[c]->loadComplex(xyzLoad,sub_surface,r);
+
+		for( int Q = 0; Q < NQ; Q++ )
+		{
+			getLine(xyzLoad,buffer);
+			if(feof(xyzLoad) ) break;
+			double genp;
+			int nr = sscanf(buffer, "GQ %lf\n", &genp );
+			if( nr == 1 && do_gen_q )
+				pp[Q] = genp;
+		}
 
 		int nr=	fscanf( xyzLoad, "seed %d", &debug_seed );
 		if( nr > 0 )
 			printf("Loaded seed %d\n", debug_seed );
 	}
 	
-	setupParallel( sub_surface, allComplexes, ncomplex );
-	SparseMatrix *EFFM;
-	sub_surface->getSparseEffectiveMass( theForceSet, sparse_effective_mass, sparse_use, &n_vuse, &EFFM);	
-	setupSparseVertexPassing( EFFM, sub_surface->nv );
 
+	setupParallel( sub_surface, allComplexes, ncomplex, ( do_gen_q ? NQ : 0) );
+	SparseMatrix *EFFM;
+	int max_mat = nv;
+	if( NQ > nv )
+		max_mat = NQ;
+	int *sparse_use = (int *)malloc( sizeof(int) * nv );
+	int n_vuse = 0;
+	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ);	
+	setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
+
+	if( !do_gen_q ) // generalized coordinates are simply the control point positions.
+		NQ = 3 * nv;
 
 	if( block.nmin > 0 )
 	{
@@ -578,10 +651,9 @@ int temp_main( int argc, char **argv )
 		
 	}
 		
-//	sub_surface->debug_dynamics( r, theForceSet, effective_mass, allComplexes, ncomplex );
 	
-	if( block.timestep_analysis && taskid == BASE_TASK )
-		sub_surface->timestep_analysis( r, theForceSet, effective_mass, allComplexes, ncomplex, dt );
+//	if( block.timestep_analysis && taskid == BASE_TASK )
+//		sub_surface->timestep_analysis( r, theForceSet, effective_mass, allComplexes, ncomplex, dt );
 
 	if( block.nsteps == 0 )
 	{
@@ -608,38 +680,35 @@ int temp_main( int argc, char **argv )
 	double prev_TV = 0;
 
 	memset( qdot0, 0, sizeof(double) * 3 * nv );
-#ifdef MM_METHOD_1
-	CartMatVecIncrScale( qdot0, pp, effective_mass, 1.0, nv, r+3*nv );
-#elif defined(MM_METHOD_2)
-	SparseCartMatVecIncrScale( qdot0, pp, sparse_effective_mass, 1.0, nv, sparse_use, n_vuse, r+3*nv );
-#else
-	AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, nv, sparse_use, n_vuse, r+3*nv );
-#endif
+	if( do_gen_q )
+	{
+		memset( Qdot0, 0, sizeof(double) * NQ );
+		GenQMatVecIncrScale( Qdot0, pp, EFFM, 1.0 );
+		MatVec( gen_transform, Qdot0, qdot0, NQ, 3*nv ); 
+	}
+	else
+		AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, r+3*nv );
+	
 	memcpy( qdot, qdot0, sizeof(double) * 3 * nv );
 	
 	memset( qdot_temp, 0, sizeof(double) * 3 * nv );	
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
-		allComplexes[c]->compute_qdot( sub_surface, r, effective_mass, qdot0, qdot_temp, pp );			
+		allComplexes[c]->compute_qdot( sub_surface, r, qdot0, qdot_temp );			
 	}
 #ifdef PARALLEL		
 	ParallelSum( qdot_temp, 3*nv );
 #endif
-#ifdef MM_METHOD_1
-	CartMatVecIncrScale( qdot, qdot_temp, effective_mass, 1.0, nv, r+3*nv );
-#elif defined(MM_METHOD_2)
-	SparseCartMatVecIncrScale( qdot, qdot_temp, sparse_effective_mass, 1.0, nv, sparse_use, n_vuse, r+3*nv );
-#else
-	AltSparseCartMatVecIncrScale( qdot, qdot_temp, EFFM, 1.0, nv, sparse_use, n_vuse, r+3*nv );
-#endif
+	if( ! do_gen_q )
+		AltSparseCartMatVecIncrScale( qdot, qdot_temp, EFFM, 1.0, r+3*nv );
 	sub_surface->grad( r, g );
 
 
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
-		allComplexes[c]->update_dH_dq( sub_surface, r, effective_mass, g, pp, qdot, qdot0 );
+		allComplexes[c]->update_dH_dq( sub_surface, r, g, qdot, qdot0 );
 	}
 #ifdef PARALLEL
 	// synchronizes particle positions at this point for computing particle-particle interactions. does not synchronize their gradient.
@@ -655,10 +724,6 @@ int temp_main( int argc, char **argv )
 #ifdef PARALLEL
 	ParallelSum(g,nc);
 #endif
-	
-	memcpy( qdot_m1, qdot, sizeof(double) * 3 * nv );
-	memcpy( pp_m1, pp, sizeof(double) * 3 * nv );
-
 #ifdef PARALLEL
 	double expec_time[par_info.nprocs];
 	expec_time[par_info.my_id] = 0;
@@ -780,7 +845,7 @@ int temp_main( int argc, char **argv )
 			if( buffer_cycle[cur_save] )
 				free(buffer_cycle[cur_save]);
 			if( par_info.my_id == BASE_TASK )
-				sub_surface->saveRestart( buffer_cycle+cur_save, r, pp, allComplexes, ncomplex );
+				sub_surface->saveRestart( buffer_cycle+cur_save, r, pp, allComplexes, ncomplex, NQ );
 			cur_save++;
 			if( cur_save == NUM_SAVE_BUFFERS )
 				cur_save = 0;
@@ -796,8 +861,6 @@ int temp_main( int argc, char **argv )
 				allComplexes[c]->cacheVelocities();
 			}
 	
-			memcpy( qdot_m1, qdot, sizeof(double) * 3*nv);		
-			memcpy( pp_m1,   pp,   sizeof(double) * 3*nv);		
 	
 
 			//printf("b0: %d p: %le\n", b0, pp[0] );
@@ -937,7 +1000,7 @@ int temp_main( int argc, char **argv )
 				{
 					memcpy( allComplexes[c]->save_grad, save_grad, sizeof(double)*3*nsites );
 
-					double dt = allComplexes[c]->update_dH_dq( sub_surface, r, effective_mass, g, pp, qdot, qdot0, time_remaining, time_step );
+					double dt = allComplexes[c]->update_dH_dq( sub_surface, r, g, qdot, qdot0, time_remaining, time_step );
 			
 					if( do_ld || o < nequil )
 					{					
@@ -946,13 +1009,13 @@ int temp_main( int argc, char **argv )
 					}
 	
 					allComplexes[c]->propagate_p( sub_surface, r, dt/2 );
-					allComplexes[c]->compute_qdot( sub_surface, r, effective_mass, qdot0, qdot_temp, pp, dt/time_step );			
+					allComplexes[c]->compute_qdot( sub_surface, r, qdot0, qdot_temp, dt/time_step );			
 			
 					// close enough.
 					PT += allComplexes[c]->T(sub_surface,r)  * (dt/time_step);
 
 					allComplexes[c]->propagate_p( sub_surface, r, dt/2 );
-					allComplexes[c]->compute_qdot( sub_surface, r, effective_mass, qdot0, qdot_temp, pp, dt/time_step );			
+					allComplexes[c]->compute_qdot( sub_surface, r, qdot0, qdot_temp,  dt/time_step );			
 
 					allComplexes[c]->propagate_surface_q( sub_surface, r, dt );
 
@@ -985,93 +1048,108 @@ int temp_main( int argc, char **argv )
 			}
 #endif
 
-			memcpy( next_pp, pp, sizeof(double) * 3 * nv );
+			memcpy( next_pp, pp, sizeof(double) * NQ );
 
 			if( !block.disable_mesh )
 			{
 				if( do_ld || o < nequil || (switched) )
 				{
-#ifdef MM_METHOD_1
-					CartMatVecIncrScale( next_pp, pp, effective_mass, -gamma_langevin*AKMA_TIME * time_step, nv, r+3*nv );
-#elif defined(MM_METHOD_2)
-					SparseCartMatVecIncrScale( next_pp, pp, sparse_effective_mass, -gamma_langevin*AKMA_TIME * time_step, nv, sparse_use, n_vuse, r+3*nv);
-#else
-					AltSparseCartMatVecIncrScale( next_pp, pp, EFFM, -gamma_langevin*AKMA_TIME * time_step, nv, sparse_use, n_vuse, r+3*nv );
-#endif
+					if( do_gen_q )
+						GenQMatVecIncrScale( next_pp, pp, EFFM, -gamma_langevin*AKMA_TIME*time_step );
+					else
+						AltSparseCartMatVecIncrScale( next_pp, pp, EFFM, -gamma_langevin*AKMA_TIME * time_step, r+3*nv );
 				}
 			}
 			// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t), report properties for this state (perform Monte Carlo?)
 
 			if( !block.disable_mesh )
 			{
-				for( int v1 = 0; v1 < nv; v1++ )
+
+				if( do_gen_q )
 				{
-					next_pp[3*v1+0] += -g[3*v1+0] * AKMA_TIME * time_step/2;
-					next_pp[3*v1+1] += -g[3*v1+1] * AKMA_TIME * time_step/2;
-					next_pp[3*v1+2] += -g[3*v1+2] * AKMA_TIME * time_step/2;
+					for( int Q = 0; Q < NQ; Q++ )
+					for( int v1 = 0; v1 < nv; v1++ )
+					{
+						next_pp[Q] += gen_transform[Q*3*nv+v1*3+0] * -g[3*v1+0] * AKMA_TIME * time_step/2;
+						next_pp[Q] += gen_transform[Q*3*nv+v1*3+1] * -g[3*v1+1] * AKMA_TIME * time_step/2;
+						next_pp[Q] += gen_transform[Q*3*nv+v1*3+2] * -g[3*v1+2] * AKMA_TIME * time_step/2;
+					}
+				}
+				else
+				{
+					for( int v1 = 0; v1 < nv; v1++ )
+					{
+						next_pp[3*v1+0] += -g[3*v1+0] * AKMA_TIME * time_step/2;
+						next_pp[3*v1+1] += -g[3*v1+1] * AKMA_TIME * time_step/2;
+						next_pp[3*v1+2] += -g[3*v1+2] * AKMA_TIME * time_step/2;
+					}
 				}	
 			}
-			memcpy( pp, next_pp, sizeof(double) * 3 * nv );
-			
-			
-			memset( qdot0_trial, 0, sizeof(double) * 3 * nv );
-#ifdef MM_METHOD_1
-			CartMatVecIncrScale( qdot0_trial, pp, effective_mass, 1.0, nv, r+3*nv );
-#elif defined(MM_METHOD_2)
-			SparseCartMatVecIncrScale( qdot0_trial, pp, sparse_effective_mass, 1.0, nv, sparse_use, n_vuse, r+3*nv );
-#else
-			AltSparseCartMatVecIncrScale( qdot0_trial, pp, EFFM, 1.0, nv, sparse_use, n_vuse, r+3*nv );
+			memcpy( pp, next_pp, sizeof(double) * NQ );
+			memset( Qdot0_trial, 0, sizeof(double) * NQ );
+
+			if( do_gen_q )
+				GenQMatVecIncrScale( Qdot0_trial, pp, EFFM, 1.0 );
+			else
+				AltSparseCartMatVecIncrScale( Qdot0_trial, pp, EFFM, 1.0, r+3*nv );
+
+			double T = 0;				
+			for( int Q = 0; Q < NQ; Q++ )
+				T += pp[Q] * Qdot0_trial[Q] * 0.5;
+#ifdef PARALLEL
+			ParallelSum(&T,1);
 #endif
-						
-			double T = sub_surface->evaluate_T( qdot0_trial, pp, NULL, NULL, r+3*nv ); //, qdot_m1, pp_m1 );
 				
 			/*****************************
  * 				Right now, we are on the *mesh* canonical ensemble with {q},{p}
  * 			 *****************************/
 
 
-
 			if( !block.disable_mesh )
 			{
 				if( do_ld || o < nequil )
 				{
+					for( int Q = 0; Q < NQ; Q++ )
+						next_pp[Q] += gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
+				}
+
+				// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t+eps/2)
+				if( do_gen_q )
+				{
+					for( int Q = 0; Q < NQ; Q++ )
 					for( int v1 = 0; v1 < nv; v1++ )
 					{
-						double fx = gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step) );
-						double fy = gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step) );
-						double fz = gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step) );
-		
-						next_pp[3*v1+0] += fx;				
-						next_pp[3*v1+1] += fy;				
-						next_pp[3*v1+2] += fz;				
+						next_pp[Q] += gen_transform[Q*3*nv+v1*3+0] * -g[3*v1+0] * AKMA_TIME * time_step/2;
+						next_pp[Q] += gen_transform[Q*3*nv+v1*3+1] * -g[3*v1+1] * AKMA_TIME * time_step/2;
+						next_pp[Q] += gen_transform[Q*3*nv+v1*3+2] * -g[3*v1+2] * AKMA_TIME * time_step/2;
 					}
 				}
-				// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t+eps/2)
-				for( int v1 = 0; v1 < nv; v1++ )
+				else
 				{
-					next_pp[3*v1+0] += -g[3*v1+0] * AKMA_TIME * time_step/2;
-					next_pp[3*v1+1] += -g[3*v1+1] * AKMA_TIME * time_step/2;
-					next_pp[3*v1+2] += -g[3*v1+2] * AKMA_TIME * time_step/2;
-				}	
+					for( int v1 = 0; v1 < nv; v1++ )
+					{
+						next_pp[3*v1+0] += -g[3*v1+0] * AKMA_TIME * time_step/2;
+						next_pp[3*v1+1] += -g[3*v1+1] * AKMA_TIME * time_step/2;
+						next_pp[3*v1+2] += -g[3*v1+2] * AKMA_TIME * time_step/2;
+					}	
+				}
 			}
-			memcpy( pp, next_pp, sizeof(double) * 3 * nv );
+			memcpy( pp, next_pp, sizeof(double) * NQ );
 			
 			memset( qdot0, 0, sizeof(double) * 3 * nv );
-#ifdef MM_METHOD_1
-			CartMatVecIncrScale( qdot0, pp, effective_mass, 1.0, nv, r+3*nv );
-#elif defined(MM_METHOD_2)
-			SparseCartMatVecIncrScale( qdot0, pp, sparse_effective_mass, 1.0, nv, sparse_use, n_vuse, r+3*nv );
-#else
-			AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, nv, sparse_use, n_vuse, r+3*nv );
-#endif
+
+			if( do_gen_q )
+			{	
+				GenQMatVecIncrScale( Qdot0, pp, EFFM, 1.0 );
+				MatVec( gen_transform, Qdot0, qdot0, NQ, 3*nv ); 
+			}
+			else
+				AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, r+3*nv );
+
 			memcpy( qdot, qdot0, sizeof(double) * 3 * nv );
-#ifdef MM_METHOD_1
-			CartMatVecIncrScale( qdot, qdot_temp, effective_mass, 1.0, nv, r+3*nv );
-#elif defined(MM_METHOD_2)
-			SparseCartMatVecIncrScale( qdot, qdot_temp, sparse_effective_mass, 1.0, nv, sparse_use, n_vuse, r+3*nv  );
-#else
-			AltSparseCartMatVecIncrScale( qdot, qdot_temp, EFFM, 1.0, nv, sparse_use, n_vuse, r+3*nv  );
-#endif
+
+			if( !do_gen_q )
+				AltSparseCartMatVecIncrScale( qdot, qdot_temp, EFFM, 1.0, r+3*nv  );
 
 			// LEAPFROG: increment q by eps, we have q(t+eps), p(t+eps/2)
 			for( int v1 = 0; v1 < nv; v1++ )
@@ -1082,8 +1160,10 @@ int temp_main( int argc, char **argv )
 			}
 
 #ifdef PARALLEL
-			PartialSyncVertices(pp);
-//			ParallelBroadcast(pp,3*nv);	
+			if( do_gen_q )
+				PartialSyncGenQ(pp);
+			else
+				PartialSyncVertices(pp);
 #endif
 
 
@@ -1307,14 +1387,21 @@ int temp_main( int argc, char **argv )
 		FILE *saveFile = fopen( fname, "w");
 	
 		for( int x = 0; x < nv; x++ )
-			fprintf( saveFile, "%lf %lf %lf %lf %lf %lf\n", r[3*x+0], r[3*x+1], r[3*x+2], pp[3*x+0], pp[3*x+1], pp[3*x+2] );
-		
+		{
+			if( do_gen_q )
+				fprintf( saveFile, "%lf %lf %lf\n", r[3*x+0], r[3*x+1], r[3*x+2]  );
+			else
+				fprintf( saveFile, "%lf %lf %lf %lf %lf %lf\n", r[3*x+0], r[3*x+1], r[3*x+2], pp[3*x+0], pp[3*x+1], pp[3*x+2] );
+		}
 		for( int x = nv; x < nv+1; x++ )
 			fprintf( saveFile, "%lf %lf %lf\n", r[3*x+0], r[3*x+1], r[3*x+2]  );
 	
 		for( int c = 0; c < ncomplex; c++ )
 			allComplexes[c]->saveComplex(saveFile);
 	
+		for( int Q = 0; Q < NQ; Q++ )
+			fprintf(saveFile, "GQ %.14le\n", pp[Q] );
+
 		fclose(saveFile);
 	}
 
@@ -1330,7 +1417,6 @@ int temp_main( int argc, char **argv )
 	fclose(saveFile);
 */
 	clearForceSet(theForceSet);
-	free(effective_mass);	
 	if( do_srd )
 		srd_i->clear();
 

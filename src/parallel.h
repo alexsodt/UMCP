@@ -16,6 +16,10 @@ typedef struct parallel_info
 {
 	int my_id;
 	int nprocs;
+	
+	// list of generalized coordinates we are processing.
+	int *genQ;
+	int NQ;
 
 	// list of faces we are computing
 	int *faces;
@@ -51,8 +55,8 @@ extern int setup_for_parallel;
 #endif
 
 void quietParallel( void );
-void setupParallel( surface *theSurface, pcomplex **allComplexes, int ncomplex );
-void setupSparseVertexPassing( SparseMatrix *EFFM, int nverts  );
+void setupParallel( surface *theSurface, pcomplex **allComplexes, int ncomplex, int NQ );
+void setupSparseVertexPassing( SparseMatrix *EFFM, int nverts, int NQ  );
 void ParallelSum( double *vec, int len );
 void ParallelSyncComplexes( pcomplex **allComplexes, int ncomplexes );
 void ParallelBroadcast( double *vec, int len );
@@ -61,10 +65,12 @@ void ParallelGather( double *vec, int len_per_proc );
 void ParallelGather( int *vec, int len_per_proc );
 void FullSyncVertices( double *total_vec );
 void PartialSyncVertices( double *total_vec );
+void PartialSyncGenQ( double *total_vec );
 void PartialSumVertices( double *total_vec );
 void PartialGenVertices( double *total_vec, int do_sum );
 
 void SparseCartMatVecIncrScale( double *vec_out, double *vec_in, double *Mat, double scale, int nv, int *sparse_use, int nv_use, double *alphas );
-void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double scale, int nv, int *sparse_use, int nv_use, double *alphas );
+void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double scale, double *alphas );
+void GenQMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double scale );
 
 #endif

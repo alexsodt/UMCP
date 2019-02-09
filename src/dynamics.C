@@ -75,14 +75,16 @@ void surface::debug_dynamics( double *r, force_set *theForceSet,  double *Minv, 
 	memcpy( mesh_qdot, mesh_qdot0, sizeof(double) * 3 * nv );
 
 	for( int c = 0; c < ncomplex; c++ )
-		allComplexes[c]->compute_qdot( this, r, Minv, mesh_qdot0, mesh_qdot, mesh_p );
+		allComplexes[c]->compute_qdot( this, r, mesh_qdot0, mesh_qdot );
 
 
 	double *mesh_der_qdot = (double *)malloc( sizeof(double) * 3 * nv );
 	memset( mesh_der_qdot, 0, sizeof(double) * 3 * nv );
 
-	for( int c = 0; c < ncomplex; c++ )	
-		allComplexes[c]->getMeshQxdot( this, r, Minv, mesh_p, mesh_qdot, mesh_qdot0, mesh_der_qdot ); 
+	printf("BROKEN HERE.\n");
+	exit(1);
+//	for( int c = 0; c < ncomplex; c++ )	
+//		allComplexes[c]->getMeshQxdot( this, r, Minv, mesh_p, mesh_qdot, mesh_qdot0, mesh_der_qdot ); 
 
 	int sglobal = 0;
 	
@@ -110,8 +112,8 @@ void surface::debug_dynamics( double *r, force_set *theForceSet,  double *Minv, 
 	sglobal = 0;
 	for( int c = 0; c < ncomplex; c++ )	
 	{
-		allComplexes[c]->debug_dynamics( this, r, Minv,
-			mesh_p, mesh_qdot, mesh_qdot0,
+		allComplexes[c]->debug_dynamics( this, r,
+			mesh_qdot, mesh_qdot0,
 			mesh_g_V,
 			mesh_g_T,
 			pgrad_V+sglobal*2,
@@ -253,7 +255,7 @@ void surface::debug_dynamics( double *r, force_set *theForceSet,  double *Minv, 
 				memcpy( mesh_qdot, mesh_qdot0, sizeof(double) * 3 * nv );
 
 				for( int c = 0; c < ncomplex; c++ )
-					allComplexes[c]->compute_qdot( this, r, Minv, mesh_qdot0, mesh_qdot_temp, mesh_p );
+					allComplexes[c]->compute_qdot( this, r, mesh_qdot0, mesh_qdot_temp );
 
 				for( int c1 = 0; c1 < nv; c1++ )
 				for( int c2 = 0; c2 < nv; c2++ )
@@ -300,7 +302,7 @@ void surface::debug_dynamics( double *r, force_set *theForceSet,  double *Minv, 
 				memcpy( mesh_qdot, mesh_qdot0, sizeof(double) * 3 * nv );
 
 				for( int c = 0; c < ncomplex; c++ )
-					allComplexes[c]->compute_qdot( this, r, Minv, mesh_qdot0, mesh_qdot_temp, mesh_p );
+					allComplexes[c]->compute_qdot( this, r, mesh_qdot0, mesh_qdot_temp );
 
 				for( int c1 = 0; c1 < nv; c1++ )
 				for( int c2 = 0; c2 < nv; c2++ )
@@ -366,7 +368,7 @@ void surface::debug_dynamics( double *r, force_set *theForceSet,  double *Minv, 
 					memset( mesh_qdot_temp, 0, sizeof(double ) * 3 * nv );
 					memcpy( mesh_qdot, mesh_qdot0, sizeof(double) * 3 * nv );
 					for( int c = 0; c < ncomplex; c++ )
-						allComplexes[c]->compute_qdot( this, r, Minv, mesh_qdot0, mesh_qdot_temp, mesh_p );
+						allComplexes[c]->compute_qdot( this, r,  mesh_qdot0, mesh_qdot_temp );
 				
 					for( int c1 = 0; c1 < nv; c1++ )
 					for( int c2 = 0; c2 < nv; c2++ )

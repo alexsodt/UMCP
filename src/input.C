@@ -31,7 +31,6 @@ void setDefaults( parameterBlock *block )
 	block->rho = 0;
 	block->mode_x = -1;
 	block->mode_y = -1;
-	block->fix_alpha = 0;
 	block->mode_KA = 0;
 	block->nsteps = -1; // these are resolved later.
 	block->nequil = 0;
@@ -209,11 +208,6 @@ int resolveParameters( parameterBlock *block )
 		return 1;
 	}
 
-	if( block->sphere && !block->fix_alpha )
-	{
-		printf("ERROR: alpha is floating while simulating a sphere.\n");
-		exit(1);
-	}
 
 	if( block->sphere && (block->mode_x >= 0 || block->mode_max >= 0) )
 	{
@@ -826,18 +820,6 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}	
 		}
-		else if( !strcasecmp( word1, "fix_alpha" ) )
-		{
-			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
-				block->fix_alpha = 1;
-			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
-				block->fix_alpha = 0;
-			else
-			{
-				printf("Could not interpret input line '%s'.\n", tbuf );
-				ERROR = 1;
-			}	
-		}
 		else if( !strcasecmp( word1, "monge" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
@@ -967,7 +949,6 @@ void printParamBlock( parameterBlock *block )
 	printf("\tMesh:      %s\n", block->meshName );	
 	printf("\tmode_x:    %d\n", block->mode_x );	
 	printf("\tmode_y:    %d\n", block->mode_y );	
-	printf("\tfix_alpha  %s\n", (block->fix_alpha ? "yes" : "no" ) );
 	printf("\tMonge      %s\n", (block->monge ? "yes" : "no" ) );
 	printf("\tmode_KA:   %lf kcal/mol/A^2\n", block->mode_KA );
 	printf("\tKA:        %lf kcal/mol/A^2\n", block->KA );
