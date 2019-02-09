@@ -374,8 +374,15 @@ int temp_main( int argc, char **argv )
 		if( block.sphere )
 		{	
 			double *output_q=NULL;
-			NQ = sub_surface->getSphericalHarmonicModes( r, block.mode_min, block.mode_max, &gen_transform, &output_q );
-			free(output_q);
+//			NQ = sub_surface->getSphericalHarmonicModes( r, block.mode_min, block.mode_max, &gen_transform, &output_q );
+//			free(output_q);
+
+			gen_transform = ( double *)malloc( sizeof(double)*3*nv*3*nv);
+			memset( gen_transform, 0, sizeof(double) * 3 * nv * 3 * nv );
+	
+			for( int v = 0; v < nv*3; v++ )
+				gen_transform[v*(3*nv)+v] = 1.0;
+			NQ=3*nv;
 		}
 		else
 		{
@@ -1135,6 +1142,7 @@ int temp_main( int argc, char **argv )
 
 			if( do_gen_q )
 			{	
+				memset( Qdot0, 0, sizeof(double) * NQ );
 				GenQMatVecIncrScale( Qdot0, pp, EFFM, 1.0 );
 				MatVec( gen_transform, Qdot0, qdot0, NQ, 3*nv ); 
 			}
@@ -1166,7 +1174,9 @@ int temp_main( int argc, char **argv )
 			ParallelSum( &PT, 1 );
 #endif
 			T += PT;
-			double dof = 3 * nv - 3;
+			double dof = NQ;
+			if( !do_gen_q )
+				dof = 3*nv-3;
 
 			for( int c = 0; c < ncomplex; c++ )
 #ifdef DISABLE_ON_MEMBRANE_T
