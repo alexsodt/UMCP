@@ -170,20 +170,6 @@ int temp_main( int argc, char **argv )
 	r[3*nv+1] = 1.0;
 	r[3*nv+2] = 1.0;
 
-	{
-		printf("evaluate order %d %d %d %d %d %d\n",
-			sub_surface->theVertices[0].edges[0],
-			sub_surface->theVertices[0].edges[1],
-			sub_surface->theVertices[0].edges[2],
-			sub_surface->theVertices[0].edges[3],
-			sub_surface->theVertices[0].edges[4],
-			sub_surface->theVertices[0].edges[5] );
-		double testpt[3], testnrm[3];
-		sub_surface->evaluateRNRM( 0, 1.0/3, 1.0/3, testpt, testnrm, r );
-		printf("Test PT %lf %lf %lf nrm %lf %lf %lf\n",
-			testpt[0], testpt[1], testpt[2], testnrm[0], testnrm[1], testnrm[2] );
-	}
-
 	for ( int x = 0; x < nv; x++ )
 	{
 		int val = sub_surface->theVertices[x].valence;
