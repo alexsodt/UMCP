@@ -422,27 +422,36 @@ int temp_main( int argc, char **argv )
 	double *pp=NULL;
 	double *next_pp=NULL;
 	int n_real_q = 3*nv;
+	double *QV = NULL;
+	double *Qdot = NULL;
+	double *Qdot0 = NULL;
+	double *Qdot0_trial = NULL;
+
 	if( do_gen_q )
 	{
 		n_real_q = NQ;
 		pp = (double *)malloc( sizeof(double) * NQ ); 
 		next_pp = (double *)malloc( sizeof(double) * NQ );
+		QV = (double *)malloc( sizeof(double) * NQ );
+		Qdot = (double *)malloc( sizeof(double) * NQ );
+		Qdot0 = (double *)malloc( sizeof(double) * NQ );
+		Qdot0_trial = (double *)malloc( sizeof(double) * NQ );
 	}
 	else
 	{	
 		pp = (double *)malloc( sizeof(double) * (3*nv+3) );
 		next_pp = (double *)malloc( sizeof(double) * (3*nv+3) );
+		QV = (double *)malloc( sizeof(double) * (3*nv+3) );
+		Qdot = (double *)malloc( sizeof(double) * (3*nv+3) );
+		Qdot0 = (double *)malloc( sizeof(double) * (3*nv+3) );
+		Qdot0_trial = (double *)malloc( sizeof(double) * (3*nv+3) );
 	}
+	
 
-	double *QV = (double *)malloc( sizeof(double) * NQ );
-	memset( QV, 0, sizeof(double) * NQ );
 
 	double *qdot = (double *)malloc( sizeof(double) * 3 * nv );
 	double *qdot0 = (double *)malloc( sizeof(double) * 3 * nv );
 	
-	double *Qdot = (double *)malloc( sizeof(double) * NQ );
-	double *Qdot0 = (double *)malloc( sizeof(double) * NQ );
-	double *Qdot0_trial = (double *)malloc( sizeof(double) * NQ );
 	
 	double *qdot_temp = (double *)malloc( sizeof(double) * 3 * nv );
 
@@ -592,9 +601,9 @@ int temp_main( int argc, char **argv )
 	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ);	
 	setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
 
+
 	if( !do_gen_q ) // generalized coordinates are simply the control point positions.
 		NQ = 3 * nv;
-
 	if( block.nmin > 0 )
 	{
 		FILE *mpsf;
