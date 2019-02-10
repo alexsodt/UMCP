@@ -157,8 +157,8 @@ double dimer::V( surface *theSurface, double *rsurf )
 	}
 	else
 	{
-		memcpy(r , rall, sizeof(double) * 9 );
-		memset(n, 0, sizeof(double) * 9 ); 
+		memcpy(r , rall, sizeof(double) * 6 );
+		memset(n, 0, sizeof(double) * 6 ); 
 	}
 	double dr1[3] = { r[0] - r[3], r[1] - r[4], r[2] - r[5] };	
 
@@ -239,7 +239,7 @@ double dimer::grad(surface *theSurface, double *rsurf, double *surfacer_g, doubl
 	}
 	else
 	{
-		memcpy( r, rall, sizeof(double) * 9 );
+		memcpy( r, rall, sizeof(double) * 6 );
  	
 		double dr1[3] = { r[0] - r[3], r[1] - r[4], r[2] - r[5] };	
 		

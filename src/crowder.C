@@ -80,7 +80,7 @@ double elasticCrowder::V( surface *theSurface, double *rsurf )
 {
 	double *alphas = rsurf+3*theSurface->nv;
 	double r[6];
-	double n[3];
+	double n[6];
 
 	if( bound )
 	{
@@ -141,8 +141,8 @@ double elasticCrowder::V( surface *theSurface, double *rsurf )
 	}
 	else
 	{
-		memcpy(r , rall, sizeof(double) * 9 );
-		memset(n, 0, sizeof(double) * 9 ); 
+		memcpy(r , rall, sizeof(double) * 6 );
+		memset(n, 0, sizeof(double) * 6 ); 
 	}
 	double dr[3] = { r[3] - (r[0] + d * n[0]),
 			  r[4] - (r[1] + d * n[1]),
@@ -160,7 +160,7 @@ double elasticCrowder::grad(surface *theSurface, double *rsurf, double *surfacer
 {
 	double *alphas = rsurf+3*theSurface->nv;
 	double r[6];
-	double n[3];
+	double n[6];
 
 	if( bound )
 	{
@@ -226,8 +226,8 @@ double elasticCrowder::grad(surface *theSurface, double *rsurf, double *surfacer
 	}
 	else
 	{
-		memcpy(r , rall, sizeof(double) * 9 );
-		memset(n, 0, sizeof(double) * 9 ); 
+		memcpy(r , rall, sizeof(double) * 6 );
+		memset(n, 0, sizeof(double) * 6 ); 
 	}
 	
 

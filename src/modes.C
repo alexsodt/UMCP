@@ -131,7 +131,7 @@ void surface::getAMAT( double *Amat, double *ro, double *r0_pos)
 }
 
 
-int surface::getSphericalHarmonicModes( double *ro, int l_min, int l_max, double **gen_transform, double **output_qvals )
+int surface::getSphericalHarmonicModes( double *ro, int l_min, int l_max, double **gen_transform, double **output_qvals, double **scaling_factor )
 {
 	double *Amat = (double *)malloc( sizeof(double) * (nv) * (nv) );
 	double *r0_pos = (double *)malloc( sizeof(double) * 3 * nv );
@@ -157,7 +157,17 @@ int surface::getSphericalHarmonicModes( double *ro, int l_min, int l_max, double
 	/* where we store gen_transform for its computation */
 
 	double *t_g_t = (double *)malloc( sizeof(double) * NQ * 3 * nv );
+	
+	double av_R = 0;
+	for( int j = 0; j < nv; j++ )
+	{
+		double *ro = r0_pos+3*j;
+		double r = sqrt(ro[0]*ro[0]+ro[1]*ro[1]+ro[2]*ro[2]);
+		av_R += r;
+	}
+	av_R /= nv;
 
+		
 	int m_cntr = 0;
 	for( int ql = l_min; ql <= l_max; ql++ )
 	for( int qm = -ql; qm <= ql; qm++, m_cntr++)
@@ -212,6 +222,8 @@ int surface::getSphericalHarmonicModes( double *ro, int l_min, int l_max, double
 	}
 
 	// normalize them.
+	
+	(*scaling_factor) = (double *)malloc( sizeof(double) * NQ );
 
 	for( int v = 0; v < NQ; v++ )
 	{
@@ -220,6 +232,7 @@ int surface::getSphericalHarmonicModes( double *ro, int l_min, int l_max, double
 		for( int x = 0; x < 3*nv; x++ )
 			r2 += (*gen_transform)[v*3*nv+x] * (*gen_transform)[v*3*nv+x];
 		double r = sqrt(r2);
+		(*scaling_factor)[v] = 1.0 / r;
 		for( int x = 0; x < 3*nv; x++ )
 			(*gen_transform)[v*3*nv+x] /= r;
 		 
@@ -232,7 +245,7 @@ int surface::getSphericalHarmonicModes( double *ro, int l_min, int l_max, double
 	return NQ;
 }
 
-int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_min, int l_max, double **gen_transform, double **output_qvals )
+int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_min, int l_max, double **gen_transform, double **output_qvals, double **scaling_factor )
 {
 	double *Amat = (double *)malloc( sizeof(double) * (nv) * (nv) );
 	double *r0_pos = (double *)malloc( sizeof(double) * 3 * nv );
@@ -328,6 +341,23 @@ int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_m
 		{
 			(*gen_transform)[vec*(3*nv)+3*v+vc] = t_g_t[vec*3*nv+vc*nv+v];
 		}
+	}
+	
+	// normalize them.
+
+	(*scaling_factor) = (double *)malloc( sizeof(double) * NQ );
+
+	for( int v = 0; v < NQ; v++ )
+	{
+		double r2 = 0;
+
+		for( int x = 0; x < 3*nv; x++ )
+			r2 += (*gen_transform)[v*3*nv+x] * (*gen_transform)[v*3*nv+x];
+		double r = sqrt(r2);
+		(*scaling_factor)[v] = 1.0 / r;
+		for( int x = 0; x < 3*nv; x++ )
+			(*gen_transform)[v*3*nv+x] /= r;
+		 
 	}
 
 	free(Amat);
