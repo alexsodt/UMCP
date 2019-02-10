@@ -365,32 +365,35 @@ int temp_main( int argc, char **argv )
 	
 	sub_surface->load_least_squares_fitting( theForceSet );
 	
+	double *scaling_factor = NULL;
 	double *gen_transform = NULL;
 	int NQ = 0;
 	int do_gen_q = 0;
+	int doing_spherical_harmonics = 0;
+	int doing_planar_harmonics = 0;
+	double *output_qvals=NULL;
+
 	if( block.mode_max >= 0 )
 	{
 		do_gen_q=1;
 		if( block.sphere )
 		{	
-			double *output_q=NULL;
-//			NQ = sub_surface->getSphericalHarmonicModes( r, block.mode_min, block.mode_max, &gen_transform, &output_q );
-//			free(output_q);
+			doing_spherical_harmonics = 1;
+			NQ = sub_surface->getSphericalHarmonicModes( r, block.mode_min, block.mode_max, &gen_transform, &output_qvals, &scaling_factor );
 
-#if 1
+#if 0 
 			gen_transform = ( double *)malloc( sizeof(double)*3*nv*3*nv);
 			memset( gen_transform, 0, sizeof(double) * 3 * nv * 3 * nv );
 	
 			for( int v = 0; v < nv*3; v++ )
-				gen_transform[v*(3*nv)+v] = 1000.0;
+				gen_transform[v*(3*nv)+v] = 1.0;
 			NQ=3*nv;
 #endif
 		}
 		else
 		{
-			double *output_q=NULL;
-			NQ = sub_surface->getPlanarHarmonicModes( r, -1, -1, block.mode_min, block.mode_max, &gen_transform, &output_q );
-			free(output_q);
+			doing_planar_harmonics = 1;
+			NQ = sub_surface->getPlanarHarmonicModes( r, -1, -1, block.mode_min, block.mode_max, &gen_transform, &output_qvals, &scaling_factor );
 		}
 	}
 	else if( block.mode_x >= 0 || block.mode_y >= 0 )
@@ -398,17 +401,17 @@ int temp_main( int argc, char **argv )
 		do_gen_q=1;
 		if( block.sphere )
 		{
+			doing_spherical_harmonics = 1;
 			printf("Single spherical harmonic NYI.\n");
 			exit(1);
 		}
 		else
 		{
-			double *output_q=NULL;
+			doing_planar_harmonics = 1;
 			int max_l = block.mode_x;
 			if( block.mode_y > max_l ) max_l = block.mode_y;
 
-			NQ = sub_surface->getPlanarHarmonicModes( r, block.mode_x, block.mode_y, 0, max_l, &gen_transform, &output_q );
-			free(output_q);
+			NQ = sub_surface->getPlanarHarmonicModes( r, block.mode_x, block.mode_y, 0, max_l, &gen_transform, &output_qvals, &scaling_factor );
 		}
 	}
 	
@@ -431,6 +434,11 @@ int temp_main( int argc, char **argv )
 	double *pp=NULL;
 	double *next_pp=NULL;
 	int n_real_q = 3*nv;
+
+	double *nav_Q = NULL;
+	double *av_Q = NULL;
+	double *av_Q2 = NULL;
+
 	double *QV = NULL;
 	double *Qdot = NULL;
 	double *Qdot0 = NULL;
@@ -445,6 +453,9 @@ int temp_main( int argc, char **argv )
 		Qdot = (double *)malloc( sizeof(double) * NQ );
 		Qdot0 = (double *)malloc( sizeof(double) * NQ );
 		Qdot0_trial = (double *)malloc( sizeof(double) * NQ );
+		nav_Q = (double *)malloc( sizeof(double) * NQ );
+		av_Q = (double *)malloc( sizeof(double) * NQ );
+		av_Q2 = (double *)malloc( sizeof(double) * NQ );
 	}
 	else
 	{	
@@ -605,7 +616,7 @@ int temp_main( int argc, char **argv )
 	int max_mat = nv;
 	if( NQ > nv )
 		max_mat = NQ;
-	int *sparse_use = (int *)malloc( sizeof(int) * nv );
+	int *sparse_use = (int *)malloc( sizeof(int) * (NQ > nv ? NQ : nv) );
 	int n_vuse = 0;
 	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ);	
 	setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
@@ -1164,6 +1175,19 @@ int temp_main( int argc, char **argv )
 				r[3*v1+2] += qdot[3*v1+2] * AKMA_TIME * time_step;
 			}
 
+			if( do_gen_q )
+			{
+				for( int Q = 0; Q < NQ; Q++ )
+				{
+					QV[Q] += Qdot0[Q] * AKMA_TIME * time_step;
+					if( o >= nequil )
+					{
+						av_Q[Q] += QV[Q];
+						av_Q2[Q] += QV[Q]*QV[Q];
+						nav_Q[Q] += 1;
+					}
+				}
+			}
 #ifdef PARALLEL
 			if( do_gen_q )
 				PartialSyncGenQ(pp);
@@ -1411,6 +1435,46 @@ int temp_main( int argc, char **argv )
 
 		fclose(saveFile);
 	}
+
+	if( doing_spherical_harmonics || doing_planar_harmonics )
+	{
+		printf("------ Harmonic general variables ------\n");
+		for( int Q = 0; Q < NQ; Q++ )
+		{
+			av_Q2[Q] *= scaling_factor[Q] * scaling_factor[Q];
+			av_Q[Q] *= scaling_factor[Q];
+			av_Q2[Q] /= nav_Q[Q];	
+			av_Q[Q] /= nav_Q[Q];
+
+			double kc_app = -1;
+			double expected = 0;
+			if( doing_spherical_harmonics )
+			{	
+				double l = output_qvals[Q];
+				expected = temperature / ( kc * (l+2)*(l-1)*l*(l+1) ); 
+			}
+			else
+			{	
+				double q = output_qvals[Q];
+				expected = temperature / ( kc * area0 *q*q*q*q); 
+			}
+
+			double var = av_Q2[Q] - av_Q[Q] * av_Q[Q];
+
+			kc_app = kc * (expected / var);
+
+			printf("Mode_index %d", Q );
+			if( doing_planar_harmonics )
+				printf(" q %le", output_qvals[Q] );
+			else if( doing_spherical_harmonics )
+				printf(" l %d", lround(output_qvals[Q]) ); 
+			printf("<h> %le <h^2> %le k_c_apparent %le\n",
+					av_Q[Q], av_Q2[Q], kc_app );
+		}
+		printf("------ done\n");
+		
+	}
+
 
 /*	FILE *saveFile = fopen("file.save", "w");
 
