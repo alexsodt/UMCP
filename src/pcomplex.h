@@ -34,9 +34,6 @@ struct pcomplex
 	int *grad_fs;	
 	double *grad_puv;
 	
-	double *p_m1; // Hamiltonian conjugate momenta, previous time step
-	double *qdot_m1; // time derivatives of generalized coordinates, previous time step
-
 	double *p; // Hamiltonian conjugate momenta
 	double *qdot; // time derivatives of generalized coordinates.
 	double *save_grad;

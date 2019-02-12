@@ -65,9 +65,10 @@ void ParallelGather( double *vec, int len_per_proc );
 void ParallelGather( int *vec, int len_per_proc );
 void FullSyncVertices( double *total_vec );
 void PartialSyncVertices( double *total_vec );
-void PartialSyncGenQ( double *total_vec );
 void PartialSumVertices( double *total_vec );
 void PartialGenVertices( double *total_vec, int do_sum );
+
+void FullSyncGenQ( double *total_vec );
 
 void SparseCartMatVecIncrScale( double *vec_out, double *vec_in, double *Mat, double scale, int nv, int *sparse_use, int nv_use, double *alphas );
 void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double scale, double *alphas );

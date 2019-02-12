@@ -117,6 +117,7 @@ void balanceWork( surface *theSurface, int *regions_for_tri )
 			check_work[regions_for_tri[t]] += theSurface->nf_irr_pts;
 	}
 
+#if 0
 	printf("\"Balanced\" work:\n");
 
 	for( int x = 0; x < par_info.nprocs; x++ )
@@ -126,7 +127,7 @@ void balanceWork( surface *theSurface, int *regions_for_tri )
 	for( int x = 0; x < par_info.nprocs; x++ )
 		printf(" %lf", check_work[x] );
 	printf("\n");
-
+#endif
 //	exit(1);
 	
 }
@@ -319,7 +320,8 @@ void setupParallel( surface *theSurface, pcomplex **allComplexes, int ncomplex, 
 
 			for( int vq = 0; vq < NQ; vq++ )
 			{
-				if( vq % par_info.nprocs == par_info.my_id )
+				//if( vq % par_info.nprocs == par_info.my_id )
+				if( par_info.my_id == BASE_TASK )
 				{
 					if( pass == 1 ) par_info.genQ[par_info.NQ] = vq;
 					par_info.NQ += 1;
@@ -429,7 +431,6 @@ void setupSparseVertexPassing( SparseMatrix *EFFM, int nv, int do_gen_q )
 	
 					if( nneed > 0 )
 					{
-						printf("%d SENDING %d ints to %d.\n", p1, nneed, p2 );
 						MPI_Send( need_list, nneed, MPI_INT, p2, (p1*np+p2)*6+(pass==0?1:3), MPI_COMM_WORLD );
 						if( pass == 0 )
 						{
@@ -505,7 +506,6 @@ void setupSparseVertexPassing( SparseMatrix *EFFM, int nv, int do_gen_q )
 
 							par_info.psum_nsend_to[p1] = npass;
 							free(could_pass);
-							printf("%d RECEIVING %d ints from %d.\n", p2, nsend, p1 );
 					
 							MPI_Send( &npass, 1, MPI_INT, p1, (p1 * np + p2)*6+4,  MPI_COMM_WORLD );
 							MPI_Send( par_info.psum_send_to[p1], npass, MPI_INT, p1, (p1 * np + p2)*6+5,  MPI_COMM_WORLD );
@@ -704,6 +704,100 @@ void ParallelSyncComplexes( pcomplex **allComplexes, int ncomplexes )
 
 	free(ibuffer);
 	free(fbuffer);
+#endif
+}
+
+void FullSyncGenQ( double *total_vec )
+{
+#ifdef PARALLEL
+	int vspace = 100*3;
+
+	double *vec = (double *)malloc( sizeof(double) * vspace );
+	int    *ivec = (int *)malloc( sizeof(int) * vspace );
+
+	for( int p = 0; p < par_info.nprocs; p++ )
+	{
+		int NQ = par_info.NQ;
+
+		MPI_Bcast( &NQ, 1, MPI_INT, p, MPI_COMM_WORLD );
+
+		if( NQ*3 > vspace )
+		{
+			vspace = NQ * 3;
+			vec = (double *)realloc( vec, sizeof(double) * vspace );
+			ivec = (int *)realloc( ivec, sizeof(double) * vspace );
+		}
+		if( p == par_info.my_id )
+			memcpy( ivec, par_info.genQ, sizeof(int) * par_info.NQ );
+			
+		MPI_Bcast( ivec, NQ, MPI_INT, p, MPI_COMM_WORLD );
+
+		if( p == par_info.my_id )
+		{
+			for( int x = 0; x < NQ; x++ )
+				vec[x] = total_vec[par_info.genQ[x]];
+		}
+		
+		MPI_Bcast( vec, NQ, MPI_DOUBLE, p, MPI_COMM_WORLD );
+
+		for( int x = 0; x < NQ; x++ )
+		{
+			total_vec[ivec[x]] = vec[x];
+		}
+	}
+
+	free(vec);
+	free(ivec);
+#endif
+}
+
+void GatherVertices( double *total_vec )
+{
+#ifdef PARALLEL
+	int vspace = 100*3;
+
+	double *vec = (double *)malloc( sizeof(double) * vspace );
+	int    *ivec = (int *)malloc( sizeof(int) * vspace );
+
+	for( int p = 0; p < par_info.nprocs; p++ )
+	{
+		int nv = par_info.nv;
+
+		MPI_Bcast( &nv, 1, MPI_INT, p, MPI_COMM_WORLD );
+
+		if( nv*3 > vspace )
+		{
+			vspace = nv * 3;
+			vec = (double *)realloc( vec, sizeof(double) * vspace );
+			ivec = (int *)realloc( ivec, sizeof(double) * vspace );
+		}
+		if( p == par_info.my_id )
+			memcpy( ivec, par_info.verts, sizeof(int) * par_info.nv );
+			
+		MPI_Bcast( ivec, nv, MPI_INT, p, MPI_COMM_WORLD );
+
+		if( p == par_info.my_id )
+		{
+			for( int x = 0; x < nv; x++ )
+			{
+				vec[x*3+0] = total_vec[par_info.verts[x]*3+0];
+				vec[x*3+1] = total_vec[par_info.verts[x]*3+1];
+				vec[x*3+2] = total_vec[par_info.verts[x]*3+2];
+			}
+		}
+		
+		MPI_Bcast( vec, nv*3, MPI_DOUBLE, p, MPI_COMM_WORLD );
+
+		for( int x = 0; x < nv; x++ )
+		{
+			total_vec[ivec[x]*3+0] = vec[3*x+0];
+			total_vec[ivec[x]*3+1] = vec[3*x+1];
+			total_vec[ivec[x]*3+2] = vec[3*x+2];
+		}
+	}
+
+	free(vec);
+	free(ivec);
 #endif
 }
 

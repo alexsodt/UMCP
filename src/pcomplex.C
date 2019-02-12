@@ -43,10 +43,6 @@ void pcomplex::alloc( void )
 	memset( p, 0, sizeof(double) * 3 * nsites );
 	memset( qdot, 0, sizeof(double) * 3 * nsites );
 
-	p_m1 = (double *)malloc( sizeof(double) * nsites * 3 );
-	qdot_m1 = (double *)malloc( sizeof(double) * nsites * 3 );
-	memset( p_m1, 0, sizeof(double) * 3 * nsites );
-	memset( qdot_m1, 0, sizeof(double) * 3 * nsites );
 
 	grad_fs = (int *)malloc( sizeof(int) * nsites );
 
@@ -202,11 +198,6 @@ void pcomplex::debug_dPinv_dq( surface * theSurface, double *rsurf  )
 	}
 }
 
-void pcomplex::cacheVelocities( void )
-{
-	memcpy( p_m1, p, sizeof(double) * 3 * nsites );
-	memcpy( qdot_m1, qdot, sizeof(double) * 3 * nsites );
-}
 
 void pcomplex::prepareForGradient( void )
 {
@@ -1412,8 +1403,6 @@ double pcomplex::T( surface *theSurface, double *rsurf )
 		T += 0.5 * (p[2*s+0]) * (qdot0[2*s+0]);
 		T += 0.5 * (p[2*s+1]) * (qdot0[2*s+1]);
 #endif
-	//	T += 0.5 * (p[2*s+0]+p_m1[2*s+0])/2 * (qdot[2*s+0]+qdot_m1[2*s+0])/2;
-	//	T += 0.5 * (p[2*s+1]+p_m1[2*s+1])/2 * (qdot[2*s+1]+qdot_m1[2*s+1])/2;
 	}
 
 	for( int s = nattach; s < nsites; s++ )

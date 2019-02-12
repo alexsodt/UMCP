@@ -364,6 +364,11 @@ int temp_main( int argc, char **argv )
 	}
 	
 	sub_surface->load_least_squares_fitting( theForceSet );
+
+/*
+ * for doing generalized coordinates (normal modes here).
+ *
+ * */
 	
 	double *scaling_factor = NULL;
 	double *gen_transform = NULL;
@@ -372,6 +377,7 @@ int temp_main( int argc, char **argv )
 	int doing_spherical_harmonics = 0;
 	int doing_planar_harmonics = 0;
 	double *output_qvals=NULL;
+	double *mass_scaling = NULL;
 
 	if( block.mode_max >= 0 )
 	{
@@ -381,12 +387,15 @@ int temp_main( int argc, char **argv )
 			doing_spherical_harmonics = 1;
 			NQ = sub_surface->getSphericalHarmonicModes( r, block.mode_min, block.mode_max, &gen_transform, &output_qvals, &scaling_factor );
 
+	
+
 #if 0 
+			doing_spherical_harmonics = 0;
 			gen_transform = ( double *)malloc( sizeof(double)*3*nv*3*nv);
 			memset( gen_transform, 0, sizeof(double) * 3 * nv * 3 * nv );
 	
 			for( int v = 0; v < nv*3; v++ )
-				gen_transform[v*(3*nv)+v] = 1.0;
+				gen_transform[v*(3*nv)+v] = 1;
 			NQ=3*nv;
 #endif
 		}
@@ -433,11 +442,14 @@ int temp_main( int argc, char **argv )
 	
 	double *pp=NULL;
 	double *next_pp=NULL;
+	double *del_pp=NULL; // for gen_q
 	int n_real_q = 3*nv;
 
 	double *nav_Q = NULL;
 	double *av_Q = NULL;
 	double *av_Q2 = NULL;
+	double *av_Q_T = NULL;
+	double *nav_Q_T = NULL;
 
 	double *QV = NULL;
 	double *Qdot = NULL;
@@ -449,6 +461,7 @@ int temp_main( int argc, char **argv )
 		n_real_q = NQ;
 		pp = (double *)malloc( sizeof(double) * NQ ); 
 		next_pp = (double *)malloc( sizeof(double) * NQ );
+		del_pp = (double *)malloc( sizeof(double) * NQ );
 		QV = (double *)malloc( sizeof(double) * NQ );
 		Qdot = (double *)malloc( sizeof(double) * NQ );
 		Qdot0 = (double *)malloc( sizeof(double) * NQ );
@@ -456,6 +469,13 @@ int temp_main( int argc, char **argv )
 		nav_Q = (double *)malloc( sizeof(double) * NQ );
 		av_Q = (double *)malloc( sizeof(double) * NQ );
 		av_Q2 = (double *)malloc( sizeof(double) * NQ );
+		av_Q_T = (double *)malloc( sizeof(double) * NQ );
+		nav_Q_T = (double *)malloc( sizeof(double) * NQ );
+		memset( nav_Q, 0, sizeof(double) * NQ );
+		memset( av_Q, 0, sizeof(double) * NQ );
+		memset( av_Q2, 0, sizeof(double) * NQ );
+		memset( av_Q_T, 0, sizeof(double) * NQ );
+		memset( nav_Q_T, 0, sizeof(double) * NQ );
 	}
 	else
 	{	
@@ -537,8 +557,6 @@ int temp_main( int argc, char **argv )
 	}
 
 			
-	double V = sub_surface->energy(r,NULL);
-	printf("Initial energy: %lf\n", V );
 	memset( g, 0, sizeof(double) * nc );
 
 	double *saved_ref_point = (double *)malloc( sizeof(double) * 3 * (nv+1) );	
@@ -550,6 +568,16 @@ int temp_main( int argc, char **argv )
 	int o = 0;
 	double running_time = 0;
 	double gamma_langevin = block.gamma_langevin;
+
+	if( do_ld )
+	{
+		double prod =  gamma_langevin * time_step * AKMA_TIME;
+	
+		printf("gamma_langevin * time_step = %lf\n", gamma_langevin * time_step * AKMA_TIME );
+
+		if( prod > 1 )	
+			printf("WARNING: Langevin gamma * time_step greater than one: %lf\n", prod );
+	}
 	// report average temperature
 	double sum_average_temp = 0;
 	double n_temp = 0;
@@ -618,10 +646,14 @@ int temp_main( int argc, char **argv )
 		max_mat = NQ;
 	int *sparse_use = (int *)malloc( sizeof(int) * (NQ > nv ? NQ : nv) );
 	int n_vuse = 0;
-	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ);	
+	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
 	setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
 
 
+
+	double V = sub_surface->energy(r,NULL);
+	printf("Initial energy: %lf\n", V );
+	
 	if( !do_gen_q ) // generalized coordinates are simply the control point positions.
 		NQ = 3 * nv;
 	if( block.nmin > 0 )
@@ -781,6 +813,34 @@ int temp_main( int argc, char **argv )
 		alphaFile = fopen(fileName,"w");
 	}
 
+	if( block.debug )
+	{	
+		double *r_test = (double *)malloc( sizeof(double) * (3*nv+3) );
+		memcpy( r_test, r, sizeof(double) * (3*nv+3) );
+		for( int Q = 0; Q < NQ; Q++ )
+		{
+			double ens[3]={0,0,0};
+
+			double eps = 1e-5;
+			for( int iq = 0; iq < 3; iq++ )
+			{
+				for( int v = 0; v < nv; v++ )
+				{
+					r_test[3*v+0] = r[3*v+0] + iq * eps * gen_transform[Q*3*nv+3*v+0]/scaling_factor[Q];
+					r_test[3*v+1] = r[3*v+1] + iq * eps * gen_transform[Q*3*nv+3*v+1]/scaling_factor[Q];
+					r_test[3*v+2] = r[3*v+2] + iq * eps * gen_transform[Q*3*nv+3*v+2]/scaling_factor[Q];
+				}
+				ens[iq] = sub_surface->energy(r_test,NULL);
+#ifdef PARALLEL
+				ParallelSum(ens+iq,1);
+#endif	
+			}
+			printf("MODE %d L: %d coeff2: %le\n",
+				Q, (int)lround(output_qvals[Q]), (ens[0]+ens[2]-2*ens[1])/(eps*eps) );
+		}	
+		free(r_test);
+	}
+
 
 	int global_cntr = 0;
 	struct timeval tnow;
@@ -832,7 +892,6 @@ int temp_main( int argc, char **argv )
 
 			sub_surface->put(r);			
 
-
 			/*********** COMPUTE ENERGY ************/	
 	
 			VR=0;
@@ -866,21 +925,6 @@ int temp_main( int argc, char **argv )
 				cur_save = 0;
 #endif
 			/*********** END SAVE RESTARTS FOR DEBUGGING ***/
-
-			/*********** SAVE PREVIOUS VELOCITIES *************/
-
-			for( int cx = 0; cx < par_info.nc; cx++ )
-			{
-				int c = par_info.complexes[cx];
-		
-				allComplexes[c]->cacheVelocities();
-			}
-	
-	
-
-			//printf("b0: %d p: %le\n", b0, pp[0] );
-			/********** END SAVE *******************************/
-
 
 			if( block.lipid_mc_period > 0 )
 			{
@@ -1052,9 +1096,15 @@ int temp_main( int argc, char **argv )
 #ifdef PARALLEL
 			if( ncomplex == 0 )
 			{
-				PartialSumVertices(g);
-//				ParallelSum(g,nc);
-				PartialSyncVertices(qdot_temp);
+				if( do_gen_q )
+				{
+
+				}
+				else
+				{
+					PartialSumVertices(g);
+					PartialSyncVertices(qdot_temp);
+				}
 			}
 			else
 			{
@@ -1064,7 +1114,6 @@ int temp_main( int argc, char **argv )
 #endif
 
 			memcpy( next_pp, pp, sizeof(double) * NQ );
-
 			if( !block.disable_mesh )
 			{
 				if( do_ld || o < nequil || (switched) )
@@ -1075,6 +1124,7 @@ int temp_main( int argc, char **argv )
 						AltSparseCartMatVecIncrScale( next_pp, pp, EFFM, -gamma_langevin*AKMA_TIME * time_step, r+3*nv );
 				}
 			}
+
 			// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t), report properties for this state (perform Monte Carlo?)
 
 			if( !block.disable_mesh )
@@ -1082,13 +1132,22 @@ int temp_main( int argc, char **argv )
 
 				if( do_gen_q )
 				{
+					memset(del_pp,0,sizeof(double)*NQ);
+					
 					for( int Q = 0; Q < NQ; Q++ )
 					for( int v1 = 0; v1 < nv; v1++ )
 					{
-						next_pp[Q] += gen_transform[Q*3*nv+v1*3+0] * -g[3*v1+0] * AKMA_TIME * time_step/2;
-						next_pp[Q] += gen_transform[Q*3*nv+v1*3+1] * -g[3*v1+1] * AKMA_TIME * time_step/2;
-						next_pp[Q] += gen_transform[Q*3*nv+v1*3+2] * -g[3*v1+2] * AKMA_TIME * time_step/2;
+						del_pp[Q] += gen_transform[Q*3*nv+v1*3+0] * -g[3*v1+0] * AKMA_TIME * time_step/2;
+						del_pp[Q] += gen_transform[Q*3*nv+v1*3+1] * -g[3*v1+1] * AKMA_TIME * time_step/2;
+						del_pp[Q] += gen_transform[Q*3*nv+v1*3+2] * -g[3*v1+2] * AKMA_TIME * time_step/2;
 					}
+
+#ifdef PARALLEL
+					ParallelSum( del_pp, NQ );
+					ParallelBroadcast( del_pp, NQ );
+#endif
+					for( int Q = 0; Q < NQ; Q++ )
+						next_pp[Q] += del_pp[Q];
 				}
 				else
 				{
@@ -1110,9 +1169,16 @@ int temp_main( int argc, char **argv )
 
 			double T = 0;				
 			for( int Q = 0; Q < NQ; Q++ )
+			{
+				if( o >= nequil && do_gen_q ) { av_Q_T[Q] += pp[Q]*Qdot0_trial[Q] * 0.5; 
+								nav_Q_T[Q] += 1;
+//								printf("av_Q_T[%d] %le\n", Q, av_Q_T[Q]/nav_Q[Q]);
+				}
 				T += pp[Q] * Qdot0_trial[Q] * 0.5;
+			}
 #ifdef PARALLEL
-			ParallelSum(&T,1);
+			if( ! do_gen_q )
+				ParallelSum(&T,1);
 #endif
 				
 			/*****************************
@@ -1126,18 +1192,17 @@ int temp_main( int argc, char **argv )
 				{
 					for( int Q = 0; Q < NQ; Q++ )
 						next_pp[Q] += gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
+
+#ifdef PARALLEL
+					ParallelBroadcast(next_pp,NQ);
+#endif
 				}
 
 				// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t+eps/2)
 				if( do_gen_q )
 				{
 					for( int Q = 0; Q < NQ; Q++ )
-					for( int v1 = 0; v1 < nv; v1++ )
-					{
-						next_pp[Q] += gen_transform[Q*3*nv+v1*3+0] * -g[3*v1+0] * AKMA_TIME * time_step/2;
-						next_pp[Q] += gen_transform[Q*3*nv+v1*3+1] * -g[3*v1+1] * AKMA_TIME * time_step/2;
-						next_pp[Q] += gen_transform[Q*3*nv+v1*3+2] * -g[3*v1+2] * AKMA_TIME * time_step/2;
-					}
+						next_pp[Q] += del_pp[Q];
 				}
 				else
 				{
@@ -1150,7 +1215,6 @@ int temp_main( int argc, char **argv )
 				}
 			}
 			memcpy( pp, next_pp, sizeof(double) * NQ );
-			
 			memset( qdot0, 0, sizeof(double) * 3 * nv );
 
 			if( do_gen_q )
@@ -1174,9 +1238,11 @@ int temp_main( int argc, char **argv )
 				r[3*v1+1] += qdot[3*v1+1] * AKMA_TIME * time_step;
 				r[3*v1+2] += qdot[3*v1+2] * AKMA_TIME * time_step;
 			}
+				
 
 			if( do_gen_q )
 			{
+
 				for( int Q = 0; Q < NQ; Q++ )
 				{
 					QV[Q] += Qdot0[Q] * AKMA_TIME * time_step;
@@ -1190,7 +1256,9 @@ int temp_main( int argc, char **argv )
 			}
 #ifdef PARALLEL
 			if( do_gen_q )
-				PartialSyncGenQ(pp);
+			{
+
+			}
 			else
 				PartialSyncVertices(pp);
 #endif
@@ -1332,7 +1400,9 @@ int temp_main( int argc, char **argv )
 			free(q_sorter);
 		}
 	
+#ifdef PARALLEL
 		if( ncomplex > 0 ) ParallelSyncComplexes( allComplexes, ncomplex );
+#endif
 		if( tFile && par_info.my_id == BASE_TASK )
 		{
 			sub_surface->put(r);

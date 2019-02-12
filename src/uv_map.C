@@ -133,7 +133,7 @@ void surface::get_pt_coeffs( int f, double u, double v, double *coeffs, int *coo
 			coord_list[x] = cset[x];
 
 			for( int y = 0; y < 12; y++ )
-				coeffs[x] = theMap[y*ncoords_base+x] * ceff_map[y];
+				coeffs[x] += theMap[y*ncoords_base+x] * ceff_map[y];
 		}
 	}
 	else

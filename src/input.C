@@ -29,6 +29,9 @@ void setDefaults( parameterBlock *block )
 	block->loadName = NULL;
 	block->concentration = 0;
 	block->rho = 0;
+
+
+	block->mass_scaling = 0;
 	block->mode_x = -1;
 	block->mode_y = -1;
 	block->mode_KA = 0;
@@ -190,10 +193,13 @@ int resolveParameters( parameterBlock *block )
 	if( block->nequil == -1 )
 		block->nequil = block->nsteps * 0.1;
 
-	if( block->KA < 0 && ((block->mode_x != -1 && block->mode_y != -1) || block->mode_max >0) )
-		block->KA = 0;
-	else if ( block->KA < 0 )
+	if( block->KA < 0 )
 		block->KA = 0.215;
+
+//	if( block->KA < 0 && ((block->mode_x != -1 && block->mode_y != -1) || block->mode_max >0) )
+//		block->KA = 0;
+//	else if ( block->KA < 0 )
+//		block->KA = 0.215;
 	
 	if( block->dist_nrm > 0 && block->radius2 > 0 && (block->dist_nrm < block->radius1 + block->radius2) )
 	{
@@ -267,6 +273,13 @@ int resolveParameters( parameterBlock *block )
 
 int getInput( const char **argv, int argc, parameterBlock *block) 
 {
+	printf("Input line:\n");
+	for( int x = 0; x < argc; x++ )
+	{
+		printf("%s ", argv[x] );
+	}
+	printf("\n");
+
 	char *word1 = (char *)malloc( sizeof(char) * 4096 );
 	char *word2 = (char *)malloc( sizeof(char) * 4096 );
 
@@ -304,6 +317,8 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			printf("Couldn't open input file '%s'\n", argv[1] );
 			exit(1);
 		}
+		printf("Input file:\n");
+		printf("#####################################\n");
 	}
 	char *buffer = (char *)malloc( sizeof(char) * 100000 );
 	
@@ -324,10 +339,11 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 		
 			if( feof(theFile) )
 			{
+				printf("#####################################\n");
 				pass = COMMAND_LINE_PASS;
 				continue;
 			}
-	
+			printf("%s\n", buffer );	
 			if( strlen(buffer) > 4095 )
 			{
 				printf("Line %s too long.\n", buffer );
@@ -442,6 +458,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->write_alpha_period = atoi( word2 );
 		else if( !strcasecmp( word1, "nruns" ) )
 			block->nruns = atoi( word2 );
+		else if( !strcasecmp( word1, "mass_scaling" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->mass_scaling = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->mass_scaling = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
 		else if( !strcasecmp( word1, "mode_x" ) || !strcasecmp( word1, "mode_l" ))
 			block->mode_x = atoi( word2 );
 		else if( !strcasecmp( word1, "mode_min" ) )
@@ -947,75 +975,20 @@ void printParamBlock( parameterBlock *block )
 		printf("\tnsteps:    %d\n", block->nsteps );
 	printf("Surface:\n");
 	printf("\tMesh:      %s\n", block->meshName );	
-	printf("\tmode_x:    %d\n", block->mode_x );	
-	printf("\tmode_y:    %d\n", block->mode_y );	
-	printf("\tMonge      %s\n", (block->monge ? "yes" : "no" ) );
-	printf("\tmode_KA:   %lf kcal/mol/A^2\n", block->mode_KA );
 	printf("\tKA:        %lf kcal/mol/A^2\n", block->KA );
 	printf("\tkc:        %lf kcal/mol\n", block->kc );
-	printf("Particle:\n");
-	printf("\trho:       %lf\n", block->rho );	
-	printf("\tradius1:   %lf A\n", block->radius1 );
-	printf("\tc0:        %lf A\n", block->c0 );
-	printf("\tfootprint: %lf A^2\n", block->footprint );
-
-	if( block->fixEdge )
-		printf("Zeroing the surrounding edge of the bilayer.\n");
-	if( fabs(block->perturbCenter) > 1e-10 )
-		printf("Perturbing the middle of the bilayer by %lf Angstroms.\n", block->perturbCenter );
-
-
-	if( block->dist_nrm <= 0 || block->radius2 < 1e-7)
-	{
-		printf("Not using a second particle off the membrane surface.\n");
-	}
-	else
-	{
-		printf("dist_nrm:  %lf A\n", block->dist_nrm );
-		printf("radius2 :  %lf A\n", block->dist_nrm );
-	}
-
-	if( block->dimer_radius <= block->radius1 )
-	{
-		printf("Not modeling particle dimerization [dimer radius %lf less than particle radius %lf].\n", block->dimer_radius, block->radius1);
-	}
-	else
-	{
-		printf("Modeling particle dimerization:\n");
-		printf("dimer radius:  %lf A\n", block->dimer_radius );
-		printf("dimer eps:     %lf kcal/mol\n", block->dimer_eps );
-	}
-	if(  block->do_bar )
-	{
-		printf("/****************************/\n");
-		printf("BAR domain parameters\n");
-		printf("	bar_bond_length %lf Angstroms\n", block->bar_bond_length ); 
-		printf("	bar_bond_k      %lf kcal/mol/Angstroms^2\n", block->bar_bond_k ); 
-		printf("	bar_theta_0     %lf degrees\n", block->bar_theta_0 ); 
-		printf("    bar_phi_0       %lf degrees\n", block->bar_phi_0 );
-		printf("	bar_theta_k     %lf kcal/mol/degrees^2\n", block->bar_theta_k ); 
-		printf("	bar_phi_k       %lf kcal/mol/degrees^2\n", block->bar_phi_k ); 
-
-		printf("/****************************/\n");
-	}
-	if( block->kinetics )
-	{
-		printf("/****************************/\n");
-		printf("Doing kinetics analysis.\n");
-		if( block->kinetics_do_phase )
-			printf("Doing phase analysis (sin and cos together).\n");
-		else
-			printf("Only doing the cos() mode.\n");
-		printf("Kinetics diffusion coefficient %le\n", block->diffc );
-		printf("Kinetics period %d.\n", block->kinetic_corr_period ); 
-		printf("/****************************/\n");
-		
-	}
-	if( block->hours > 0 )
-	{
-		printf("Running for %lf hours (instead of %d steps).\n", block->hours, block->nsteps );
-	}
 	printf("Random seed: %d\n", block->random_seed );
+	printf("Timestep:    %lf seconds.\n", block->time_step );
+
+	if( block->do_ld )
+	{
+		printf("Doing Langevin dynamics with gamma=%lf.\n", block->gamma_langevin );
+	}
+	
+	if( block->do_ld == 0 && block->nequil > 0 )
+	{
+		printf("Doing Langevin dynamics only during the %d equilibration steps with gamma=%lf\n", block->nequil,	block->gamma_langevin );
+	}
 
 	if( block->lipid_mc_period > 0 )
 		printf("Lipid Monte Carlo move period: %d\n", block->lipid_mc_period );

@@ -62,8 +62,8 @@ int activate_height_debug = 0;
 int n_v_finite = 1;
 int n_u_gauss = 1;
 #else
-int n_v_finite = 8;
-int n_u_gauss = 8;
+int n_v_finite = 4;
+int n_u_gauss = 4;
 
 #endif
 int debug_bit = 0;
@@ -3437,6 +3437,8 @@ double surface::ifenergy( int f, double *r, double *p_uv )
 		double c0 = theIrregularFormulas[frm].c0;
 		double c1 = -0.5*(a+d-sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d));
 		double c2 = -0.5*(a+d+sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d));
+		
+//		printf("%d %d IRREG %lf %lf %lf c %.14le %.14le g: %.14le w: %.14le\n", f, p, R[0], R[1], R[2], c1, c2, g, theIrregularFormulas[frm].weight );
 			
 		double en_tot = 0.5 * kc * (c1+c2-c0 ) * (c1+c2-c0) ;
 		double en_tot_2 = 0.5 * kc * (c1+c2 ) * (c1+c2) ;
@@ -3635,7 +3637,9 @@ double surface::fenergy( int f, double *r, double *p_uv )
 		double c0 = theFormulas[frm].c0;
 		double c1 = -0.5*(a+d-sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d));
 		double c2 = -0.5*(a+d+sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d));
-			
+		
+//		printf("%d %d REG %lf %lf %lf c %le %le g: %.14le\n", f, p, R[0], R[1], R[2], c1, c2, g  );
+	
 		double en_tot = 0.5 * kc * (c1+c2-c0 ) * (c1+c2-c0) ;
 		double en_tot_2 = 0.5 * kc * (c1+c2 ) * (c1+c2) ;
 		double en_kg = kg * c1 * c2;
@@ -4212,6 +4216,7 @@ double surface::energy( double *r, double *puv, int do_vertex, int *plist, int *
 //		ie = irregularEnergy( r );
 	}
 */
+
 	return e + ie;
 
 }

@@ -1623,16 +1623,18 @@ void vpass_inner(
 
 	double running_F = compute_F( ntarget, ntri, tris, gamma_i, area_i, states, PBC_vec, load_cens, aux_i, aux_w);
 
-	printf("F start %le\n", running_F );
 
 	for( int pass = 0; pass < 2; pass ++ )
 	{
 		int v_done = 0;
+		int niter = 0;
 		while( !v_done )
 		{
 			printf("Border iteration.\n");
 			v_done = 1;
-	
+			niter++;
+			if( niter > 50 )
+				break;
 #ifdef ALL_EDGES
 			for( int e = 0; e < nedges; e++ )
 			{
