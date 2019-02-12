@@ -1291,7 +1291,7 @@ int temp_main( int argc, char **argv )
 			
 			if( t == 0 )
 			{
-				printf("t: %le o: %d ns T: %.8le V: %.8le T+V: %.14le TEMP: %le AV_TEMP %le VR: %.3le VMEM: %le VP: %le", (cur_t * 1e9), o, T, V,T+V, TEMP, sum_average_temp / n_temp,VR, VMEM, VP );
+				printf("t: %le ns o: %d T: %.8le V: %.8le T+V: %.14le TEMP: %le AV_TEMP %le VR: %.3le VMEM: %le VP: %le", (cur_t * 1e9), o, T, V,T+V, TEMP, sum_average_temp / n_temp,VR, VMEM, VP );
 				if( step_rate > 0 )
 					printf(" steps/s: %le", step_rate );
 				printf("\n");
