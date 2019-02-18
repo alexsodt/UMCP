@@ -1256,7 +1256,7 @@ void srd_integrator::checkResolve( double * r, surface * theSurface, double delt
 	}
 }
 
-int srd_integrator::resolveCollision( double *r, double *g, double *vmem, SparseMatrix *effm, double delta_hull_collision, surface *theSurface, double **M, int mlow, int mhigh, force_set *theForceSet, double time_step, double force_factor )
+int srd_integrator::resolveCollision( double *r, double *g, double *qdot, SparseMatrix *effm, double delta_hull_collision, surface *theSurface, double **M, int mlow, int mhigh, force_set *theForceSet, double time_step, double force_factor )
 {
 	double LA = PBC_vec[0][0];
 	double LB = PBC_vec[1][1];
@@ -1264,8 +1264,8 @@ int srd_integrator::resolveCollision( double *r, double *g, double *vmem, Sparse
 	double search_radius = 20.0;
 	//double search_radius = delta_hull_collision;
 
-	double *force_vector = (double *)malloc( sizeof(double) * theSurface->nv * 3 );
-	memset( force_vector, 0, sizeof(double) * theSurface->nv * 3 );
+	double *dp_vector = (double *)malloc( sizeof(double) * theSurface->nv * 3 );
+	memset( dp_vector, 0, sizeof(double) * theSurface->nv * 3 );
 
 	double total_dp[3]={0,0,0};
 
@@ -1339,77 +1339,53 @@ int srd_integrator::resolveCollision( double *r, double *g, double *vmem, Sparse
 
 			if( do_collide )
 			{
+				// DOCUMENTATION MARKER: SRD/Mesh collision.
+
 				int col_f;	
 				double col_u, col_v;
 			
 				theSurface->nearPointOnBoxedSurface( rp+3*p, &col_f, &col_u, &col_v, M, mlow, mhigh, distance+p, search_radius );
 
-				rp_dist[3*p+0] = rp[3*p+0];
-				rp_dist[3*p+1] = rp[3*p+1];
-				rp_dist[3*p+2] = rp[3*p+2];
-			
-				double rcol[3], nrm[3];
- 
-				theSurface->evaluateRNRM(col_f, col_u, col_v, rcol, nrm, r ); 
-				double vp_proj = (vp[3*p+0]) * nrm[0] + (vp[3*p+1]) * nrm[1] + (vp[3*p+2]) * nrm[2];
-	
-				double mem_v[3];
-				theSurface->velocityAtPoint( col_f, col_u, col_v, vp, mem_v ); 
+				double col_w = 1-col_u-col_v;
 
-//				printf("memv: %le %le %le rpv: %le %le %le\n", mem_v[0], mem_v[1], mem_v[2],
-//										vp[3*p+0], vp[3*p+1], vp[3*p+2] );
+				double dA = (col_u-1)*(col_u-1) + col_v*col_v+col_w*col_w;
+				double dB = (col_v-1)*(col_v-1) + col_u*col_u+col_w*col_w;
+				double dC = (col_w-1)*(col_w-1) + col_u*col_u+col_v*col_v;
 
-/*
-				The force will be directed along the membrane normal.
-				We are solving for the magnitude of the force, x.
-				The constraints are conservation of momentum and conservation of kinetic energy.
-
-				compute the first and second derivatives of the KE.
-
-				the force is the change in momentum of the particle divide by the timestep.			
-*/
-				// the ratio of the magnitude of the force to the change in momentum of the particle.
-
-
-				double df_dp = 1.0;//force_factor;
-				double dKE_mem_dx = 0;
-				double d2KE_mem_dx2 = 0;
-
-				double dKE_p_dx = vp_proj; // mass weighted 
-				double d2KE_p_dx2 = 1.0 / mass;
-
-				theSurface->dKE_dx_and2( theForceSet, effm, vmem, nrm, col_f, col_u, col_v, &dKE_mem_dx, &d2KE_mem_dx2 );
-//				theSurface->debug_dKE_dx_and2( theForceSet, effm, vmem, nrm, col_f, col_u, col_v );
-				dKE_mem_dx *= df_dp;
-				d2KE_mem_dx2 *= df_dp * df_dp;
-
-
-				double mag = - 2* (dKE_p_dx + dKE_mem_dx) / (d2KE_p_dx2 + d2KE_mem_dx2); 
-				if( debug_mode )
-				{	
-					printf("sweep dKE_mem_dx: %le d2KE_mem_dx2: %le\n", dKE_mem_dx, d2KE_mem_dx2 );
-					printf("sweep dKE_p_dx: %le d2KE_p_dx2: %le\n", dKE_p_dx, d2KE_p_dx2 );
+				double r_collision[3];
+				double n_collision[3];
 				
-					printf("sweep mag: %.14le\n", mag );
-				}
+				int use_code = 0; // use the main face vertex if dC is smallest.
 
-				double dKE_p = dKE_p_dx * mag + d2KE_p_dx2 * 0.5 * mag*mag;
-				double dKE_mem = dKE_mem_dx * (mag) + d2KE_mem_dx2 * 0.5 * mag*mag;
+				if( dA < dC && dA < dB )
+					use_code = 1; // du
+				else if( dB < dC )
+					use_code = 2;
 
+				// get n_collision.
+				theSurface->evaluateRNRM(col_f, col_u, col_v, r_collision, n_collision, r ); 
 
+				int tri, near_vertex;
+	
+				if( col_f < theSurface->nf_faces )
+					near_vertex = theSurface->theFormulas[col_f*theSurface->nf_g_q_p].cp[use_code];
+				else	
+					near_vertex = theSurface->theIrregularFormulas[col_f*theSurface->nf_irr_pts].cp[use_code];
 
-				dKE_out_collision_sweep += dKE_mem;
+				double M_ii = effm->diagonal_element[near_vertex]; 
+	
+				double m_srd_p_ncol = vp[3*p+0] * n_collision[0] +
+						      vp[3*p+1] * n_collision[1] +  
+						      vp[3*p+2] * n_collision[2];
 
-//				printf("dKE_CHECK sweep dKE_p: %le dKE_mem: %le\n", dKE_p, dKE_mem );
-			
-				// modify the position and velocity of the colliding particle.
+				double m_mesh_p_ncol = qdot[3*near_vertex+0] * n_collision[0] +
+						       qdot[3*near_vertex+1] * n_collision[1] +  
+						       qdot[3*near_vertex+2] * n_collision[2]; 
 
-				double proj_out_move[3] = {rp[3*p+0] - rp_prev[3*p+0],
-							   rp[3*p+1] - rp_prev[3*p+1], 
-							   rp[3*p+2] - rp_prev[3*p+2] };
-				//change in momentum
-//				double rp_proj =  proj_out_move[0] * nrm[0] + proj_out_move[1] * nrm[1] + proj_out_move[2] * nrm[2];
-				double rp_proj = (vp[3*p+0] * nrm[0] + vp[3*p+1] * nrm[1] + vp[3*p+2] * nrm[2]) * time_step;			
+				double alpha_i = 2 * ( m_srd_p_ncol - m_mesh_p_ncol) / ( 1.0/mass + M_ii);
+				double alpha_SRD = -alpha_i;
+				
+				double rp_proj = (vp[3*p+0] * n_collision[0] + vp[3*p+1] * n_collision[1] + vp[3*p+2] * n_collision[2]) * time_step;			
 				/*
 					vp_proj is the velocity projected along the normal. the solution to
 					constant momentum and kinetic energy is
@@ -1419,96 +1395,44 @@ int srd_integrator::resolveCollision( double *r, double *g, double *vmem, Sparse
 
 				*/
 	
-				double sign_change = -1.0;
+				// move the SRD particle ... could compute the real time of collision I guess...
 
+				rp[3*p+0] = r_collision[0] - rp_proj * n_collision[0] / 2;
+				rp[3*p+1] = r_collision[1] - rp_proj * n_collision[1] / 2;
+				rp[3*p+2] = r_collision[2] - rp_proj * n_collision[2] / 2;
 
-				rp[3*p+0] = rcol[0] - rp_proj * nrm[0] / 2;
-				rp[3*p+1] = rcol[1] - rp_proj * nrm[1] / 2;
-				rp[3*p+2] = rcol[2] - rp_proj * nrm[2] / 2;
+				double dr[3] = { rp[3*p+0] - r_collision[0],
+						 rp[3*p+1] - r_collision[1],
+						 rp[3*p+2] - r_collision[2] };
 
-				double dr[3] = { rp[3*p+0] - rcol[0],
-						 rp[3*p+1] - rcol[1],
-						 rp[3*p+2] - rcol[2] };
 				while( dr[0] < -LA/2 ) dr[0] += LA;
 				while( dr[0] >  LA/2 ) dr[0] -= LA;
 				while( dr[1] < -LB/2 ) dr[1] += LB;
 				while( dr[1] >  LB/2 ) dr[1] -= LB;
 				while( dr[2] < -LC/2 ) dr[2] += LC;
 				while( dr[2] >  LC/2 ) dr[2] -= LC;
+
 				double dpv = dr[0] * nrm[0] + dr[1] * nrm[1] + dr[2] * nrm[2];
 
-				if( last_known_tag[p] * dpv < 0 || topological_tag[p] * dpv < 0 )
-				{
-//					printf("SETTING A FLIPPED SIGN TAG last: %le top: %le dpv: %le.\n", last_known_tag[p], topological_tag[p], dpv );
-				}
 				topological_tag[p] = dpv; 
 				last_known_tag[p] = topological_tag[p];
-#ifdef SPECIFIC_PARTICLE
-				if( p == 2267 ) printf("2267 Setting tag to %lf rp_proj: %lf z: %lf nrm: %lf\n", topological_tag[p], rp_proj, rp[3*p+2], nrm[2]  );
-#endif
+
 				//change in momentum
 
 				double dp[3] = {0,0,0};
 						
-				dp[0] = mag * nrm[0];
-				dp[1] = mag * nrm[1];
-				dp[2] = mag * nrm[2];
-
-				double ke_before = 0.5 * mass * (vp[3*p+0]*vp[3*p+0]+vp[3*p+1]*vp[3*p+1]+vp[3*p+2]*vp[3*p+2]);
-
-				if( debug_mode )
-					printf("sweep vp before: %le %le %le, KE: %le\n", vp[3*p+0], vp[3*p+1], vp[3*p+2], ke_before );
-
-#ifdef SPECIFIC_PARTICLE
-				if( p == 2267 )  printf("2267 prevMOM %le %le %le\n", vp[3*p+0], vp[3*p+1], vp[3*p+2] );
-#endif
+				dp[0] = alpha_SRD * n_collision[0];
+				dp[1] = alpha_SRD * n_collision[1];
+				dp[2] = alpha_SRD * n_collision[2];
 
 				vp[3*p+0] += dp[0] / mass;
 				vp[3*p+1] += dp[1] / mass;
 				vp[3*p+2] += dp[2] / mass;
-
-				double ke_after = 0.5 * mass * (vp[3*p+0]*vp[3*p+0]+vp[3*p+1]*vp[3*p+1]+vp[3*p+2]*vp[3*p+2]);
-
-				if( debug_mode  )
-					printf("sweep vp after: %le %le %le, KE: %le\n", vp[3*p+0], vp[3*p+1], vp[3*p+2], ke_after );
-				
-#ifdef SPECIFIC_PARTICLE
-				if( p == 2267 )  printf("2267 nowMOM %le %le %le\n", vp[3*p+0], vp[3*p+1], vp[3*p+2] );
-#endif
-				
 			
-				// apply force to the membrane.
-			
-				int vert,edge;
-				// getting the vertex and edge of a face is a convenient way to get the local coordinate system.
-				if( col_f < theSurface->nf_faces )
-				{
-					vert = theSurface->theFormulas[col_f*theSurface->nf_g_q_p].vertex;
-					edge = theSurface->theFormulas[col_f*theSurface->nf_g_q_p].edge;
-				}
-				else	
-				{
-					vert = theSurface->theIrregularFormulas[(col_f-theSurface->nf_faces)*theSurface->nf_irr_pts].vertex;
-					edge = theSurface->theIrregularFormulas[(col_f-theSurface->nf_faces)*theSurface->nf_irr_pts].edge;
-				}
-
-				int j = theSurface->theVertices[vert].edges[edge];
-				int ep1 = edge+1;
-				if( ep1 >= theSurface->theVertices[vert].valence )
-					ep1 -= theSurface->theVertices[vert].valence;
-				int k = theSurface->theVertices[vert].edges[ep1];
-
-				// I want a particular momentum spread on the face.
-				// I can do a least-squares fit using the inverse operator.
-				// this appears to be equivalent to the effective-mass matrix inverse, so I'm not sure at this point.
-				
+				dp_vector[3*near_vertex+0] = alpha_i * n_collision[0];	
+				dp_vector[3*near_vertex+1] = alpha_i * n_collision[1];	
+				dp_vector[3*near_vertex+2] = alpha_i * n_collision[2];	
 	
-				theSurface->applyForceAtPoint( col_f, col_u, col_v, dp, force_vector, theForceSet );
-			
-
-				total_dp[0] += dp[0];
-				total_dp[1] += dp[1];
-				total_dp[2] += dp[2];
 				n_col++;
 			}
 		}
@@ -1519,17 +1443,16 @@ int srd_integrator::resolveCollision( double *r, double *g, double *vmem, Sparse
 
 	for( int v1 = 0; v1 < nv; v1++ )
 	{
-		// double negative, negative because gradient is neg of force, dp_mem is negative of dp particle
-		g[3*v1+0] += force_factor * force_vector[3*v1+0] / time_step;		
-		g[3*v1+1] += force_factor * force_vector[3*v1+1] / time_step;	
-		g[3*v1+2] += force_factor * force_vector[3*v1+2] / time_step;		
+		g[3*v1+0] -= force_factor * dp_vector[3*v1+0] / time_step;		
+		g[3*v1+1] -= force_factor * dp_vector[3*v1+1] / time_step;	
+		g[3*v1+2] -= force_factor * dp_vector[3*v1+2] / time_step;		
 	}
 
 #ifdef DEBUG_MOMENTUM_CHANGE
 	if( n_col > 0 )
 		printf("Collision total solvent momentum change: %le %le %le\n", total_dp[0], total_dp[1], total_dp[2] ); 
 #endif
-	free(force_vector);
+	free(dp_vector);
 #ifdef SPECIFIC_PARTICLE
 	printf("tag 2267 %lf %lf\n", topological_tag[2267], last_known_tag[2267] );
 #endif

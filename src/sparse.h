@@ -11,7 +11,8 @@ struct SparseMatrix
 	int *source_list;
 	int nsource;
 
-	int *diage;
+	double *diagonal_element; // turns out I need ready access to this.
+	int *diage; // pointer to it. 
 	int *nnz;
 	int **nzl;
 	int *nzl_space;
@@ -39,6 +40,7 @@ struct SparseMatrix
 	void compress_source_vector( double *full_B, double *compr_B, int nfast );
 	void expand_target_vector( double *full_A, double *compr_A, int nfast );
 	void mult( double *compr_A, double *compr_B, int nfast  );
+
 };
 
 void SparseMult( double *vec_out, double *vec_in, SparseMatrix *Mat );

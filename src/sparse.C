@@ -425,8 +425,10 @@ void SparseMatrix::coupleParameters( int p1, int p2, double val )
 		}
 
 		if( p2 == p1 )
+		{
 			diage[p1] = nnz[p1];
-
+			diagonal_element[p1] = val;
+		}
 		nzl[p1][nnz[p1]] = p2;
 		nzv[p1][nnz[p1]] = val;
 
@@ -480,7 +482,8 @@ void SparseMatrix::init( int new_n )
 	nzl = (int **)malloc( sizeof(int*) * new_n );
 	nzl_space = (int *)malloc( sizeof(int*) * new_n );
 	diage = (int *)malloc( sizeof(int) * new_n );
-
+	diagonal_element = (double *)malloc( sizeof(double) * new_n );
+	memset( diagonal_element, 0, sizeof(double) * new_n );
 	nzv = (double **)malloc( sizeof(double*) * new_n );
 
 	scratch = (double *)malloc( sizeof(double) * new_n );
