@@ -1597,57 +1597,8 @@ void surface::evaluate_fp( force_set *theForceSet, double *xp, double *r )
 	}	
 }
 
-void surface::debug_dKE_dx_and2( force_set *theForceSet, double *effM, double *vp, double *unit_f_vec, int f, double u, double v )
-{
-#if 0
-	double dKEdx = 0;
-	double d2KEdx2 = 0;
 
-	dKE_dx_and2( theForceSet, effM, vp, unit_f_vec, f, u, v, &dKEdx, &d2KEdx2 );
-
-	double T_cur = evaluate_T( theForceSet, vp, mesh_p );
-
-	int neps = 100;
-	double maxeps = 1;
-
-	double *vcopy = (double *)malloc( sizeof(double) * 3 * nv );
-	
-	double *g = (double *)malloc( sizeof(double) * 3 * nv );
-
-	for( int ieps = 0; ieps < neps; ieps++ )
-	{
-		memcpy( vcopy, vp, sizeof(double) * 3 * nv );
-
-		double eps = ieps * (maxeps)/(double)neps;
-	
-		double frc[3] = { unit_f_vec[0] * eps,
-				  unit_f_vec[1] * eps,
-				  unit_f_vec[2] * eps};
-
-		memset( g, 0, sizeof(double) * 3 * nv );			
-		applyForceAtPoint( f, u, v, frc, g, theForceSet );
-
-		// perturb the velocity
-
-		for( int v1 = 0; v1 < nv; v1++ )
-		for( int v2 = 0; v2 < nv; v2++ )
-		{
-			vcopy[3*v2+0] += (-g[3*v1+0]*effM[v2*nv+v1]);
-			vcopy[3*v2+1] += (-g[3*v1+1]*effM[v2*nv+v1]);
-			vcopy[3*v2+2] += (-g[3*v1+2]*effM[v2*nv+v1]);
-		}
-		
-		double T_new = evaluate_T( theForceSet, vcopy );
-
-		printf("%le T: %le approx %le\n", eps, T_new-T_cur, dKEdx * eps + d2KEdx2 * 0.5 * eps * eps  );
-	}	
-
-	free(vcopy);
-	free(g);
-#endif
-}
-
-void surface::dKE_dx_and2( force_set *theForceSet, double *effM, double *vp, double *unit_f_vec, int f, double u, double v, double *dKEdx, double *d2KEdx2 )
+void surface::dKE_dx_and2( force_set *theForceSet, SparseMatrix *effM, double *vp, double *unit_f_vec, int f, double u, double v, double *dKEdx, double *d2KEdx2 )
 {
 	// apply force at this point, what is the change in kinetic energy?
 
@@ -1663,13 +1614,15 @@ void surface::dKE_dx_and2( force_set *theForceSet, double *effM, double *vp, dou
 	double *dv_coef = (double *)malloc( sizeof(double) * nv );
 	memset( dv_coef, 0, sizeof(double) * nv );
 
-	for( int v2 = 0; v2 < nv; v2++ )
-	{
-		for( int c1 = 0; c1 < ncoef; c1++ )
-			dv_coef[v2] += effM[v2*nv+coef_list[c1]] * coefs[c1];
+	/* this is wasteful but I want to worry about it when it's necessary */
 
-	}
-	
+	double *full_vec = (double *)malloc( sizeof(double) * nv );
+	memset( full_vec, 0, sizeof(double) * nv );
+	for( int c = 0; c < ncoef; c++ )
+		full_vec[coef_list[c]] = coefs[c];
+
+	SparseMult( dv_coef, full_vec, effM  );	
+
 	*dKEdx = 0;
 	*d2KEdx2 = 0;
 

@@ -822,9 +822,9 @@ void cpass( double *gamma_i, double *gamma_nrm, int nv, int *bonds, int nbonds_p
 
 	while( !v_done )
 	{
-		printf("Border iteration.\n");
+//		printf("Border iteration.\n");
 		v_done = 1;
-		printf("nborder: %d\n", nborder);
+//		printf("nborder: %d\n", nborder);
 		for( int b = 0; b < nborder; b++ )
 		{
 			int t1 = border_edges[b*2+0];
@@ -1630,7 +1630,7 @@ void vpass_inner(
 		int niter = 0;
 		while( !v_done )
 		{
-			printf("Border iteration.\n");
+//			printf("Border iteration.\n");
 			v_done = 1;
 			niter++;
 			if( niter > 50 )

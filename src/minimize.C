@@ -358,7 +358,9 @@ void surface::minimize( double *r, pcomplex **allComplexes, int ncomplex )
 	int use_m = nsteps;
 	if( use_m > num_params )
 		use_m = num_params;
-
+	
+	double e_init = surface_f(p);
+	printf("Entering minimize with e_init: %le\n", e_init );
 	l_bfgs_setup( use_m, num_params, p, 1.0, surface_f, surface_fdf); 
 
 	for( int x = 0; x < nsteps; x++ )

@@ -913,3 +913,18 @@ void SparseMatrix::mult(double *compr_A, double *compr_B, int nfast )
 	Amat->cgsolve( b, solv );
 
 */
+
+void SparseMult( double *vec_out, double *vec_in, SparseMatrix *Mat )
+{
+	double *mcopy = (double *)malloc( sizeof(double) * Mat->nsource );
+	double *vout  = (double *)malloc( sizeof(double) * Mat->nneed );
+	memset( vout, 0, sizeof(double)*Mat->nneed);
+
+	Mat->compress_source_vector( vec_in,   mcopy, 1 );
+	Mat->mult( vout, mcopy, 1 );
+	Mat->expand_target_vector( vec_out, vout, 1 );
+
+	free(mcopy);
+	free(vout);
+}
+

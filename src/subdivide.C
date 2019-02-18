@@ -92,9 +92,9 @@ int main( int argc, char **argv )
 	sub_surface->saveSurface("subdiv.mesh");
 //	sub_surface->writeLimitingSurface("limit.xyz");
 	sub_surface->generatePlan();
-	FILE* limit = fopen("limit.xyz","w");
-	sub_surface->writeStructure(limit);
-	fclose(limit);
+//	FILE* limit = fopen("limit.xyz","w");
+//	sub_surface->writeStructure(limit);
+//	fclose(limit);
 	int nv = sub_surface->nv;
 	int nc = 3 * nv+3;
 	double *r = (double *)malloc( sizeof(double) * nc );

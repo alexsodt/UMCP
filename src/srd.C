@@ -481,7 +481,7 @@ void srd_integrator::initializeDistances( double *r, surface *theSurface, double
 	}
 }
 
-int srd_integrator::stream_and_collide( double *r, double *g, double *drdt, double *vmem, double *effm, surface *theSurface, double **M, int mlow, int mhigh, double del_hull, force_set *theForceSet, double running_time, double integrate_time, double time_step_collision )
+int srd_integrator::stream_and_collide( double *r, double *g, double *vmem, SparseMatrix *effm, surface *theSurface, double **M, int mlow, int mhigh, double del_hull, force_set *theForceSet, double running_time, double integrate_time, double time_step_collision )
 {
 
 
@@ -506,6 +506,8 @@ int srd_integrator::stream_and_collide( double *r, double *g, double *drdt, doub
 
 //	printf("Free path time: %le collision time: %le running_time: %le\n",
 //		time_free_path_grain, time_step_collision, running_time );
+		
+	setMembraneMinMax(r,theSurface);
 
 	int iter = 0;
 	for( double t = use_running_time; t < use_running_time + integrate_time - 1e-14; t += dt, iter++)
@@ -518,31 +520,14 @@ int srd_integrator::stream_and_collide( double *r, double *g, double *drdt, doub
 		double path_expec = SAFETY_FACTOR * average_velocity * use_dt;
 //		printf("path expec: %le\n", path_expec );
 		
-#ifdef TAG_MECHANISM
 		// refreshes the tags on particles that have moved into range of the membrane.		
 		tagParticlesForCollision( r, theSurface, path_expec+del_hull, M, mlow, mhigh );
-//		altTag( r, theSurface, path_expec+del_hull, M, mlow, mhigh );
-#endif
 		stream(use_dt);
 
-		for( int v = 0; v < theSurface->nv; v++ )
-		{	
-			r[3*v+0] += drdt[3*v+0] * use_dt;
-			r[3*v+1] += drdt[3*v+1] * use_dt;
-			r[3*v+2] += drdt[3*v+2] * use_dt;
-		}
-		theSurface->put(r);
-
-		setMembraneMinMax(r,theSurface);
 
 		int ncol_local = 0;				
 
-#ifdef TAG_MECHANISM
 		ncol_local = resolveCollision( r, g, vmem, effm, path_expec+del_hull, theSurface, M, mlow, mhigh, theForceSet, use_dt, force_factor );
-//		checkResolve( r, theSurface, path_expec+del_hull, M, mlow, mhigh );
-#else
-		ncol_local = collide_with_membrane( r, g, theSurface, M, mlow, mhigh, del_hull, theForceSet, use_dt, force_factor, vmem, effm );
-#endif
 		ncol += ncol_local;
 
 		if( icol != (int)use_running_time/time_step_collision )
@@ -556,7 +541,7 @@ int srd_integrator::stream_and_collide( double *r, double *g, double *drdt, doub
 	return ncol;
 }
 
-int srd_integrator::collide_with_membrane( double *r, double *g, surface *theSurface, double **M, int mlow, int mhigh, double del_hull, force_set *theForceSet, double time_step, double force_factor, double *vmem, double *effm )
+int srd_integrator::collide_with_membrane( double *r, double *g, surface *theSurface, double **M, int mlow, int mhigh, double del_hull, force_set *theForceSet, double time_step, double force_factor, double *vmem, SparseMatrix *effm )
 {
 	memset( did_collide, 0, sizeof(int) * np );
 	if( planar )
@@ -567,7 +552,7 @@ int srd_integrator::collide_with_membrane( double *r, double *g, surface *theSur
 
 static int col_cntr = 0; // debugging only 
 
-int srd_integrator::collide_with_membrane_planar( double *r, double *g, surface *theSurface, double **M, int mlow, int mhigh, double del_hull, force_set *theForceSet, double time_step, double force_factor, double *vmem, double *effm  )
+int srd_integrator::collide_with_membrane_planar( double *r, double *g, surface *theSurface, double **M, int mlow, int mhigh, double del_hull, force_set *theForceSet, double time_step, double force_factor, double *vmem, SparseMatrix *effm  )
 {
 	// this is the vector of forces projected onto the control points ( the generalized coordinates )
 	// d v / d xi * dxi / dcontrol_pt. The change in control points giving the proper change in velocities must be solved at the end
@@ -778,40 +763,6 @@ int srd_integrator::collide_with_membrane_planar( double *r, double *g, surface 
 					force_vector[3*v+2] *= -1;
 				}
 
-				if( debug_mode )
-				{
-					int nv = theSurface->nv;
-					double dvm_pred[3*nv+3];
-					memset( dvm_pred, 0, sizeof(double) * 3 * (nv+1) );
-
-					for( int v = 0; v < nv; v++ )
-					for( int v2 = 0; v2 < nv; v2++ )
-					{
-						dvm_pred[3*v+0] += effm[v*nv+v2] * force_vector[3*v2+0] * force_factor / time_step; 
-						dvm_pred[3*v+1] += effm[v*nv+v2] * force_vector[3*v2+1] * force_factor / time_step; 
-						dvm_pred[3*v+2] += effm[v*nv+v2] * force_vector[3*v2+2] * force_factor / time_step; 
-					}
-					double dv_at_point[3];
-
-					theSurface->velocityAtPoint( col_f, col_u, col_v, dvm_pred, dv_at_point );
-
-					if( debug_mode )
-					printf("CHECK membrane change_in_velocity_at_collision point: %le %le %le\n", dv_at_point[0], dv_at_point[1], dv_at_point[2] );		
-
-					double dprod = dv_at_point[0] * dp[0] + dv_at_point[1] * dp[1] + dv_at_point[2] * dp[2];
-					if( dprod > 0 && 0)
-					{
-						printf("Particle velocity before: %le %le %le\n", vp[3*p+0] - dp[0] / mass, vp[3*p+1] - dp[1] / mass, vp[3*p+2] - dp[2] / mass);		
-						printf("Particle velocity after: %le %le %le\n", vp[3*p+0], vp[3*p+1], vp[3*p+2] );		
-						printf("CHECK membrane velocity_at_collision point: %le %le %le\n", mem_v[0], mem_v[1], mem_v[2] );		
-						printf("CHECK membrane change_in_velocity_at_collision point: %le %le %le\n", dv_at_point[0], dv_at_point[1], dv_at_point[2] );		
-						printf("collision_counter = %d\n", col_cntr );
-			
-						theSurface->testFAP( col_f, col_u, col_v, dp, effm );
-
-						exit(1);
-					}
-				}
 				total_dp[0] += dp[0];
 				total_dp[1] += dp[1];
 				total_dp[2] += dp[2];
@@ -841,7 +792,7 @@ int srd_integrator::collide_with_membrane_planar( double *r, double *g, surface 
 	return n_col;
 }
 
-int srd_integrator::collide_with_membrane_inside_outside( double *r, double *g, surface *theSurface, double **M, int mlow, int mhigh, double del_hull, force_set *theForceSet, double time_step, double force_factor, double *vmem, double *effm )
+int srd_integrator::collide_with_membrane_inside_outside( double *r, double *g, surface *theSurface, double **M, int mlow, int mhigh, double del_hull, force_set *theForceSet, double time_step, double force_factor, double *vmem, SparseMatrix *effm )
 {
 	printf("This needs to be updated to reflect the proper collision.\n");
 	exit(1);
@@ -1305,7 +1256,7 @@ void srd_integrator::checkResolve( double * r, surface * theSurface, double delt
 	}
 }
 
-int srd_integrator::resolveCollision( double *r, double *g, double *vmem, double *effm, double delta_hull_collision, surface *theSurface, double **M, int mlow, int mhigh, force_set *theForceSet, double time_step, double force_factor )
+int srd_integrator::resolveCollision( double *r, double *g, double *vmem, SparseMatrix *effm, double delta_hull_collision, surface *theSurface, double **M, int mlow, int mhigh, force_set *theForceSet, double time_step, double force_factor )
 {
 	double LA = PBC_vec[0][0];
 	double LB = PBC_vec[1][1];

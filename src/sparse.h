@@ -41,4 +41,6 @@ struct SparseMatrix
 	void mult( double *compr_A, double *compr_B, int nfast  );
 };
 
+void SparseMult( double *vec_out, double *vec_in, SparseMatrix *Mat );
+
 #endif

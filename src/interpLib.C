@@ -2380,7 +2380,7 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 
 
 	sortFaces();
-	writeXYZSurface("success.xyz","success.psf", this );
+//	writeXYZSurface("success.xyz","success.psf", this );
 	
 	for( int t = 0; t < nt; t++ )
 	{
@@ -6533,10 +6533,8 @@ void surface::generatePlan( void )
 		theFormulas[f].undeformed_r[1] = r[1];
 		theFormulas[f].undeformed_r[2] = r[2];
 	}
-					
-	FILE *theFile = fopen("plan.xyz", "w");
-	fprintf(theFile, "%d\n", nf*2 );
-	fprintf(theFile, "plan\n");
+			
+		
 
 	double alpha_x = 1.0;
 	double alpha_y = 1.0;
@@ -6572,10 +6570,7 @@ void surface::generatePlan( void )
 		double nrm[3];
 		cross( ru, rv, nrm );
 		normalize(nrm);
-		fprintf(theFile, "C %lf %lf %lf\n", r[0], r[1], r[2] );
-		fprintf(theFile, "O %lf %lf %lf\n", r[0]+del * nrm[0], r[1]+del * nrm[1], r[2]+del * nrm[2] );
 	}
-	fclose(theFile);
 
 	constructIrregularKernels();
 }
@@ -7392,7 +7387,7 @@ void surface::orientSurface( void )
 {
 
 	constructTriangles();
-	writeXYZSurface("init.xyz","init.psf", this );
+//	writeXYZSurface("init.xyz","init.psf", this );
 	
 
 	int done = 0;

@@ -266,7 +266,7 @@ void do_linesearch( double *search_step )
 	
 	int iter = 0;
 	int n_max = 20;
-	int n_cat = 30;
+	int n_cat = 300;
 
 	if( f_low < ENERGY_ERROR)
 	{
@@ -337,8 +337,8 @@ void do_linesearch( double *search_step )
 	if( f_mid > f_high )
 	{	
 		printf("TRUNCATING linesearch, max move f_low: %.14le f_mid: %.14le f_high %.14le.\n", f_low, f_mid, f_high);
-		for( int j = 0; j < n; j++ )
-			cur_x[j] -= alpha_high * search_step[j];		
+//		for( int j = 0; j < n; j++ )
+//			cur_x[j] -= alpha_high * search_step[j];		
 		return;	
 	}
 

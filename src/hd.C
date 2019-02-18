@@ -652,6 +652,9 @@ int temp_main( int argc, char **argv )
 
 
 	double V = sub_surface->energy(r,NULL);
+#ifdef PARALLEL
+	ParallelSum(&V,1);
+#endif
 	printf("Initial energy: %lf\n", V );
 	
 	if( !do_gen_q ) // generalized coordinates are simply the control point positions.
@@ -1091,6 +1094,22 @@ int temp_main( int argc, char **argv )
 			last_complex_time += complex_time_stop - complex_time_start;
 
 			/* END complex */
+
+			/* BEGIN SRD */
+			
+			if( do_srd )
+			{
+				sub_surface->rebox_system();
+				// reinitialize everything if we are going to collide over and over.
+				srd_i->initializeDistances( r, sub_surface, M, mlow, mhigh );
+				double use_dhull = 0;
+
+				double ncol = srd_i->stream_and_collide( r, g, qdot, EFFM, sub_surface, M, mlow, mhigh, use_dhull, theForceSet, cur_t*AKMA_TIME, time_step * AKMA_TIME, time_step_collision * AKMA_TIME  );
+			}
+
+
+			/* END SRD */
+
 			gettimeofday(&tnow,NULL);
 			double misc_time_start = tnow.tv_sec + (1e-6)*tnow.tv_usec;
 #ifdef PARALLEL
@@ -1177,8 +1196,8 @@ int temp_main( int argc, char **argv )
 				T += pp[Q] * Qdot0_trial[Q] * 0.5;
 			}
 #ifdef PARALLEL
-			if( ! do_gen_q )
-				ParallelSum(&T,1);
+//			if( ! do_gen_q )
+//				ParallelSum(&T,1);
 #endif
 				
 			/*****************************
