@@ -1370,7 +1370,7 @@ int srd_integrator::resolveCollision( double *r, double *g, double *qdot, Sparse
 				if( col_f < theSurface->nf_faces )
 					near_vertex = theSurface->theFormulas[col_f*theSurface->nf_g_q_p].cp[use_code];
 				else	
-					near_vertex = theSurface->theIrregularFormulas[col_f*theSurface->nf_irr_pts].cp[use_code];
+					near_vertex = theSurface->theIrregularFormulas[(col_f-theSurface->nf_faces)*theSurface->nf_irr_pts].cp[use_code];
 
 				double M_ii = effm->diagonal_element[near_vertex]; 
 	

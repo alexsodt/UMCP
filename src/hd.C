@@ -460,7 +460,9 @@ int temp_main( int argc, char **argv )
 	{
 		n_real_q = NQ;
 		pp = (double *)malloc( sizeof(double) * NQ ); 
+		memset( pp, 0, sizeof(double) * NQ );
 		next_pp = (double *)malloc( sizeof(double) * NQ );
+		memset( next_pp, 0, sizeof(double) * NQ );
 		del_pp = (double *)malloc( sizeof(double) * NQ );
 		QV = (double *)malloc( sizeof(double) * NQ );
 		Qdot = (double *)malloc( sizeof(double) * NQ );
@@ -480,7 +482,9 @@ int temp_main( int argc, char **argv )
 	else
 	{	
 		pp = (double *)malloc( sizeof(double) * (3*nv+3) );
+		memset( pp, 0, sizeof(double) * (3*nv+3) );
 		next_pp = (double *)malloc( sizeof(double) * (3*nv+3) );
+		memset( next_pp, 0, sizeof(double) * (3*nv+3) );
 		QV = (double *)malloc( sizeof(double) * (3*nv+3) );
 		Qdot = (double *)malloc( sizeof(double) * (3*nv+3) );
 		Qdot0 = (double *)malloc( sizeof(double) * (3*nv+3) );
