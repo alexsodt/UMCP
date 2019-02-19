@@ -344,16 +344,17 @@ void srd_integrator::collide( void )
 
 	double eps = 0.1;
 		
-	double S = (1+eps);
-
-	if( rand() % 2 == 0 )
-		S = 1-eps;
 
 	double inst_temp = 0;
 
 	for( int b = 0; b < nbins; b++ )
 	{
-		if( bins[b].np == 0 ) continue;
+		double S = (1+eps);
+
+		if( rand() % 2 == 0 )
+			S = 1-eps;
+
+		if( bins[b].np < 1 ) continue;
 
 		double vav[3] = {0,0,0};
 
@@ -397,7 +398,7 @@ void srd_integrator::collide( void )
 			inst_temp += 0.5 * mass * (vp[3*p+0] * vp[3*p+0] + vp[3*p+1] * vp[3*p+1] + vp[3*p+2] * vp[3*p+2]);	
 		}
 			
-		if( !debug_mode ) 
+		if( !debug_mode && bins[b].np > 1 ) 
 		{
 			double A = pow( S, 3 * (bins[b].np - 1) ) * exp( - mass * ( S*S-1) / (2 * temp) * RELKE );
 	
@@ -427,7 +428,7 @@ void srd_integrator::collide( void )
 	running_temp += inst_temp;
 	nrunning += 1;
 
-	if( nrunning % 100 == 0 )		
+//	if( nrunning % 100 == 0 )		
 		printf("temp: %le av %le\n", inst_temp / 0.592, running_temp / (nrunning) / 0.592 );
 	
 	double KE_out = KE();
@@ -1659,7 +1660,7 @@ void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface,
 
 void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface, double delta_hull_collision, double **M, int mlow, int mhigh )
 {
-
+	return;
 	double *vertex_data = NULL;
 	int *ptr_to_data = (int *)malloc( sizeof(int) * theSurface->nt );
 	int *nump = (int *)malloc( sizeof(int) * theSurface->nt );
@@ -1682,20 +1683,20 @@ void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface,
 		double fx = rp[3*p+0] / PBC_vec[0][0];
 		while( fx < 0 ) fx += 1.0;
 		while( fx >= 1.0 ) fx -= 1.0;
-		int bx = fx * grain_x;
-		if( bx == grain_x ) bx--;
+		int bx = fx * id_grain_x;
+		if( bx == id_grain_x ) bx--;
 		
 		double fy = rp[3*p+1] / PBC_vec[1][1];
 		while( fy < 0 ) fy += 1.0;
 		while( fy >= 1.0 ) fy -= 1.0;
-		int by = fy * grain_y;
-		if( by == grain_y ) by--;
+		int by = fy * id_grain_y;
+		if( by == id_grain_y ) by--;
 		
 		double fz = rp[3*p+2] / PBC_vec[2][2];
 		while( fz < 0 ) fz += 1.0;
 		while( fz >= 1.0 ) fz -= 1.0;
-		int bz = fz * grain_z;
-		if( bz == grain_z ) bz--;
+		int bz = fz * id_grain_z;
+		if( bz == id_grain_z ) bz--;
 
 		int bin = (bx * id_grain_y + by ) * id_grain_z + bz;
 
