@@ -6,8 +6,8 @@ EMAIL = alexander.sodt@nih.gov
 bin_PROGRAMS = hd.opt makeHexSquare.opt min.opt subdivide.opt scale.opt icosahedron.opt makeBud.opt makeBump.opt makeHexCylinder.opt  writeBiasPotential.opt writeCylRTraj.opt
 
 AM_CPPFLAGS = -include ../config.h -include ../src/local_config.h $(AM_INCLUDE) 
-AM_CFLAGS = -O2
-AM_CXXFLAGS = -O2
+AM_CFLAGS = -O2 -pg
+AM_CXXFLAGS = -O2 -pg
 
 vpath %.C ../src
 vpath %.c ../src
@@ -33,6 +33,8 @@ makeHexCylinder_opt_SOURCES = makeHexCylinder.C $(hull_SRCS) $(util_SRCS)
 makeHexSquare_opt_SOURCES = makeHexSquare.C $(hull_SRCS) $(util_SRCS)
 writeBiasPotential_opt_SOURCES = writeBiasPotential.C $(util_SRCS)
 writeCylRTraj_opt_SOURCES      = writeCylRTraj.C $(util_SRCS) 
+
+hd_opt_LDFLAGS		  = $(AM_LDFLAGS) -pg
 
 hd_opt_LDADD              = $(AM_LDADD) -lstdc++
 min_opt_LDADD             = $(AM_LDADD) -lstdc++
