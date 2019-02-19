@@ -115,6 +115,7 @@ int temp_main( int argc, char **argv )
 	int debug = block.debug;
 	double kcal_mol_K = (5.92186663194E-01/298);
 	double temperature = kcal_mol_K * (block.T);
+	printf("temperature: %le (kcal/mol) %le T\n", temperature, block.T );
 	double eta_SI = block.eta; //8.90*(1e-4); // Joule second per meter cubed)	
 	double eta = eta_SI * (1e-30 /* meters per angstrom*/ ) * (1./1000.) * (1/4.184) * (6.022e23);
 

@@ -347,12 +347,13 @@ void srd_integrator::collide( void )
 
 	double inst_temp = 0;
 
+
 	for( int b = 0; b < nbins; b++ )
 	{
 		double S = (1+eps);
 
 		if( rand() % 2 == 0 )
-			S = 1-eps;
+			S = 1.0 / (1+eps);
 
 		if( bins[b].np < 1 ) continue;
 
@@ -421,7 +422,9 @@ void srd_integrator::collide( void )
 				}
 			}
 		}
+
 	}
+
 		
 	inst_temp /= (3 * (np));
 
@@ -429,7 +432,7 @@ void srd_integrator::collide( void )
 	nrunning += 1;
 
 //	if( nrunning % 100 == 0 )		
-		printf("temp: %le av %le\n", inst_temp / 0.592, running_temp / (nrunning) / 0.592 );
+		printf("temp: %le av %le target: %le\n", inst_temp / 0.592, running_temp / (nrunning) / 0.592, temp );
 	
 	double KE_out = KE();
 
@@ -1660,7 +1663,6 @@ void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface,
 
 void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface, double delta_hull_collision, double **M, int mlow, int mhigh )
 {
-	return;
 	double *vertex_data = NULL;
 	int *ptr_to_data = (int *)malloc( sizeof(int) * theSurface->nt );
 	int *nump = (int *)malloc( sizeof(int) * theSurface->nt );
