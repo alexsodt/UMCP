@@ -15,13 +15,14 @@ class Min_Distance {
 
 		// Number of points in simplex
 		int elements;
+		int quick_abort;
 
 		Point simplex[4];
 //		Point *simplex;
 		double r;
 
 	public:
-		Min_Distance(double*& objA, double*& objB, int numA, double radius);
+		Min_Distance(double*& objA, double*& objB, int numA, double radius, int do_quick_abort=0);
 
 		~Min_Distance();
 

@@ -11,11 +11,12 @@
 
 using namespace std;
 
-Min_Distance::Min_Distance(double*& objA, double*& objB, int numA, double radius) {
+Min_Distance::Min_Distance(double*& objA, double*& objB, int numA, double radius, int do_quick_abort) {
 	elements = 0;
 //	simplex = new Point[4];
 	numM = numA;
 	r = radius;
+	quick_abort = do_quick_abort;
 	
 	if( numA > MAX_MD_POINTS )
 	{
@@ -254,6 +255,9 @@ bool Min_Distance::run_GJK() {
 //		cout << "triangle" << endl;
             } else if (elements == 4) {
 		//		cout << "HERE!!!" << endl;
+				if( quick_abort ) // skip calling expensive nearestsimplex unless we are at the lowest level.
+					return true;
+
 				Check checkTetra = NearestSimplex();
 				if (checkTetra.inside == true) {
 					return true;

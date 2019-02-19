@@ -1077,12 +1077,9 @@ int temp_main( int argc, char **argv )
 			if( do_srd )
 			{
 				sub_surface->rebox_system();
-				// reinitialize everything if we are going to collide over and over.
-				srd_i->initializeDistances( r, sub_surface, M, mlow, mhigh );
 				double use_dhull = 0;
 
 				double ncol = srd_i->stream_and_collide( r, g, qdot, EFFM, sub_surface, M, mlow, mhigh, use_dhull, theForceSet, cur_t*AKMA_TIME, time_step * AKMA_TIME, time_step_collision * AKMA_TIME  );
-				printf("ncol: %lf\n", ncol );
 			}
 
 

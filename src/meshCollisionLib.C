@@ -233,7 +233,7 @@ int collision( surface *surface1, surface *surface2, double **M, int mlow, int m
 }
 
 
-bool minimum_distance( double *r1, int nv1, double *r2, double radius );
+bool minimum_distance( double *r1, int nv1, double *r2, double radius, int do_quick_abort );
 int checkCollision2( double *r1, int nv1, double *r2, double **M, int mlow, int mhigh, int level, int max_level, double radius, 
 		double factor, 
 		double cur_u, double cur_v,
@@ -252,7 +252,7 @@ int checkCollision2( double *r1, int nv1, double *r2, double **M, int mlow, int 
 
 	int tt = (tr_tri_intersect3D( C1, P1, P2, D1, Q1, Q2 ) != 0);
 #endif
-	bool min = minimum_distance( r1, nv1, r2, radius );
+	bool min = minimum_distance( r1, nv1, r2, radius, level!=max_level );
 
 
 	if( !min ) {
@@ -2148,7 +2148,7 @@ int nearMembraneWorker( double *r1, int nv1, double *r2, double **M, int mlow, i
 		double *puv_list, double *areas, int *npts )	
 {
 
-	bool min = minimum_distance( r1, nv1, r2, radius );
+	bool min = minimum_distance( r1, nv1, r2, radius, level!=max_level );
 
 	if( !min ) {
 		return 0;

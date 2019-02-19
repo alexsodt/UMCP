@@ -50,12 +50,12 @@ bool quick_check( double *r1, int nv1, double *r2, double radius )
 }
 
 
-bool minimum_distance(double* r1, int nv1, double* r2, double radius) {
+bool minimum_distance(double* r1, int nv1, double* r2, double radius, int do_quick_abort ) {
 
 	if( ! quick_check( r1, nv1, r2, radius ) )
 		return false;
 
-	Min_Distance test(r1, r2, nv1, radius);
+	Min_Distance test(r1, r2, nv1, radius, do_quick_abort);
 //	test.write_Minkowski();
 	bool trgjk =  test.run_GJK();
 

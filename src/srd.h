@@ -61,6 +61,15 @@ typedef struct srd_integrator
 	double PBC_vec[3][3];	
 	bin *bins;
 	
+	int grain_x_p;
+	int grain_y_p;
+	int grain_z_p;
+	int id_grain_x;
+	int id_grain_y;
+	int id_grain_z;
+	bin *bins_id;
+	int *bin_level;
+	
 
 //	void init( double mesh_spacing, double PBC_vec[3][3], double temp_in, double eta_in, double dt_si, double dt, int doPlanarTopology, double binw=50.0 );
 	void init( double mesh_spacing, double PBC_vec[3][3], double temp_in, double eta_in, double dt_si, double dt, int doPlanarTopology, double mass, double M, int hard_z_boundary );

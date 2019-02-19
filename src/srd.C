@@ -20,13 +20,21 @@
 #define TAG_MECHANISM
 #define MEMBRANE_LEVEL_TOLERANCE (0.0)
 static double FUDGE_DISTANCE = 1.0;
-static double SAFETY_FACTOR  = 4.0;
+static double SAFETY_FACTOR  = 2.0;
 
 static gsl_rng * r_gen = NULL;
 static double running_temp = 0;
 static int nrunning = 0;
 //#define DEBUG_MOMENTUM_CHANGE
 // void rotateArbitrary( double *xyz_rot, double *axis, double *origin, int nat, double val );
+
+int ipw2( int y )
+{
+	double val = 1.0;
+	for( int ty = 0; ty < y; ty++ )
+		val *= 2;
+	return val;
+}
 
 void srd_integrator::init( double av_edge_length, double PBC_vec_in[3][3], double temp_in /* kcal/mol */, double eta_in /* SI */, double dt_si, double dt_in /* seconds */, int doPlanarTopology, double mass_in, double srd_M, int hard_z_boundary_in)
 {
@@ -200,6 +208,39 @@ void srd_integrator::init( double av_edge_length, double PBC_vec_in[3][3], doubl
 		srdCollisionEstimator = a;
 	printf("srdCollisionEstimator: %le\n", srdCollisionEstimator );
 
+	{	
+		double vol = PBC_vec[0][0] * PBC_vec[1][1] * PBC_vec[2][2];
+		double rho = np / vol;
+	
+		// lowest level: approx 5 per.
+		double low_vol = 5 / rho;
+		double approx_len = pow( low_vol, 1.0 / 3.0 );
+	
+		grain_x_p = 1 + log( PBC_vec[0][0] / approx_len ) / log(2);
+		grain_y_p = 1 + log( PBC_vec[1][1] / approx_len ) / log(2);
+		grain_z_p = 1 + log( PBC_vec[2][2] / approx_len ) / log(2);
+		
+		id_grain_x = (int) pow( 2, grain_x_p );
+		id_grain_y = (int) pow( 2, grain_x_p );
+		id_grain_z = (int) pow( 2, grain_x_p );
+	
+		// find lowest power, this will limit our log search
+		int min_p = grain_x_p;
+		if( grain_y_p < min_p ) min_p = grain_y_p;
+		if( grain_z_p < min_p ) min_p = grain_z_p;
+	
+		int nbins_id = id_grain_x * id_grain_y * id_grain_z;
+	
+		bins_id = (bin *)malloc( sizeof(bin) * nbins_id );
+		for( int x = 0; x < nbins_id; x++ )
+		{
+			bins_id[x].np = 0;
+			bins_id[x].npSpace = 5;
+			bins_id[x].list = (int *)malloc( sizeof(int) * bins_id[x].npSpace );
+		}
+		bin_level = (int *)malloc( sizeof(int) * nbins_id );
+
+	}
 }
 
 void srd_integrator::stream( double dt )
@@ -408,15 +449,15 @@ double srd_integrator::KE( void )
 
 	return l_KE;
 }
-
-void srd_integrator::initializeDistances( double *r, surface *theSurface, double **M, int mlow, int mhigh )
+/*
+void srd_integrator::initializeDistances_works( double *r, surface *theSurface, double **M, int mlow, int mhigh )
 {
 	double *vertex_data = NULL;
 	int *ptr_to_data = (int *)malloc( sizeof(int) * theSurface->nt );
 	int *nump = (int *)malloc( sizeof(int) * theSurface->nt );
 	theSurface->buildFaceData( &vertex_data, ptr_to_data, nump );
 
-#if 1
+#if 1 
 	int nbins = grain_x * grain_y * grain_z;
 
 	for( int x = 0; x < nbins;x ++ )
@@ -495,8 +536,10 @@ void srd_integrator::initializeDistances( double *r, surface *theSurface, double
 		
 		int f;
 		double u,v;
+		printf("Checking %d particles near %lf %lf %lf ", bins[b].np, cen[0], cen[1], cen[2] );
 		if( ! theSurface->withinRadius( cen, &f, &u, &v,  M, mlow, mhigh, -1,  r_max + srdCollisionEstimator, vertex_data, ptr_to_data, nump ) )
 		{
+			printf("... all are clear.\n");
 			for( int px = 0; px < bins[b].np; px++ )
 			{
 				int p = bins[b].list[px];
@@ -509,12 +552,15 @@ void srd_integrator::initializeDistances( double *r, surface *theSurface, double
 		}	
 		else
 		{
+			printf("...checking them all...");
+			double nok = 0, nbad=0;
 			for( int px = 0; px < bins[b].np; px++ )
 			{
 				int p = bins[b].list[px];
 			
 				if( ! theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1,  srdCollisionEstimator, vertex_data, ptr_to_data, nump ) )
 				{
+					nok += 1;
 					distance[p] = srdCollisionEstimator;
 
 					rp_dist[3*p+0] = rp[3*p+0];
@@ -523,6 +569,7 @@ void srd_integrator::initializeDistances( double *r, surface *theSurface, double
 				}
 				else
 				{
+					nbad += 1;
 					theSurface->nearPointOnBoxedSurface( rp+3*p, &f, &u, &v, M, mlow, mhigh, distance+p, -1 );
 					rp_dist[3*p+0] = rp[3*p+0];
 					rp_dist[3*p+1] = rp[3*p+1];
@@ -550,6 +597,7 @@ void srd_integrator::initializeDistances( double *r, surface *theSurface, double
 							inside_outside[p] = POINT_OUTSIDE;
 					}
 				}
+				printf(" %lf%% were clear.\n", 100 * nok / (nok+nbad) );
 			}
 		}
 	}
@@ -624,6 +672,321 @@ void srd_integrator::initializeDistances( double *r, surface *theSurface, double
 		}	
 	}
 #endif	
+	free(vertex_data);
+	free(ptr_to_data);
+	free(nump);
+}
+*/
+void srd_integrator::initializeDistances( double *r, surface *theSurface, double **M, int mlow, int mhigh )
+{
+	double *vertex_data = NULL;
+	int *ptr_to_data = (int *)malloc( sizeof(int) * theSurface->nt );
+	int *nump = (int *)malloc( sizeof(int) * theSurface->nt );
+	theSurface->buildFaceData( &vertex_data, ptr_to_data, nump );
+		
+	// find lowest power, this will limit our log search
+	int min_p = grain_x_p;
+	if( grain_y_p < min_p ) min_p = grain_y_p;
+	if( grain_z_p < min_p ) min_p = grain_z_p;
+	
+	int nbins_id = id_grain_x * id_grain_y * id_grain_z;
+
+	for( int x = 0; x < nbins_id; x++ )
+	{
+		bin_level[x] = -1; // unchecked.
+		bins_id[x].np = 0;
+	}
+	for( int p = 0; p < np; p++ )
+	{
+		double fx = rp[3*p+0] / PBC_vec[0][0];
+		while( fx < 0 ) fx += 1.0;
+		while( fx >= 1.0 ) fx -= 1.0;
+		int bx = fx * grain_x;
+		if( bx == grain_x ) bx--;
+		
+		double fy = rp[3*p+1] / PBC_vec[1][1];
+		while( fy < 0 ) fy += 1.0;
+		while( fy >= 1.0 ) fy -= 1.0;
+		int by = fy * grain_y;
+		if( by == grain_y ) by--;
+		
+		double fz = rp[3*p+2] / PBC_vec[2][2];
+		while( fz < 0 ) fz += 1.0;
+		while( fz >= 1.0 ) fz -= 1.0;
+		int bz = fz * grain_z;
+		if( bz == grain_z ) bz--;
+
+		int bin = (bx * id_grain_y + by ) * id_grain_z + bz;
+
+		if( bins_id[bin].npSpace == bins_id[bin].np )
+		{
+			bins_id[bin].npSpace *= 2;
+			bins_id[bin].list = (int *)realloc( bins_id[bin].list, sizeof(int) * bins_id[bin].npSpace );
+		}
+
+		bins_id[bin].list[bins_id[bin].np] = p;
+		bins_id[bin].np++;
+	}
+
+	int *upper_level = NULL;
+
+	int nradius = 0;
+	int ntiny = 0;
+	int nexplicit = 0;
+
+	// this is the power search.
+	for( int level = min_p-2; level >= 0; level-- )
+	{
+		int pfac = ipw2(level);
+
+		int gx = id_grain_x / pfac; 
+		int gy = id_grain_y / pfac; 
+		int gz = id_grain_z / pfac; 
+
+		int *our_level = (int *)malloc( sizeof(int) * gx * gy * gz );
+		memset( our_level,0,sizeof(int) * gx*gy*gz);
+		for( int bx = 0; bx < gx; bx++ )
+		for( int by = 0; by < gy; by++ )
+		for( int bz = 0; bz < gz; bz++ )
+		{
+			// do we need to check this or was it cleared at a higher level?
+
+			if( upper_level )
+			{
+				int tbx = bx/2;
+				int tby = by/2;
+				int tbz = bz/2;
+
+				if( upper_level[tbx*(gy/2)*(gz/2)+tby*(gz/2)+tbz] )
+				{
+//					printf("%d %d %d cleared at a higher level!\n", bx, by, bz );
+					our_level[bx*gy*gz+by*gz+bz] = 1;
+					continue; 
+				}
+			}
+
+			double cen[3] = { (bx+0.5) * PBC_vec[0][0] / gx,
+					  (by+0.5) * PBC_vec[1][1] / gy,
+					  (bz+0.5) * PBC_vec[2][2] / gz };
+
+			double LX = PBC_vec[0][0] / gx;
+			double LY = PBC_vec[1][1] / gy;
+			double LZ = PBC_vec[2][2] / gz;
+
+		
+			double maxr = sqrt( (LX*LX + LY*LY + LZ*LZ) / 4 );
+	
+			int f;
+			double u,v;
+
+//			printf("LEVEL %d cen %le %le %le\n", level, cen[0], cen[1], cen[2] );
+			nradius++;
+			if( ! theSurface->withinRadius( cen, &f, &u, &v,  M, mlow, mhigh, -1, maxr + srdCollisionEstimator, vertex_data, ptr_to_data, nump ) )
+			{
+				// cleared at this level.
+				our_level[bx*gy*gz+by*gz+bz] = 1;
+				int ncleared = 0;
+				for( int tbx = bx * pfac; tbx < (bx+1)*pfac; tbx++ )
+				for( int tby = by * pfac; tby < (by+1)*pfac; tby++ )
+				for( int tbz = bz * pfac; tbz < (bz+1)*pfac; tbz++ )
+				{
+					int tbin = tbx*id_grain_y*id_grain_z+tby*id_grain_z+tbz;
+					for( int bx = 0; bx < bins_id[tbin].np; bx++ )
+					{
+						int p = bins_id[tbin].list[bx];
+						double dr[3] = { rp[3*p+0] - cen[0], rp[3*p+1] - cen[1], rp[3*p+2] - cen[2] };
+						while( dr[0] < -PBC_vec[0][0]/2 ) dr[0] += PBC_vec[0][0];
+						while( dr[1] < -PBC_vec[1][1]/2 ) dr[1] += PBC_vec[1][1];
+						while( dr[2] < -PBC_vec[2][2]/2 ) dr[2] += PBC_vec[2][2];
+						while( dr[0] > PBC_vec[0][0]/2 ) dr[0] -= PBC_vec[0][0];
+						while( dr[1] > PBC_vec[1][1]/2 ) dr[1] -= PBC_vec[1][1];
+						while( dr[2] > PBC_vec[2][2]/2 ) dr[2] -= PBC_vec[2][2];
+						double r_cen = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+				
+						distance[p] = (maxr - r_cen) + srdCollisionEstimator;
+						ncleared++;
+						rp_dist[3*p+0] = rp[3*p+0];
+						rp_dist[3*p+1] = rp[3*p+1];
+						rp_dist[3*p+2] = rp[3*p+2];					
+					}
+				}
+//				printf("CLEARED! with %d particles.\n", ncleared );
+			}
+			else if( level == 0 ) 
+			{
+//				printf("failed to clear at lowest level.\n");
+				int bin = bx*gy*gz+by*gz+bz;
+				for( int px = 0; px < bins_id[bin].np; px++ )
+				{
+					int p = bins_id[bin].list[px];
+
+					ntiny++;
+					if( ! theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1, maxr + srdCollisionEstimator, vertex_data, ptr_to_data, nump ) )
+					{
+						rp_dist[3*p+0] = rp[3*p+0];
+						rp_dist[3*p+1] = rp[3*p+1];
+						rp_dist[3*p+2] = rp[3*p+2];
+						distance[p] = srdCollisionEstimator;
+					}
+					else
+					{
+						nexplicit++;
+						theSurface->nearPointOnBoxedSurface( rp+3*p, &f, &u, &v, M, mlow, mhigh, distance+p, -1 );
+						rp_dist[3*p+0] = rp[3*p+0];
+						rp_dist[3*p+1] = rp[3*p+1];
+						rp_dist[3*p+2] = rp[3*p+2];
+	
+						double rpt[3], rnrm[3];
+	
+						theSurface->evaluateRNRM( f, u, v, rpt, rnrm, r );
+	
+						double dr[3] = { rp[3*p+0] - rpt[0],
+							 rp[3*p+1] - rpt[1],
+							 rp[3*p+2] - rpt[2] };
+		
+						double len = normalize(dr);
+					
+						double dp = dr[0] * rnrm[0] + dr[1] * rnrm[1] + dr[2] * rnrm[2];
+
+//			printf("init len: %le dp: %le dist: %le\n", len, dp, distance[p] );
+
+						if( !planar )
+						{
+							if( dp > 0 )
+								inside_outside[p] = POINT_INSIDE;
+							else
+								inside_outside[p] = POINT_OUTSIDE;
+						}
+					}
+				}
+			}
+			else
+			{
+//				printf("...failed to clear.\n");
+			}
+		}
+
+		if( upper_level )
+			free(upper_level);
+		upper_level = our_level;
+	}  
+
+	printf("Ran %d radius checks.\n", nradius );
+	printf("Ran %d tiny radius checks.\n", ntiny );
+	printf("Ran explicit check on %d/%d particles.\n", nexplicit, np );
+	
+
+/*
+	for( int bx = 0; bx < id_grain_x; bx++ )
+	for( int by = 0; by < id_grain_y; by++ )
+	for( int bz = 0; bz < id_grain_z; bz++ )
+	{
+		int b = (bx * grain_y + by ) * grain_z + bz;
+
+		
+
+		double cen[3] = {  
+			(bx+0.5) * PBC_vec[0][0] / grain_x,
+			(by+0.5) * PBC_vec[1][1] / grain_y,
+			(bz+0.5) * PBC_vec[2][2] / grain_z };
+
+		if( bins[b].np == 0 ) continue;
+
+		double r_max = 0;
+		double dr[bins[b].np];
+
+		for( int px = 0; px < bins[b].np; px++ )
+		{
+			int p = bins[b].list[px];
+
+			double dr[3] = { rp[3*p+0] - cen[0],
+					 rp[3*p+1] - cen[1],
+					 rp[3*p+2] - cen[2] };
+
+			while( dr[0] < -PBC_vec[0][0]/2 ) dr[0] += PBC_vec[0][0];
+			while( dr[1] < -PBC_vec[1][1]/2 ) dr[1] += PBC_vec[1][1];
+			while( dr[2] < -PBC_vec[2][2]/2 ) dr[2] += PBC_vec[2][2];
+			while( dr[0] >  PBC_vec[0][0]/2 ) dr[0] -= PBC_vec[0][0];
+			while( dr[1] >  PBC_vec[1][1]/2 ) dr[1] -= PBC_vec[1][1];
+			while( dr[2] >  PBC_vec[2][2]/2 ) dr[2] -= PBC_vec[2][2];
+
+			double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+
+			if( r > r_max )
+				r_max = r;
+
+			dr[px] = r;
+					
+		}
+		
+		int f;
+		double u,v;
+		printf("FINAL LEVEL Checking %d particles near %lf %lf %lf ", bins[b].np, cen[0], cen[1], cen[2] );
+		if( ! theSurface->withinRadius( cen, &f, &u, &v,  M, mlow, mhigh, -1,  r_max + srdCollisionEstimator, vertex_data, ptr_to_data, nump ) )
+		{
+			printf("... all are clear.\n");
+			for( int px = 0; px < bins[b].np; px++ )
+			{
+				int p = bins[b].list[px];
+				distance[p] = (r_max - dr[px]) + srdCollisionEstimator;
+
+				rp_dist[3*p+0] = rp[3*p+0];
+				rp_dist[3*p+1] = rp[3*p+1];
+				rp_dist[3*p+2] = rp[3*p+2];				
+			}
+		}	
+		else
+		{
+			printf("...checking them all...");
+			double nok = 0, nbad=0;
+			for( int px = 0; px < bins[b].np; px++ )
+			{
+				int p = bins[b].list[px];
+			
+				if( ! theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1,  srdCollisionEstimator, vertex_data, ptr_to_data, nump ) )
+				{
+					nok += 1;
+					distance[p] = srdCollisionEstimator;
+
+					rp_dist[3*p+0] = rp[3*p+0];
+					rp_dist[3*p+1] = rp[3*p+1];
+					rp_dist[3*p+2] = rp[3*p+2];				
+				}
+				else
+				{
+					nbad += 1;
+					theSurface->nearPointOnBoxedSurface( rp+3*p, &f, &u, &v, M, mlow, mhigh, distance+p, -1 );
+					rp_dist[3*p+0] = rp[3*p+0];
+					rp_dist[3*p+1] = rp[3*p+1];
+					rp_dist[3*p+2] = rp[3*p+2];
+
+					double rpt[3], rnrm[3];
+
+					theSurface->evaluateRNRM( f, u, v, rpt, rnrm, r );
+
+					double dr[3] = { rp[3*p+0] - rpt[0],
+						 rp[3*p+1] - rpt[1],
+						 rp[3*p+2] - rpt[2] };
+	
+					double len = normalize(dr);
+				
+					double dp = dr[0] * rnrm[0] + dr[1] * rnrm[1] + dr[2] * rnrm[2];
+
+//			printf("init len: %le dp: %le dist: %le\n", len, dp, distance[p] );
+
+					if( !planar )
+					{
+						if( dp > 0 )
+							inside_outside[p] = POINT_INSIDE;
+						else
+							inside_outside[p] = POINT_OUTSIDE;
+					}
+				}
+				printf(" %lf%% were clear.\n", 100 * nok / (nok+nbad) );
+			}
+		}
+	}
+*/
 	free(vertex_data);
 	free(ptr_to_data);
 	free(nump);
@@ -1207,7 +1570,7 @@ void srd_integrator::clear( void )
 }
 
 //hi
-
+/*
 void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface, double delta_hull_collision, double **M, int mlow, int mhigh )
 {
 	double *vertex_data = NULL;
@@ -1288,6 +1651,335 @@ void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface,
 //			last_known_tag[p] = 0;
 	}
 
+	free(vertex_data);
+	free(ptr_to_data);
+	free(nump);
+}
+*/
+
+void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface, double delta_hull_collision, double **M, int mlow, int mhigh )
+{
+
+	double *vertex_data = NULL;
+	int *ptr_to_data = (int *)malloc( sizeof(int) * theSurface->nt );
+	int *nump = (int *)malloc( sizeof(int) * theSurface->nt );
+	theSurface->buildFaceData( &vertex_data, ptr_to_data, nump );
+		
+	// find lowest power, this will limit our log search
+	int min_p = grain_x_p;
+	if( grain_y_p < min_p ) min_p = grain_y_p;
+	if( grain_z_p < min_p ) min_p = grain_z_p;
+	
+	int nbins_id = id_grain_x * id_grain_y * id_grain_z;
+
+	for( int x = 0; x < nbins_id; x++ )
+	{
+		bin_level[x] = -1; // unchecked.
+		bins_id[x].np = 0;
+	}
+	for( int p = 0; p < np; p++ )
+	{
+		double fx = rp[3*p+0] / PBC_vec[0][0];
+		while( fx < 0 ) fx += 1.0;
+		while( fx >= 1.0 ) fx -= 1.0;
+		int bx = fx * grain_x;
+		if( bx == grain_x ) bx--;
+		
+		double fy = rp[3*p+1] / PBC_vec[1][1];
+		while( fy < 0 ) fy += 1.0;
+		while( fy >= 1.0 ) fy -= 1.0;
+		int by = fy * grain_y;
+		if( by == grain_y ) by--;
+		
+		double fz = rp[3*p+2] / PBC_vec[2][2];
+		while( fz < 0 ) fz += 1.0;
+		while( fz >= 1.0 ) fz -= 1.0;
+		int bz = fz * grain_z;
+		if( bz == grain_z ) bz--;
+
+		int bin = (bx * id_grain_y + by ) * id_grain_z + bz;
+
+		if( bins_id[bin].npSpace == bins_id[bin].np )
+		{
+			bins_id[bin].npSpace *= 2;
+			bins_id[bin].list = (int *)realloc( bins_id[bin].list, sizeof(int) * bins_id[bin].npSpace );
+		}
+
+		bins_id[bin].list[bins_id[bin].np] = p;
+		bins_id[bin].np++;
+	}
+
+	int *upper_level = NULL;
+
+	int nradius = 0;
+	int ntiny = 0;
+	int nexplicit = 0;
+
+	double LA = PBC_vec[0][0];
+	double LB = PBC_vec[1][1];
+	double LC = PBC_vec[2][2];
+
+	// this is the power search.
+	for( int level = min_p-2; level >= 0; level-- )
+	{
+		int pfac = ipw2(level);
+
+		int gx = id_grain_x / pfac; 
+		int gy = id_grain_y / pfac; 
+		int gz = id_grain_z / pfac; 
+
+		int *our_level = (int *)malloc( sizeof(int) * gx * gy * gz );
+		memset( our_level,0,sizeof(int) * gx*gy*gz);
+		for( int bx = 0; bx < gx; bx++ )
+		for( int by = 0; by < gy; by++ )
+		for( int bz = 0; bz < gz; bz++ )
+		{
+			// do we need to check this or was it cleared at a higher level?
+
+			if( upper_level )
+			{
+				int tbx = bx/2;
+				int tby = by/2;
+				int tbz = bz/2;
+
+				if( upper_level[tbx*(gy/2)*(gz/2)+tby*(gz/2)+tbz] )
+				{
+//					printf("%d %d %d cleared at a higher level!\n", bx, by, bz );
+					our_level[bx*gy*gz+by*gz+bz] = 1;
+					continue; 
+				}
+			}
+
+			double cen[3] = { (bx+0.5) * PBC_vec[0][0] / gx,
+					  (by+0.5) * PBC_vec[1][1] / gy,
+					  (bz+0.5) * PBC_vec[2][2] / gz };
+
+			double LX = PBC_vec[0][0] / gx;
+			double LY = PBC_vec[1][1] / gy;
+			double LZ = PBC_vec[2][2] / gz;
+
+		
+			double maxr = sqrt( (LX*LX + LY*LY + LZ*LZ) / 4 );
+	
+			int f;
+			double u,v;
+
+//			printf("LEVEL %d cen %le %le %le\n", level, cen[0], cen[1], cen[2] );
+			nradius++;
+			if( ! theSurface->withinRadius( cen, &f, &u, &v,  M, mlow, mhigh, -1, maxr + srdCollisionEstimator + delta_hull_collision, vertex_data, ptr_to_data, nump ) )
+			{
+				// cleared at this level.
+				our_level[bx*gy*gz+by*gz+bz] = 1;
+				int ncleared = 0;
+				for( int tbx = bx * pfac; tbx < (bx+1)*pfac; tbx++ )
+				for( int tby = by * pfac; tby < (by+1)*pfac; tby++ )
+				for( int tbz = bz * pfac; tbz < (bz+1)*pfac; tbz++ )
+				{
+					int tbin = tbx*id_grain_y*id_grain_z+tby*id_grain_z+tbz;
+					for( int bx = 0; bx < bins_id[tbin].np; bx++ )
+					{
+						int p = bins_id[tbin].list[bx];
+						double dr[3] = { rp[3*p+0] - cen[0], rp[3*p+1] - cen[1], rp[3*p+2] - cen[2] };
+						while( dr[0] < -PBC_vec[0][0]/2 ) dr[0] += PBC_vec[0][0];
+						while( dr[1] < -PBC_vec[1][1]/2 ) dr[1] += PBC_vec[1][1];
+						while( dr[2] < -PBC_vec[2][2]/2 ) dr[2] += PBC_vec[2][2];
+						while( dr[0] > PBC_vec[0][0]/2 ) dr[0] -= PBC_vec[0][0];
+						while( dr[1] > PBC_vec[1][1]/2 ) dr[1] -= PBC_vec[1][1];
+						while( dr[2] > PBC_vec[2][2]/2 ) dr[2] -= PBC_vec[2][2];
+						double r_cen = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+				
+						distance[p] = (maxr - r_cen) + srdCollisionEstimator + delta_hull_collision;
+						ncleared++;
+						rp_dist[3*p+0] = rp[3*p+0];
+						rp_dist[3*p+1] = rp[3*p+1];
+						rp_dist[3*p+2] = rp[3*p+2];					
+					}
+				}
+//				printf("CLEARED! with %d particles.\n", ncleared );
+			}
+			else if( level == 0 ) 
+			{
+//				printf("failed to clear at lowest level.\n");
+				int bin = bx*gy*gz+by*gz+bz;
+				for( int px = 0; px < bins_id[bin].np; px++ )
+				{
+					int p = bins_id[bin].list[px];
+
+					ntiny++;
+					if( ! theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1, maxr + srdCollisionEstimator + delta_hull_collision, vertex_data, ptr_to_data, nump ) )
+					{
+						rp_dist[3*p+0] = rp[3*p+0];
+						rp_dist[3*p+1] = rp[3*p+1];
+						rp_dist[3*p+2] = rp[3*p+2];
+						distance[p] = srdCollisionEstimator;
+					}
+					else
+					{
+						nexplicit++;
+						theSurface->nearPointOnBoxedSurface( rp+3*p, &f, &u, &v, M, mlow, mhigh, distance+p, -1 );
+
+						rp_dist[3*p+0] = rp[3*p+0];
+						rp_dist[3*p+1] = rp[3*p+1];
+						rp_dist[3*p+2] = rp[3*p+2];
+		
+						double rnrm[3], nrm[3];
+		
+						theSurface->evaluateRNRM(f, u, v, rnrm, nrm, r ); 
+		
+						double dr[3] = { rp[3*p+0] - rnrm[0],
+								 rp[3*p+1] - rnrm[1],
+								 rp[3*p+2] - rnrm[2] };
+		
+						while( dr[0] < -LA/2 ) dr[0] += LA;
+						while( dr[0] >  LA/2 ) dr[0] -= LA;
+						while( dr[1] < -LB/2 ) dr[1] += LB;
+						while( dr[1] >  LB/2 ) dr[1] -= LB;
+						while( dr[2] < -LC/2 ) dr[2] += LC;
+						while( dr[2] >  LC/2 ) dr[2] -= LC;
+		
+						double dp = dr[0] * nrm[0] + dr[1] * nrm[1] + dr[2] * nrm[2];
+						
+						if( dp < 0 )
+							topological_tag[p] = dp;
+						else
+							topological_tag[p] = dp;
+		
+						if( last_known_tag[p] * topological_tag[p] < 0 )
+						{
+							printf("ABSOLUTELY MISSED COLLISION %d tag1 %lf tag2 %lf\n", p, last_known_tag[p], topological_tag[p]);
+						}
+		
+						last_known_tag[p] = dp;
+					}
+				}
+			}
+			else
+			{
+//				printf("...failed to clear.\n");
+			}
+		}
+
+		if( upper_level )
+			free(upper_level);
+		upper_level = our_level;
+	}  
+
+//	printf("tag Ran %d radius checks.\n", nradius );
+//	printf("tag Ran %d tiny radius checks.\n", ntiny );
+//	printf("tag Ran explicit check on %d/%d particles.\n", nexplicit, np );
+	
+
+/*
+	for( int bx = 0; bx < id_grain_x; bx++ )
+	for( int by = 0; by < id_grain_y; by++ )
+	for( int bz = 0; bz < id_grain_z; bz++ )
+	{
+		int b = (bx * grain_y + by ) * grain_z + bz;
+
+		
+
+		double cen[3] = {  
+			(bx+0.5) * PBC_vec[0][0] / grain_x,
+			(by+0.5) * PBC_vec[1][1] / grain_y,
+			(bz+0.5) * PBC_vec[2][2] / grain_z };
+
+		if( bins[b].np == 0 ) continue;
+
+		double r_max = 0;
+		double dr[bins[b].np];
+
+		for( int px = 0; px < bins[b].np; px++ )
+		{
+			int p = bins[b].list[px];
+
+			double dr[3] = { rp[3*p+0] - cen[0],
+					 rp[3*p+1] - cen[1],
+					 rp[3*p+2] - cen[2] };
+
+			while( dr[0] < -PBC_vec[0][0]/2 ) dr[0] += PBC_vec[0][0];
+			while( dr[1] < -PBC_vec[1][1]/2 ) dr[1] += PBC_vec[1][1];
+			while( dr[2] < -PBC_vec[2][2]/2 ) dr[2] += PBC_vec[2][2];
+			while( dr[0] >  PBC_vec[0][0]/2 ) dr[0] -= PBC_vec[0][0];
+			while( dr[1] >  PBC_vec[1][1]/2 ) dr[1] -= PBC_vec[1][1];
+			while( dr[2] >  PBC_vec[2][2]/2 ) dr[2] -= PBC_vec[2][2];
+
+			double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+
+			if( r > r_max )
+				r_max = r;
+
+			dr[px] = r;
+					
+		}
+		
+		int f;
+		double u,v;
+		printf("FINAL LEVEL Checking %d particles near %lf %lf %lf ", bins[b].np, cen[0], cen[1], cen[2] );
+		if( ! theSurface->withinRadius( cen, &f, &u, &v,  M, mlow, mhigh, -1,  r_max + srdCollisionEstimator, vertex_data, ptr_to_data, nump ) )
+		{
+			printf("... all are clear.\n");
+			for( int px = 0; px < bins[b].np; px++ )
+			{
+				int p = bins[b].list[px];
+				distance[p] = (r_max - dr[px]) + srdCollisionEstimator;
+
+				rp_dist[3*p+0] = rp[3*p+0];
+				rp_dist[3*p+1] = rp[3*p+1];
+				rp_dist[3*p+2] = rp[3*p+2];				
+			}
+		}	
+		else
+		{
+			printf("...checking them all...");
+			double nok = 0, nbad=0;
+			for( int px = 0; px < bins[b].np; px++ )
+			{
+				int p = bins[b].list[px];
+			
+				if( ! theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1,  srdCollisionEstimator, vertex_data, ptr_to_data, nump ) )
+				{
+					nok += 1;
+					distance[p] = srdCollisionEstimator;
+
+					rp_dist[3*p+0] = rp[3*p+0];
+					rp_dist[3*p+1] = rp[3*p+1];
+					rp_dist[3*p+2] = rp[3*p+2];				
+				}
+				else
+				{
+					nbad += 1;
+					theSurface->nearPointOnBoxedSurface( rp+3*p, &f, &u, &v, M, mlow, mhigh, distance+p, -1 );
+					rp_dist[3*p+0] = rp[3*p+0];
+					rp_dist[3*p+1] = rp[3*p+1];
+					rp_dist[3*p+2] = rp[3*p+2];
+
+					double rpt[3], rnrm[3];
+
+					theSurface->evaluateRNRM( f, u, v, rpt, rnrm, r );
+
+					double dr[3] = { rp[3*p+0] - rpt[0],
+						 rp[3*p+1] - rpt[1],
+						 rp[3*p+2] - rpt[2] };
+	
+					double len = normalize(dr);
+				
+					double dp = dr[0] * rnrm[0] + dr[1] * rnrm[1] + dr[2] * rnrm[2];
+
+//			printf("init len: %le dp: %le dist: %le\n", len, dp, distance[p] );
+
+					if( !planar )
+					{
+						if( dp > 0 )
+							inside_outside[p] = POINT_INSIDE;
+						else
+							inside_outside[p] = POINT_OUTSIDE;
+					}
+				}
+				printf(" %lf%% were clear.\n", 100 * nok / (nok+nbad) );
+			}
+		}
+	}
+*/
 	free(vertex_data);
 	free(ptr_to_data);
 	free(nump);
