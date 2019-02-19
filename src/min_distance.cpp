@@ -13,10 +13,17 @@ using namespace std;
 
 Min_Distance::Min_Distance(double*& objA, double*& objB, int numA, double radius) {
 	elements = 0;
-	simplex = new Point[4];
+//	simplex = new Point[4];
 	numM = numA;
 	r = radius;
-	mem = new Point[numM];
+	
+	if( numA > MAX_MD_POINTS )
+	{
+		printf("ERROR: MD points\n");
+		exit(1);
+	}
+
+//	mem = new Point[numM];
 	for (int i = 0; i < numM; i++) {
 		mem[i].x = objA[3*i + 0];
 		mem[i].y = objA[3*i + 1];
@@ -29,8 +36,8 @@ Min_Distance::Min_Distance(double*& objA, double*& objB, int numA, double radius
 }   
 
 Min_Distance::~Min_Distance() {
-	delete[] mem;
-	delete[] simplex;
+//	delete[] mem;
+//	delete[] simplex;
 }
 
 double Min_Distance::dot(Point& a, Point& b) {
