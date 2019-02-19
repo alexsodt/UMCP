@@ -4,18 +4,20 @@
 #include <math.h>
 #include "Point.h"
 #include "Check.h"
+#define MAX_MD_POINTS 1000
 
 class Min_Distance {
 	private:
-		Point* mem;
+		Point mem[MAX_MD_POINTS];
+//		Point *mem;
 		Point part;
 		int numM;
 
 		// Number of points in simplex
 		int elements;
 
-		Point* simplex;
-
+		Point simplex[4];
+//		Point *simplex;
 		double r;
 
 	public:
