@@ -820,33 +820,6 @@ int temp_main( int argc, char **argv )
 		alphaFile = fopen(fileName,"w");
 	}
 
-	if( block.debug )
-	{	
-		double *r_test = (double *)malloc( sizeof(double) * (3*nv+3) );
-		memcpy( r_test, r, sizeof(double) * (3*nv+3) );
-		for( int Q = 0; Q < NQ; Q++ )
-		{
-			double ens[3]={0,0,0};
-
-			double eps = 1e-5;
-			for( int iq = 0; iq < 3; iq++ )
-			{
-				for( int v = 0; v < nv; v++ )
-				{
-					r_test[3*v+0] = r[3*v+0] + iq * eps * gen_transform[Q*3*nv+3*v+0]/scaling_factor[Q];
-					r_test[3*v+1] = r[3*v+1] + iq * eps * gen_transform[Q*3*nv+3*v+1]/scaling_factor[Q];
-					r_test[3*v+2] = r[3*v+2] + iq * eps * gen_transform[Q*3*nv+3*v+2]/scaling_factor[Q];
-				}
-				ens[iq] = sub_surface->energy(r_test,NULL);
-#ifdef PARALLEL
-				ParallelSum(ens+iq,1);
-#endif	
-			}
-			printf("MODE %d L: %d coeff2: %le\n",
-				Q, (int)lround(output_qvals[Q]), (ens[0]+ens[2]-2*ens[1])/(eps*eps) );
-		}	
-		free(r_test);
-	}
 
 
 	int global_cntr = 0;
@@ -1109,6 +1082,7 @@ int temp_main( int argc, char **argv )
 				double use_dhull = 0;
 
 				double ncol = srd_i->stream_and_collide( r, g, qdot, EFFM, sub_surface, M, mlow, mhigh, use_dhull, theForceSet, cur_t*AKMA_TIME, time_step * AKMA_TIME, time_step_collision * AKMA_TIME  );
+				printf("ncol: %lf\n", ncol );
 			}
 
 
@@ -1199,6 +1173,21 @@ int temp_main( int argc, char **argv )
 				}
 				T += pp[Q] * Qdot0_trial[Q] * 0.5;
 			}
+
+			
+			double srd_T = 0;
+			double srd_dof = 0;
+
+			if( do_srd )
+			{
+				double *vp = srd_i->vp;
+
+				srd_dof = 3 * srd_i->np;
+				for( int p = 0; p < srd_i->np; p++ )
+					srd_T += 0.5 * srd_i->mass * ( vp[3*p+0]*vp[3*p+0]+vp[3*p+1]*vp[3*p+1]+vp[3*p+2]*vp[3*p+2] ); 
+			}
+
+
 #ifdef PARALLEL
 //			if( ! do_gen_q )
 //				ParallelSum(&T,1);
@@ -1290,11 +1279,14 @@ int temp_main( int argc, char **argv )
 #ifdef PARALLEL
 			ParallelSum( &PT, 1 );
 #endif
-			T += PT;
 			double dof = NQ;
 			if( !do_gen_q )
 				dof = 3*nv-3;
-
+			double mem_T = 2*T / dof;
+			
+			T += PT;
+			T += srd_T;
+			dof += srd_dof;
 			for( int c = 0; c < ncomplex; c++ )
 #ifdef DISABLE_ON_MEMBRANE_T
 				dof += 3 * (allComplexes[c]->nsites - allComplexes[c]->nattach);
@@ -1306,7 +1298,7 @@ int temp_main( int argc, char **argv )
 			// in kcal/mol
 
 			TEMP /= kcal_mol_K;
-
+			mem_T /= kcal_mol_K;
 			sum_average_temp += TEMP;
 			n_temp += 1;
 
@@ -1314,7 +1306,7 @@ int temp_main( int argc, char **argv )
 			
 			if( t == 0 )
 			{
-				printf("t: %le ns o: %d T: %.8le V: %.8le T+V: %.14le TEMP: %le AV_TEMP %le VR: %.3le VMEM: %le VP: %le", (cur_t * 1e9), o, T, V,T+V, TEMP, sum_average_temp / n_temp,VR, VMEM, VP );
+				printf("t: %le ns o: %d T: %.8le V: %.8le T+V: %.14le TEMP: %le MEM_TEMP: %le AV_TEMP %le VR: %.3le VMEM: %le VP: %le", (cur_t * 1e9), o, T, V,T+V, TEMP, mem_T, sum_average_temp / n_temp,VR, VMEM, VP );
 				if( step_rate > 0 )
 					printf(" steps/s: %le", step_rate );
 				printf("\n");

@@ -411,11 +411,155 @@ double srd_integrator::KE( void )
 
 void srd_integrator::initializeDistances( double *r, surface *theSurface, double **M, int mlow, int mhigh )
 {
+	double *vertex_data = NULL;
+	int *ptr_to_data = (int *)malloc( sizeof(int) * theSurface->nt );
+	int *nump = (int *)malloc( sizeof(int) * theSurface->nt );
+	theSurface->buildFaceData( &vertex_data, ptr_to_data, nump );
+
+#if 1
+	int nbins = grain_x * grain_y * grain_z;
+
+	for( int x = 0; x < nbins;x ++ )
+		bins[x].np = 0;
+
+	for( int p = 0; p < np; p++ )
+	{
+		double fx = rp[3*p+0] / PBC_vec[0][0];
+		while( fx < 0 ) fx += 1.0;
+		while( fx >= 1.0 ) fx -= 1.0;
+		int bx = fx * grain_x;
+		if( bx == grain_x ) bx--;
+		
+		double fy = rp[3*p+1] / PBC_vec[1][1];
+		while( fy < 0 ) fy += 1.0;
+		while( fy >= 1.0 ) fy -= 1.0;
+		int by = fy * grain_y;
+		if( by == grain_y ) by--;
+		
+		double fz = rp[3*p+2] / PBC_vec[2][2];
+		while( fz < 0 ) fz += 1.0;
+		while( fz >= 1.0 ) fz -= 1.0;
+		int bz = fz * grain_z;
+		if( bz == grain_z ) bz--;
+
+		int bin = (bx * grain_y + by ) * grain_z + bz;
+
+		if( bins[bin].npSpace == bins[bin].np )
+		{
+			bins[bin].npSpace *= 2;
+			bins[bin].list = (int *)realloc( bins[bin].list, sizeof(int) * bins[bin].npSpace );
+		}
+
+		bins[bin].list[bins[bin].np] = p;
+		bins[bin].np++;
+	}
+
+	for( int bx = 0; bx < grain_x; bx++ )
+	for( int by = 0; by < grain_y; by++ )
+	for( int bz = 0; bz < grain_z; bz++ )
+	{
+		int b = (bx * grain_y + by ) * grain_z + bz;
+		double cen[3] = {  
+			(bx+0.5) * PBC_vec[0][0] / grain_x,
+			(by+0.5) * PBC_vec[1][1] / grain_y,
+			(bz+0.5) * PBC_vec[2][2] / grain_z };
+
+		if( bins[b].np == 0 ) continue;
+
+		double r_max = 0;
+		double dr[bins[b].np];
+
+		for( int px = 0; px < bins[b].np; px++ )
+		{
+			int p = bins[b].list[px];
+
+			double dr[3] = { rp[3*p+0] - cen[0],
+					 rp[3*p+1] - cen[1],
+					 rp[3*p+2] - cen[2] };
+
+			while( dr[0] < -PBC_vec[0][0]/2 ) dr[0] += PBC_vec[0][0];
+			while( dr[1] < -PBC_vec[1][1]/2 ) dr[1] += PBC_vec[1][1];
+			while( dr[2] < -PBC_vec[2][2]/2 ) dr[2] += PBC_vec[2][2];
+			while( dr[0] >  PBC_vec[0][0]/2 ) dr[0] -= PBC_vec[0][0];
+			while( dr[1] >  PBC_vec[1][1]/2 ) dr[1] -= PBC_vec[1][1];
+			while( dr[2] >  PBC_vec[2][2]/2 ) dr[2] -= PBC_vec[2][2];
+
+			double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+
+			if( r > r_max )
+				r_max = r;
+
+			dr[px] = r;
+					
+		}
+		
+		int f;
+		double u,v;
+		if( ! theSurface->withinRadius( cen, &f, &u, &v,  M, mlow, mhigh, -1,  r_max + srdCollisionEstimator, vertex_data, ptr_to_data, nump ) )
+		{
+			for( int px = 0; px < bins[b].np; px++ )
+			{
+				int p = bins[b].list[px];
+				distance[p] = (r_max - dr[px]) + srdCollisionEstimator;
+
+				rp_dist[3*p+0] = rp[3*p+0];
+				rp_dist[3*p+1] = rp[3*p+1];
+				rp_dist[3*p+2] = rp[3*p+2];				
+			}
+		}	
+		else
+		{
+			for( int px = 0; px < bins[b].np; px++ )
+			{
+				int p = bins[b].list[px];
+			
+				if( ! theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1,  srdCollisionEstimator, vertex_data, ptr_to_data, nump ) )
+				{
+					distance[p] = srdCollisionEstimator;
+
+					rp_dist[3*p+0] = rp[3*p+0];
+					rp_dist[3*p+1] = rp[3*p+1];
+					rp_dist[3*p+2] = rp[3*p+2];				
+				}
+				else
+				{
+					theSurface->nearPointOnBoxedSurface( rp+3*p, &f, &u, &v, M, mlow, mhigh, distance+p, -1 );
+					rp_dist[3*p+0] = rp[3*p+0];
+					rp_dist[3*p+1] = rp[3*p+1];
+					rp_dist[3*p+2] = rp[3*p+2];
+
+					double rpt[3], rnrm[3];
+
+					theSurface->evaluateRNRM( f, u, v, rpt, rnrm, r );
+
+					double dr[3] = { rp[3*p+0] - rpt[0],
+						 rp[3*p+1] - rpt[1],
+						 rp[3*p+2] - rpt[2] };
+	
+					double len = normalize(dr);
+				
+					double dp = dr[0] * rnrm[0] + dr[1] * rnrm[1] + dr[2] * rnrm[2];
+
+//			printf("init len: %le dp: %le dist: %le\n", len, dp, distance[p] );
+
+					if( !planar )
+					{
+						if( dp > 0 )
+							inside_outside[p] = POINT_INSIDE;
+						else
+							inside_outside[p] = POINT_OUTSIDE;
+					}
+				}
+			}
+		}
+	}
+
+#else
 	for( int p = 0; p < np; p++ )
 	{	
 		int f;
 		double u,v;	
-		if( ! theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1,  srdCollisionEstimator ) )
+		if( ! theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1,  srdCollisionEstimator, vertex_data, ptr_to_data, nump ) )
 		{
 #ifdef CHECK_ID
 			theSurface->nearPointOnBoxedSurface( rp+3*p, &f, &u, &v, M, mlow, mhigh, distance+p, srdCollisionEstimator );
@@ -434,7 +578,7 @@ void srd_integrator::initializeDistances( double *r, surface *theSurface, double
 			{
 				printf("ID FAILURE!! %lf %lf\n", len, srdCollisionEstimator );	
 		
-				 theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1,  srdCollisionEstimator );
+				 theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1,  srdCollisionEstimator, vertex_data, ptr_to_data, nump );
 			}
 #endif
 			distance[p] = srdCollisionEstimator;
@@ -479,6 +623,10 @@ void srd_integrator::initializeDistances( double *r, surface *theSurface, double
 			}
 		}	
 	}
+#endif	
+	free(vertex_data);
+	free(ptr_to_data);
+	free(nump);
 }
 
 int srd_integrator::stream_and_collide( double *r, double *g, double *vmem, SparseMatrix *effm, surface *theSurface, double **M, int mlow, int mhigh, double del_hull, force_set *theForceSet, double running_time, double integrate_time, double time_step_collision )
@@ -561,6 +709,11 @@ int srd_integrator::collide_with_membrane_planar( double *r, double *g, surface 
 	double *force_vector = (double *)malloc( sizeof(double) * theSurface->nv * 3 );
 	memset( force_vector, 0, sizeof(double) * theSurface->nv * 3 );
 	double total_dp[3] = { 0,0,0};
+	
+	double *vertex_data = NULL;
+	int *ptr_to_data = (int *)malloc( sizeof(int) * theSurface->nt );
+	int *nump = (int *)malloc( sizeof(int) * theSurface->nt );
+	theSurface->buildFaceData( &vertex_data, ptr_to_data, nump );
 
 	int n_col = 0;
 
@@ -595,7 +748,7 @@ int srd_integrator::collide_with_membrane_planar( double *r, double *g, surface 
 			// = theSurface->returnRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  srdCollisionEstimator, inside_outside[p] );
 
 #ifdef WITHIN_CHECK
-			if( ! theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1,  srdCollisionEstimator ) )
+			if( ! theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1,  srdCollisionEstimator, vertex_data, ptr_to_data, nump ) )
 				rad = srdCollisionEstimator;		
 	
 			rp_dist[3*p+0] = rp[3*p+0];		
@@ -621,8 +774,6 @@ int srd_integrator::collide_with_membrane_planar( double *r, double *g, surface 
 				}
 
 				did_collide[p] = 1;
-				if( debug_mode )
-				printf("PARTICLE %d collision at face %d\n", p, col_f );
 				double rcol[3], nrm[3];
 		
 				theSurface->evaluateRNRM( col_f, col_u, col_v, rcol, nrm, r );
@@ -657,27 +808,12 @@ int srd_integrator::collide_with_membrane_planar( double *r, double *g, surface 
 
 				double mag = - 2* (dKE_p_dx + dKE_mem_dx) / (d2KE_p_dx2 + d2KE_mem_dx2); 
 
-				if( col_cntr == 148 )
-				{
-				}
-
-				if( debug_mode  )
-				{	
-					printf("dKE_mem_dx: %le d2KE_mem_dx2: %le\n", dKE_mem_dx, d2KE_mem_dx2 );
-					printf("dKE_p_dx: %le d2KE_p_dx2: %le\n", dKE_p_dx, d2KE_p_dx2 );
-				
-					printf("mag: %le\n", mag );
-				}
 
 				double dKE_p = dKE_p_dx * mag + d2KE_p_dx2 * 0.5 * mag*mag;
 				double dKE_mem = -dKE_mem_dx * mag + d2KE_mem_dx2 * 0.5 * mag*mag;
 		
 				dKE_out_collision += dKE_mem;
 
-				if( debug_mode )
-				{
-					printf("dKE_CHECK collision dKE_p: %le dKE_mem: %le\n", dKE_p, dKE_mem );
-				}
 	
 				// modify the position and velocity of the colliding particle.
 
@@ -712,12 +848,6 @@ int srd_integrator::collide_with_membrane_planar( double *r, double *g, surface 
 
 				double ke_before = 0.5 * mass * (vp[3*p+0]*vp[3*p+0]+vp[3*p+1]*vp[3*p+1]+vp[3*p+2]*vp[3*p+2]);
 
-				if( debug_mode )
-				{ 
-					printf("memnrm: %lf %lf %lf\n", nrm[0], nrm[1], nrm[2] );
-					printf("mem_v before: %le %le %le\n", mem_v[0], mem_v[1], mem_v[2] );
-					printf("CHECK vp before: %le %le %le, KE: %le\n", vp[3*p+0], vp[3*p+1], vp[3*p+2], ke_before );
-				}
 
 				vp[3*p+0] += dp[0] / mass;
 				vp[3*p+1] += dp[1] / mass;
@@ -725,8 +855,6 @@ int srd_integrator::collide_with_membrane_planar( double *r, double *g, surface 
 
 				double ke_after = 0.5 * mass * (vp[3*p+0]*vp[3*p+0]+vp[3*p+1]*vp[3*p+1]+vp[3*p+2]*vp[3*p+2]);
 
-				if( debug_mode )
-					printf("vp after: %le %le %le, KE: %le\n", vp[3*p+0], vp[3*p+1], vp[3*p+2], ke_after );
 
 				// apply force to the membrane.
 
@@ -785,17 +913,24 @@ int srd_integrator::collide_with_membrane_planar( double *r, double *g, surface 
 		g[3*v1+2] -= force_factor * force_vector[3*v1+2] / time_step;		
 	}
 
-	if( n_col > 0 && debug_mode ) 
-		printf("Collision total solvent momentum change: %le %le %le\n", total_dp[0], total_dp[1], total_dp[2] ); 
 	free(force_vector);
+	free(vertex_data);
+	free(ptr_to_data);
+	free(nump);
 
 	return n_col;
 }
 
 int srd_integrator::collide_with_membrane_inside_outside( double *r, double *g, surface *theSurface, double **M, int mlow, int mhigh, double del_hull, force_set *theForceSet, double time_step, double force_factor, double *vmem, SparseMatrix *effm )
 {
+
 	printf("This needs to be updated to reflect the proper collision.\n");
 	exit(1);
+
+	double *vertex_data = NULL;
+	int *ptr_to_data = (int *)malloc( sizeof(int) * theSurface->nt );
+	int *nump = (int *)malloc( sizeof(int) * theSurface->nt );
+	theSurface->buildFaceData( &vertex_data, ptr_to_data, nump );
 	
 	// this is the vector of forces projected onto the control points ( the generalized coordinates )
 	// d v / d xi * dxi / dcontrol_pt. The change in control points giving the proper change in velocities must be solved at the end
@@ -874,7 +1009,7 @@ int srd_integrator::collide_with_membrane_inside_outside( double *r, double *g, 
 
 			double rad = 0;
 
-			rad = theSurface->returnRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  srdCollisionEstimator, inside_outside[p] );
+			rad = theSurface->returnRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  srdCollisionEstimator, vertex_data, ptr_to_data, nump, inside_outside[p] );
 			if( rad < FUDGE_DISTANCE )
 			{
 				// The particle has collided with the surface.
@@ -1029,6 +1164,10 @@ int srd_integrator::collide_with_membrane_inside_outside( double *r, double *g, 
 #endif
 	free(force_vector);
 
+	free(vertex_data);
+	free(ptr_to_data);
+	free(nump);
+
 	return n_col;
 }
 
@@ -1071,6 +1210,11 @@ void srd_integrator::clear( void )
 
 void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface, double delta_hull_collision, double **M, int mlow, int mhigh )
 {
+	double *vertex_data = NULL;
+	int *ptr_to_data = (int *)malloc( sizeof(int) * theSurface->nt );
+	int *nump = (int *)malloc( sizeof(int) * theSurface->nt );
+	theSurface->buildFaceData( &vertex_data, ptr_to_data, nump );
+
 	double search_radius = 50.0;
 	//double search_radius = delta_hull_collision;
 
@@ -1098,7 +1242,7 @@ void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface,
 		
 			if( exclude ) continue;
 	
-			int did_col = theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1, delta_hull_collision ); 
+			int did_col = theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1, delta_hull_collision, vertex_data, ptr_to_data, nump ); 
 				
 			if( did_col )
 			{
@@ -1144,6 +1288,9 @@ void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface,
 //			last_known_tag[p] = 0;
 	}
 
+	free(vertex_data);
+	free(ptr_to_data);
+	free(nump);
 }
 
 void srd_integrator::altTag( double * r, surface * theSurface, double delta_hull_collision, double **M, int mlow, int mhigh )
@@ -1151,6 +1298,11 @@ void srd_integrator::altTag( double * r, surface * theSurface, double delta_hull
 	double LA = PBC_vec[0][0];
 	double LB = PBC_vec[1][1];
 	double LC = PBC_vec[2][2];
+	
+	double *vertex_data = NULL;
+	int *ptr_to_data = (int *)malloc( sizeof(int) * theSurface->nt );
+	int *nump = (int *)malloc( sizeof(int) * theSurface->nt );
+	theSurface->buildFaceData( &vertex_data, ptr_to_data, nump );
 
 	double search_radius = 25;
 	for( int p = 0; p < np; p++ )
@@ -1162,7 +1314,7 @@ void srd_integrator::altTag( double * r, surface * theSurface, double delta_hull
 			int f;
 			double u, v;
 		
-			int did_col = theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1, search_radius ); 
+			int did_col = theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1, search_radius, vertex_data, ptr_to_data, nump ); 
 				
 			if( did_col )
 			{
@@ -1199,6 +1351,9 @@ void srd_integrator::altTag( double * r, surface * theSurface, double delta_hull
 //		else
 //			last_known_tag[p] = 0;
 	}
+	free(vertex_data);
+	free(ptr_to_data);
+	free(nump);
 }
 
 void srd_integrator::checkResolve( double * r, surface * theSurface, double delta_hull_collision, double **M, int mlow, int mhigh )
@@ -1206,6 +1361,11 @@ void srd_integrator::checkResolve( double * r, surface * theSurface, double delt
 	double LA = PBC_vec[0][0];
 	double LB = PBC_vec[1][1];
 	double LC = PBC_vec[2][2];
+	
+	double *vertex_data = NULL;
+	int *ptr_to_data = (int *)malloc( sizeof(int) * theSurface->nt );
+	int *nump = (int *)malloc( sizeof(int) * theSurface->nt );
+	theSurface->buildFaceData( &vertex_data, ptr_to_data, nump );
 
 	double search_radius = 25;
 	for( int p = 0; p < np; p++ )
@@ -1217,7 +1377,7 @@ void srd_integrator::checkResolve( double * r, surface * theSurface, double delt
 			int f;
 			double u, v;
 		
-			int did_col = theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1, search_radius ); 
+			int did_col = theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1, search_radius, vertex_data, ptr_to_data, nump ); 
 				
 			if( did_col )
 			{
@@ -1254,10 +1414,18 @@ void srd_integrator::checkResolve( double * r, surface * theSurface, double delt
 				alt_last_known_tag[p] = 0;
 		} 
 	}
+	free(vertex_data);
+	free(ptr_to_data);
+	free(nump);
 }
 
 int srd_integrator::resolveCollision( double *r, double *g, double *qdot, SparseMatrix *effm, double delta_hull_collision, surface *theSurface, double **M, int mlow, int mhigh, force_set *theForceSet, double time_step, double force_factor )
 {
+	double *vertex_data = NULL;
+	int *ptr_to_data = (int *)malloc( sizeof(int) * theSurface->nt );
+	int *nump = (int *)malloc( sizeof(int) * theSurface->nt );
+	theSurface->buildFaceData( &vertex_data, ptr_to_data, nump );
+
 	double LA = PBC_vec[0][0];
 	double LB = PBC_vec[1][1];
 	double LC = PBC_vec[2][2];
@@ -1279,7 +1447,7 @@ int srd_integrator::resolveCollision( double *r, double *g, double *qdot, Sparse
 		int f;
 		double u, v;
 	
-		int did_col = theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1,  delta_hull_collision ); 
+		int did_col = theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1,  delta_hull_collision, vertex_data, ptr_to_data, nump ); 
 			
 		if( did_col )
 		{
@@ -1384,6 +1552,7 @@ int srd_integrator::resolveCollision( double *r, double *g, double *qdot, Sparse
 
 				double alpha_i = 2 * ( m_srd_p_ncol - m_mesh_p_ncol) / ( 1.0/mass + M_ii);
 				double alpha_SRD = -alpha_i;
+
 				
 				double rp_proj = (vp[3*p+0] * n_collision[0] + vp[3*p+1] * n_collision[1] + vp[3*p+2] * n_collision[2]) * time_step;			
 				/*
@@ -1456,6 +1625,9 @@ int srd_integrator::resolveCollision( double *r, double *g, double *qdot, Sparse
 #ifdef SPECIFIC_PARTICLE
 	printf("tag 2267 %lf %lf\n", topological_tag[2267], last_known_tag[2267] );
 #endif
+	free(vertex_data);
+	free(ptr_to_data);
+	free(nump);
 
 	return n_col;
 }
