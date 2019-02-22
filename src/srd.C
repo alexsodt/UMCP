@@ -1809,7 +1809,7 @@ void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface,
 					int p = bins_id[bin].list[px];
 
 					ntiny++;
-					if( ! theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1, maxr + srdCollisionEstimator + delta_hull_collision, vertex_data, ptr_to_data, nump ) )
+					if( ! theSurface->withinRadius( rp+3*p, &f, &u, &v,  M, mlow, mhigh, -1,  srdCollisionEstimator + delta_hull_collision, vertex_data, ptr_to_data, nump ) )
 					{
 						rp_dist[3*p+0] = rp[3*p+0];
 						rp_dist[3*p+1] = rp[3*p+1];
@@ -1849,7 +1849,7 @@ void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface,
 		
 						if( last_known_tag[p] * topological_tag[p] < 0 )
 						{
-							printf("ABSOLUTELY MISSED COLLISION %d tag1 %lf tag2 %lf\n", p, last_known_tag[p], topological_tag[p]);
+//							printf("ABSOLUTELY MISSED COLLISION %d tag1 %lf tag2 %lf\n", p, last_known_tag[p], topological_tag[p]);
 						}
 		
 						last_known_tag[p] = dp;
@@ -1867,9 +1867,9 @@ void srd_integrator::tagParticlesForCollision( double * r, surface * theSurface,
 		upper_level = our_level;
 	}  
 
-//	printf("tag Ran %d radius checks.\n", nradius );
-//	printf("tag Ran %d tiny radius checks.\n", ntiny );
-//	printf("tag Ran explicit check on %d/%d particles.\n", nexplicit, np );
+	printf("tag Ran %d radius checks.\n", nradius );
+	printf("tag Ran %d tiny radius checks.\n", ntiny );
+	printf("tag Ran explicit check on %d/%d particles.\n", nexplicit, np );
 	
 
 /*
@@ -2100,7 +2100,7 @@ void srd_integrator::checkResolve( double * r, surface * theSurface, double delt
 				
 				if( dp * alt_topological_tag[p] < 0 )
 				{
-					printf("ABSOLUTELY MISSED COLLISION %d tag1 %lf tag2 %lf\n", p, dp, alt_topological_tag[p] );
+//					printf("ABSOLUTELY MISSED COLLISION %d tag1 %lf tag2 %lf\n", p, dp, alt_topological_tag[p] );
 				}
 
 				alt_last_known_tag[p] = dp;
