@@ -22,4 +22,19 @@ The choice of timestep is critical for computing proper ensembles.
 If the timestep is too large, the system will be unstable and program execution will halt.
 The option \code{timestep\_analysis=yes} provides a rough estimate of a proper timescale for dynamics.
 
+\subsubsection{Loading a simulation state}
+
+Dynamics and minimization can be restarted by loading a save file.
+The input syntax is \code{load}:
+\begin{command}
+hd run.inp load=min.save
+\end{command}
+This command can be put in the input file as well.
+Save files are generated at the end of minimization and dynamics.
+At the end of minimization, the file \code{min.save} is generated.
+At the end of a dynamics simulation, the file \code{jobName.save} is created, where \code{jobName} is the overall job name given in the input file.
+The default for this name is \code{default}, so the default for the save file is \code{default.save}.
+
+
+
 
