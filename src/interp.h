@@ -472,7 +472,7 @@ struct surface
 
 	void wrapPBC( double *dr, double *alphas=NULL );
 	void loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterBlock *block );
-	void minimize( double *r, pcomplex **allComplexes, int ncomplex );
+	void minimize( double *r, pcomplex **allComplexes, int ncomplex, int do_freeze_membrane = 0 );
 	void debug_dynamics( double *r, force_set *theForceSet, double *Minv, pcomplex **allComplexes, int ncomplex );
 	void timestep_analysis( double *r, force_set *theForceSet, double *Minv, pcomplex **allComplexes, int ncomplex, double approx_timestep );
 

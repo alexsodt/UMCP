@@ -12,6 +12,7 @@ inter-complex particle-particle interactions
 #include "units.h"
 #include "mutil.h"
 
+#define TOMMY
 //#define DISABLE_PP
 //#define DISABLE_ELASTIC
 int enable_elastic_interior = 1;
@@ -109,7 +110,7 @@ double PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, int nc
 					double att_sigma = att_sigma1+att_sigma2;
 					double att_eps = (allComplexes[c1]->att_eps[p1] + allComplexes[c2]->att_eps[p2])/2;
 
-					if( allComplexes[c2]->isElastic() && allComplexes[c1]->isElastic() && sigma1>0 && sigma2>0)
+					if( allComplexes[c2]->isElastic() && allComplexes[c1]->isElastic() && sigma1>0 && sigma2>0 && !(att_sigma1 > 0 || att_sigma2 > 0) )
 					{
 						double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
 						if( r < sigma && enable_elastic_interior )
@@ -144,6 +145,7 @@ double PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, int nc
 								v += att_eps; 	
 							else if( r < r1 * (1-SMOOTH_THRESH) )
 								v += att_eps * (1 - 1 / (1 + exp( (r1-r0)/(r-r0) - (r1-r0)/(r1-r) ) ));
+							
 						}
 					}
 //						v += eps + 4.0 * eps * (r6*r6-r6);
@@ -217,7 +219,7 @@ double PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, int nc
 					double sigma = sigma1+sigma2;
 					double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
 
-					if( allComplexes[c2]->isElastic() && allComplexes[c1]->isElastic() && sigma1 > 0 && sigma2 > 0 )
+					if( allComplexes[c2]->isElastic() && allComplexes[c1]->isElastic() && sigma1 > 0 && sigma2 > 0 && !(att_sigma1 > 0 || att_sigma2 > 0)  )
 					{
 						if( r < sigma && enable_elastic_interior )
 						{
@@ -289,6 +291,17 @@ double PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, int nc
 								v += att_eps * (1 - 1 / (1 + exp( (r1-r0)/(r-r0) - (r1-r0)/(r1-r) ) )) * local_fac;
 	
 								dvdr = att_eps * eval * ( -(r1-r0)/(r-r0)/(r-r0)-(r1-r0)/(r1-r)/(r1-r))/(1+eval)/(1+eval); 
+							}
+
+							if( r < sigma1 + sigma2 )
+							{
+								double sigma = sigma1 + sigma2;
+								double r2 = (sigma/(rmin_mult*r))*(sigma/(rmin_mult*r));
+								double r4 = r2*r2;
+								double r6 = r2*r4;
+
+								v += (eps + 4.0 * eps * (r4-r2)) * local_fac;
+								dvdr +=  4 * eps * (-4 * r4 + 2 * r2)/r;
 							}
 						}
 
@@ -450,7 +463,7 @@ double Boxed_PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 				double att_sigma = att_sigma1+att_sigma2;
 				double att_eps = (allComplexes[c1]->att_eps[p1] + allComplexes[c2]->att_eps[p2])/2;
 
-				if( allComplexes[c2]->isElastic() && allComplexes[c1]->isElastic() && sigma1>0 && sigma2>0)
+				if( allComplexes[c2]->isElastic() && allComplexes[c1]->isElastic() && sigma1>0 && sigma2>0 && !(att_sigma1 > 0 || att_sigma2 > 0) )
 				{
 					double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
 					if( r < sigma && enable_elastic_interior )
@@ -464,17 +477,7 @@ double Boxed_PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 				}
 				else
 				{
-					if( sigma1 > 0 && sigma2 > 0 )
-					{
-						double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
-						double r2 = (sigma/r)*(sigma/r);
-						double r4 = r2*r2;
-						double r6 = r2*r4;
-	
-						if( r < rmin_mult * sigma )
-							v += eps + 4.0 * eps * (r4-r2);
-					}
-					else if( att_sigma1 > 0 && att_sigma2 > 0 )
+					if( att_sigma1 > 0 && att_sigma2 > 0 )
 					{
 						double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
 						double r0 = SMOOTH * att_sigma;
@@ -484,6 +487,28 @@ double Boxed_PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 							v += att_eps; 	
 						else if( r < r1 * (1-SMOOTH_THRESH) )
 							v += att_eps * (1- 1 / (1 + exp( (r1-r0)/(r-r0) - (r1-r0)/(r1-r) ) ));
+							
+						if( r < sigma1 + sigma2 )
+						{
+							double sigma = sigma1 + sigma2;
+							double r2 = (sigma/(rmin_mult*r))*(sigma/(rmin_mult*r));
+							double r4 = r2*r2;
+							double r6 = r2*r4;
+
+#ifdef TOMMY
+							v += (eps + 4.0 * eps * (r4-r2));
+#endif
+						}
+					}
+					else if( sigma1 > 0 && sigma2 > 0 )
+					{
+						double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+						double r2 = (sigma/r)*(sigma/r);
+						double r4 = r2*r2;
+						double r6 = r2*r4;
+	
+						if( r < rmin_mult * sigma )
+							v += eps + 4.0 * eps * (r4-r2);
 					}
 				}
 			}
@@ -544,6 +569,9 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 		}
 	}
 
+	double n_att = 0;
+	int trigger_p = 0;
+	static int icycle = 0;
 //	for( int c1 = 0; c1 < ncomplex; c1++ )
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
@@ -606,7 +634,7 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 				double sigma = sigma1+sigma2;
 				double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
 
-				if( allComplexes[c2]->isElastic() && allComplexes[c1]->isElastic() && sigma1 > 0 && sigma2 > 0 )
+				if( allComplexes[c2]->isElastic() && allComplexes[c1]->isElastic() && sigma1 > 0 && sigma2 > 0 && !(att_sigma1 > 0 || att_sigma2 > 0) )
 				{
 					if( r < sigma && enable_elastic_interior )
 					{
@@ -649,7 +677,41 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 					double local_fac = 1.0;
 					if( ourp[c1] != ourp[c2] ) local_fac = 0.5; // calculation is duplicated on another process.
 
-					if( sigma1 > 0 && sigma2 > 0 )
+					if( att_sigma1 > 0 && att_sigma2 > 0 )
+					{
+						double att_sigma = att_sigma1+att_sigma2;
+						double att_eps = (allComplexes[c1]->att_eps[p1] + allComplexes[c2]->att_eps[p2])/2;
+						double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+						double r0 = SMOOTH * att_sigma;
+						double r1 = att_sigma;
+					
+						if( r < r1 )
+							n_att += local_fac;
+	
+						if( r < SMOOTH * att_sigma * (1+SMOOTH_THRESH) )
+							v += att_eps * local_fac; 	
+						else if( r < r1 * (1-SMOOTH_THRESH) )
+						{
+							double eval = exp( (r1-r0)/(r-r0) - (r1-r0)/(r1-r) );
+							v += att_eps * (1.0 - 1.0/ (1 + eval )) * local_fac;
+
+							dvdr += att_eps * eval * ( -(r1-r0)/(r-r0)/(r-r0)-(r1-r0)/(r1-r)/(r1-r))/(1+eval)/(1+eval); 
+						}
+						
+						if( r < sigma1 + sigma2 )
+						{
+							double sigma = sigma1 + sigma2;
+							double r2 = (sigma/(rmin_mult*r))*(sigma/(rmin_mult*r));
+							double r4 = r2*r2;
+							double r6 = r2*r4;
+
+#ifdef TOMMY
+							v += (eps + 4.0 * eps * (r4-r2)) * local_fac;
+							dvdr += 4 * eps * (-4 * r4 + 2 * r2)/r;
+#endif
+						}
+					}
+					else if( sigma1 > 0 && sigma2 > 0 )
 					{
 						if( r < rmin_mult * sigma )
 						{
@@ -659,29 +721,7 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 			
 							v += (eps + 4.0 * eps * (r4-r2)) * local_fac;
 			
-							dvdr = 4 * eps * (-4 * r4 + 2 * r2)/r;
-						}
-					}
-					else if( att_sigma1 > 0 && att_sigma2 > 0 )
-					{
-						double att_sigma = att_sigma1+att_sigma2;
-						double att_eps = (allComplexes[c1]->att_eps[p1] + allComplexes[c2]->att_eps[p2])/2;
-						double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
-						double r0 = SMOOTH * att_sigma;
-						double r1 = att_sigma;
-						
-						if( r < SMOOTH * att_sigma * (1+SMOOTH_THRESH) )
-							v += att_eps * local_fac; 	
-						else if( r < r1 * (1-SMOOTH_THRESH) )
-						{
-							double eval = exp( (r1-r0)/(r-r0) - (r1-r0)/(r1-r) );
-							v += att_eps * (1.0 - 1.0/ (1 + eval )) * local_fac;
-
-							dvdr = att_eps * eval * ( -(r1-r0)/(r-r0)/(r-r0)-(r1-r0)/(r1-r)/(r1-r))/(1+eval)/(1+eval); 
-							if( !(dvdr < 1 ) && !(dvdr > 0 ) )
-							{
-								printf("DBG\n");
-							}
+							dvdr += 4 * eps * (-4 * r4 + 2 * r2)/r;
 						}
 					}
 
@@ -737,6 +777,12 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 		}
 	}
 	
+	ParallelSum( &n_att, 1 );
+
+	if( icycle % 100 == 0 )
+		printf("natt: %lf\n", n_att );
+	icycle++;
+
 	free(nearlist);
 	free(ourp);
 	free(complex_for_id);

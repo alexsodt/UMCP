@@ -124,6 +124,7 @@ void setDefaults( parameterBlock *block )
 	block->crowder_d       = 25;
 	block->crowder_attraction = 0;
 	block->crowder_attraction_r = -1;
+	block->crowder_attraction_r_rep = -1;
 	block->crowder_mass	= 2e5;
 
 	block->mean_field  = 0;
@@ -164,7 +165,9 @@ int resolveParameters( parameterBlock *block )
 	if( block->crowder_bond_k < 0 )
 		block->crowder_bond_k = block->default_bond_k;
 	if( block->crowder_attraction != 0 && block->crowder_attraction_r < 0 )
-		block->crowder_attraction_r = block->crowder_r;	
+		block->crowder_attraction_r = block->crowder_r;
+	if( block->crowder_attraction_r > 0 && block->crowder_attraction_r_rep < 0 )
+		block->crowder_attraction_r_rep = 0.75 * block->crowder_attraction_r;	
 	if( block->npt_mc_period > 0 && block->cyl_tension_mc_period > 0 )
 	{
 		printf("As implemented, NPT and cylindrical tension are incompatible.\n");
@@ -529,6 +532,8 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->crowder_r = atof( word2 );
 		else if( !strcasecmp( word1, "crowder_attraction_r" ) )
 			block->crowder_attraction_r = atof( word2 );
+		else if( !strcasecmp( word1, "crowder_attraction_r_rep" ) )
+			block->crowder_attraction_r_rep = atof( word2 );
 		else if( !strcasecmp( word1, "crowder_attraction" ) )
 			block->crowder_attraction = atof( word2 );
 		else if( !strcasecmp( word1, "crowder_d" ) )

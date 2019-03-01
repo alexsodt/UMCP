@@ -684,7 +684,7 @@ int temp_main( int argc, char **argv )
 		 	sub_surface->writeLimitingSurface(minFile, allComplexes, ncomplex );
 		for( int m = 0; m < block.nmin; m++ )
 		{
-			sub_surface->minimize( r, allComplexes, ncomplex );
+			sub_surface->minimize( r, allComplexes, ncomplex, do_gen_q  );
 			sub_surface->put(r);
 			for( int c = 0; c < ncomplex; c++ ) allComplexes[c]->refresh(sub_surface, r );
 			if( par_info.my_id == BASE_TASK )
@@ -1103,8 +1103,14 @@ int temp_main( int argc, char **argv )
 			}
 			else
 			{
-				ParallelSum(g,nc);
-				ParallelSum( qdot_temp, 3*nv );
+				if( do_gen_q )
+				{
+				}
+				else
+				{
+					ParallelSum(g,nc);
+					ParallelSum( qdot_temp, 3*nv );
+				}
 			}
 #endif
 

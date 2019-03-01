@@ -137,6 +137,7 @@ class parameterBlock
 	double crowder_r; // particle radius
 	double crowder_attraction;		
 	double crowder_attraction_r;	
+	double crowder_attraction_r_rep; // radius at which repulsion starts	
 	double crowder_mass;
 
 	double default_bond_k;

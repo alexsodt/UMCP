@@ -13,7 +13,7 @@ void elasticCrowder::init( surface *theSurface, double *rsurf, int f, double u, 
 
 	alloc();
 
-	sigma[0] = 0;
+	sigma[0] = att_sigma_inner;
 	sigma[1] = hard_r;
 	
 	att_sigma[0] = att_sigma_val;
@@ -63,6 +63,7 @@ void elasticCrowder::loadParams( parameterBlock *block )
 	bond_k = fabs(block->crowder_bond_k);
 	att_eps_val = block->crowder_attraction;
 	att_sigma_val = block->crowder_attraction_r;
+	att_sigma_inner = block->crowder_attraction_r_rep;
 	crowder_mass = block->crowder_mass;
 }
 

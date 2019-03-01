@@ -9,6 +9,7 @@
 extern int enable_elastic_interior;
 static int min_ncomplex = 0;
 static int min_nparams = 0;
+static int do_freeze_membrane = 0;
 static pcomplex **min_complexes;
 static surface *min_surface;
 extern double VA,VC;
@@ -219,12 +220,19 @@ double surface_fdf( double *p, double *g)
 	g[3*min_surface->nv+0] = 0;
 	g[3*min_surface->nv+1] = 0;
 	g[3*min_surface->nv+2] = 0;
+	
+	if( do_freeze_membrane )
+	{
+		for( int x = 0; x < 3*min_surface->nv; x++ )
+			g[x] = 0;
+	}
 
 	v += min_surface->energy( p, NULL );
 	ParallelSum( &v, 1 );
 
 	ParallelSum( g, min_nparams );
-#if 0 
+
+#if 0 	
 	MPI_Barrier(MPI_COMM_WORLD);
 	if( par_info.my_id == BASE_TASK )
 	{	
@@ -321,8 +329,10 @@ void fd_test( double *p )
 	free(g);
 }
 
-void surface::minimize( double *r, pcomplex **allComplexes, int ncomplex )
+void surface::minimize( double *r, pcomplex **allComplexes, int ncomplex, int freeze_membrane )
 {
+	do_freeze_membrane = freeze_membrane;
+
 	int prev_enable = enable_elastic_interior; 
 
 	enable_elastic_interior = 1;
@@ -330,6 +340,7 @@ void surface::minimize( double *r, pcomplex **allComplexes, int ncomplex )
 	min_surface = this;
 	min_ncomplex = ncomplex;	
 	min_complexes = allComplexes;
+
 
 
 #ifdef PARALLEL
@@ -341,6 +352,7 @@ void surface::minimize( double *r, pcomplex **allComplexes, int ncomplex )
 	for( int c = 0; c < ncomplex; c++ )
 		num_params += allComplexes[c]->nparams();
 	min_nparams = num_params;
+	
 
 	double *p = (double *)malloc( sizeof(double) * num_params );
 	memcpy( p, r, sizeof(double) * 3 * (nv+1) );
@@ -352,6 +364,14 @@ void surface::minimize( double *r, pcomplex **allComplexes, int ncomplex )
 		allComplexes[c]->getParamsFromComplex( p + tp );
 		tp += allComplexes[c]->nparams();
 	}	
+	
+	double *g = (double *)malloc( sizeof(double) * num_params );
+	// derivative might be zero (absolutely)
+	surface_fdf(p,g);
+	double mag_init = 0;
+	for( int p = 0; p < num_params; p++ )
+		mag_init += g[p]*g[p];
+	
 
 	int nsteps = 100;
 	
@@ -363,19 +383,24 @@ void surface::minimize( double *r, pcomplex **allComplexes, int ncomplex )
 	printf("Entering minimize with e_init: %le\n", e_init );
 	l_bfgs_setup( use_m, num_params, p, 1.0, surface_f, surface_fdf); 
 
-	for( int x = 0; x < nsteps; x++ )
+	if( mag_init > 1e-20 )
 	{
-		if( ! l_bfgs_iteration( p ) ) { break; }
-
+		for( int x = 0; x < nsteps; x++ )
+		{
+			if( ! l_bfgs_iteration( p ) ) { break; }
+	
 //		if( x %10 == 0 )
 //			printf("Sub iteration %d, V: %le\n", x, surface_f(p) );
-	}
-		
+		}
+	}	
+	else
+	{
+		printf("Initial gradient zero.\n");
+	}	
 	l_bfgs_clear();
 //	full_fd_test(p);
 
-	double *g = (double *)malloc( sizeof(double) * num_params );
-	double v = surface_fdf(p,g);
+	double v =surface_fdf(p,g);
 	double e = surface_f(p);
 
 	double rms = 0;

@@ -185,6 +185,7 @@ struct elasticCrowder : pcomplex
 	double bond_k;
 	double att_eps_val;
 	double att_sigma_val;
+	double att_sigma_inner;
 	double crowder_mass;
 
 	void init( surface *, double *rsurf, int f, double u, double v ); 
