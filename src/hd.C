@@ -1443,7 +1443,7 @@ int temp_main( int argc, char **argv )
 		if( block.tachyon && par_info.my_id == BASE_TASK )
 		{
 			sub_surface->writeTachyon( block.jobName, block.tachyon_res, block.tachyon_interp, 
-				r, allComplexes, ncomplex ); 
+				r, allComplexes, ncomplex, &block, block.tachyon_tri_center ); 
 		}
 			
 

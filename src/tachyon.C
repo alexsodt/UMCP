@@ -9,6 +9,7 @@
 #include "alignSet.h"
 #include "pcomplex.h"
 #include "mutil.h"
+#include "input.h"
 
 #define SMOOTH_TRIANGLES
 // routine to write the current structure to a tachyon input file, including the option to linearly interpolate frames for smoothing.
@@ -21,17 +22,22 @@ static int has_pbc = -1;
 static int do_cyl = 0;
 // Tachyon parameters
 static int resolution = 1024;
-static double color[3] = { 0, 0, 1 };
+static double color[3] = { 0, 1, 0 };
+static double fixed_updir[3] = {0,0,1};
+static double fixed_view[3] = {0,0,1};
+static int fixed_views_set = 0;
 
 int surface::writeTachyon( const char *name,
 				int grid_uv, // resolution, how many points we do on one side of a triangle 
 				int nint, // number of interpolation frames
 				double *r, // current coordinates				
 				pcomplex **allComplexes,
-				int ncomplex
+				int ncomplex,
+				parameterBlock *params,
+				int face_center // put the origin on this face.
 			)
 {
-	int overlay_mesh = 0;
+	int overlay_mesh = params->tachyon_overlay_mesh;
 	int np = nv;
 	int nsites_total = nv+1;
 	for( int c = 0; c < ncomplex; c++ )
@@ -269,6 +275,80 @@ int surface::writeTachyon( const char *name,
 #endif
 	}
 	
+	
+	if( face_center >= 0 )	                 
+	{
+		double rcen[3];
+		double ncen[3];       	
+
+		evaluateRNRM( face_center, 1.0/3.0, 1.0/3.0, rcen, ncen, use_frame );
+
+		center[0] = rcen[0] * scale;
+		center[1] = rcen[1] * scale;
+		center[2] = rcen[2] * scale;
+
+		if( !fixed_views_set )
+		{
+			updir[0] = ncen[0];
+			updir[1] = ncen[1];
+			updir[2] = ncen[2];
+		
+			// designed for a cylinder in z but should work for a sphere too I think.
+			double xydir[3] = {0, 0, 1};
+	
+			double t2[3];
+			double t1[3];
+
+			cross(  xydir, ncen, t2 );
+			cross(  ncen, t2, t1 );
+
+			view[0] = t2[0];
+			view[1] = t2[1];
+			view[2] = t2[2];
+			// view is now side-on
+			// rotate 45 back into the normal dir
+			
+			double origin[3] = {0,0,0};
+			rotateArbitrary( view, t1, origin,   1, M_PI/6 );   
+			rotateArbitrary( view, ncen, origin, 1, M_PI/4 );   
+			// still side on
+
+/*	
+			double angle = 85;
+			view[0] = cos(angle*M_PI/180.0) * view90[0] + sin(angle*M_PI/180.0) * ncen[0]; 
+			view[1] = cos(angle*M_PI/180.0) * view90[1] + sin(angle*M_PI/180.0) * ncen[1]; 
+			view[2] = cos(angle*M_PI/180.0) * view90[2] + sin(angle*M_PI/180.0) * ncen[2]; 
+*/	
+			normalize(view);
+			normalize(updir);
+			
+			normalize(updir);
+			
+			fixed_view[0] = view[0];
+			fixed_view[1] = view[1];
+			fixed_view[2] = view[2];
+
+			fixed_updir[0] = updir[0];
+			fixed_updir[1] = updir[1];
+			fixed_updir[2] = updir[2];
+
+			fixed_views_set = 1;
+		}
+		else
+		{
+			view[0] = fixed_view[0];
+			view[1] = fixed_view[1];
+			view[2] = fixed_view[2];
+
+			updir[0] = fixed_updir[0];
+			updir[1] = fixed_updir[1];
+			updir[2] = fixed_updir[2];
+		}
+			
+		center[0] -= view[0];
+		center[1] -= view[1];
+		center[2] -= view[2];
+	}
 
 	fprintf(theFile,
 "Begin_Scene\n"
@@ -286,10 +366,11 @@ int surface::writeTachyon( const char *name,
 "  Viewdir %lf %lf %lf \n"
 "  Updir   %lf %lf %lf \n"
 "End_Camera\n"
+"Directional_Light Direction %lf %lf %lf Color 1.0 1.0 1.0\n"
 "Directional_Light Direction 0.1 -0.1 %lf Color 1.0 1.0 1.0\n"
 "Directional_Light Direction -1 -2 %lf Color 0.2 0.2 0.2\n"
 "Background %lf %lf %lf\n",
-	resolution, resolutiony, zoom, center[0], center[1], center[2], view[0], view[1], view[2], updir[0], updir[1], updir[2], (do_planar ? -1.0 : 1.0), (do_planar ? -0.5 : 0.5), bg[0], bg[1], bg[2] );
+	resolution, resolutiony, zoom, center[0], center[1], center[2], view[0], view[1], view[2], updir[0], updir[1], updir[2], -updir[0], -updir[1], -updir[2], (do_planar ? -1.0 : 1.0), (do_planar ? -0.5 : 0.5), bg[0], bg[1], bg[2] );
 	
 		int num = grid_uv * (grid_uv+1)/2;
 
@@ -321,6 +402,7 @@ int surface::writeTachyon( const char *name,
 		
 				iseq = 0;
 
+/*
 				int tri;
 				if( f < nf_faces )
 					tri = theFormulas[f*nf_g_q_p].tri;
@@ -351,6 +433,7 @@ int surface::writeTachyon( const char *name,
 						color[1] = 0;
 					}
 				}
+*/
 		                for( int iu = 0; iu < grid_uv; iu++ )
 		                for( int iv = 0; iv < grid_uv - iu; iv++, iseq++ )
 		                {
@@ -435,20 +518,21 @@ int surface::writeTachyon( const char *name,
 				for( int i = 0; i < nv; i++ )
 				{
 					fprintf(theFile, "Sphere\n");
-					fprintf(theFile, "Center %lf %lf %lf\n", use_frame[3*i+0]*scale +dx*Lx*scale, use_frame[3*i+1]*scale +dy*Ly*scale, use_frame[3*i+2]*scale );
+					fprintf(theFile, "Center %lf %lf %lf\n", use_frame[3*i+0]*scale +dx*Lx*scale, use_frame[3*i+1]*scale +dy*Ly*scale, use_frame[3*i+2]*scale + dz * Lz*scale );
 					fprintf(theFile, "Rad %lf\n", 9.0 * scale );
 					fprintf(theFile, "Texture\n"
 							"Ambient 0.1 Diffuse 0.4 Specular 0.8 Opacity 1.0\n"
 							 "Phong Metal 0.5 Phong_size 40 Color 1.0 1.0 1.0 TexFunc 0\n");
 					for( int e = 0; e < theVertices[i].valence; e++ )
 					{
+						double sgn=1;
 						int j = theVertices[i].edges[e];	
 						double rj[3] = { 
-							(use_frame[3*j+0]+theVertices[i].edge_PBC[3*e+0] * PBC_vec[0][0]+theVertices[i].edge_PBC[3*e+1] * PBC_vec[1][0]+theVertices[i].edge_PBC[3*e+2] * PBC_vec[2][0] )*scale + dx*Lx*scale,
-							(use_frame[3*j+1]+theVertices[i].edge_PBC[3*e+1] * PBC_vec[0][1]+theVertices[i].edge_PBC[3*e+1] * PBC_vec[1][1]+theVertices[i].edge_PBC[3*e+2] * PBC_vec[2][1] )*scale + dy*Ly*scale, 
-							(use_frame[3*j+2]+theVertices[i].edge_PBC[3*e+2] * PBC_vec[0][2]+theVertices[i].edge_PBC[3*e+1] * PBC_vec[1][2]+theVertices[i].edge_PBC[3*e+2] * PBC_vec[2][2] )*scale + dz*Lz*scale };
+							(use_frame[3*j+0]+sgn*theVertices[i].edge_PBC[3*e+0] * PBC_vec[0][0]+sgn*theVertices[i].edge_PBC[3*e+1] * PBC_vec[1][0]+sgn*theVertices[i].edge_PBC[3*e+2] * PBC_vec[2][0] )*scale + dx*Lx*scale,
+							(use_frame[3*j+1]+sgn*theVertices[i].edge_PBC[3*e+1] * PBC_vec[0][1]+sgn*theVertices[i].edge_PBC[3*e+1] * PBC_vec[1][1]+sgn*theVertices[i].edge_PBC[3*e+2] * PBC_vec[2][1] )*scale + dy*Ly*scale, 
+							(use_frame[3*j+2]+sgn*theVertices[i].edge_PBC[3*e+2] * PBC_vec[0][2]+sgn*theVertices[i].edge_PBC[3*e+1] * PBC_vec[1][2]+sgn*theVertices[i].edge_PBC[3*e+2] * PBC_vec[2][2] )*scale + dz*Lz*scale };
 						fprintf(theFile, "FCylinder\n");
-						fprintf(theFile, "Base %lf %lf %lf\n",  use_frame[3*i+0]*scale +dx*Lx*scale, use_frame[3*i+1]*scale +dy*Ly*scale, use_frame[3*i+2]*scale );
+						fprintf(theFile, "Base %lf %lf %lf\n",  use_frame[3*i+0]*scale +dx*Lx*scale, use_frame[3*i+1]*scale +dy*Ly*scale, use_frame[3*i+2]*scale + dz * Lz *scale );
 						fprintf(theFile, "Apex %lf %lf %lf\n", rj[0], rj[1], rj[2] );
 						fprintf(theFile, "Rad %lf\n", 5.0 * scale ); // six angstroms
 						fprintf(theFile, "Texture\n"

@@ -67,7 +67,9 @@ class parameterBlock
 	double time_step_collision; // srd collision timestep
 	int non_interacting;
 
+	int tachyon_overlay_mesh;
 	int tachyon_interp;
+	int tachyon_tri_center;
 	int tachyon_res;
 	int tachyon;
 	int movie;

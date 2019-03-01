@@ -501,7 +501,9 @@ struct surface
 				int nint, // number of interpolation frames
 				double *r, // current coordinates				
 				pcomplex **allComplexes,
-				int ncomplex
+				int ncomplex,
+				parameterBlock *params,
+				int face_center=-1
 			);
 	
 #ifdef PARALLEL

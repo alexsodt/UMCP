@@ -70,6 +70,8 @@ void setDefaults( parameterBlock *block )
 	block->disable_mesh = 0;
 
 	block->tachyon = 0;
+	block->tachyon_overlay_mesh = 0;
+	block->tachyon_tri_center = -1;
 	block->tachyon_res = 3;
 	block->tachyon_interp = 1;
 
@@ -825,8 +827,22 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}	
 		}
+		else if( !strcasecmp( word1, "tachyon_overlay_mesh" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->tachyon_overlay_mesh = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->tachyon_overlay_mesh = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
 		else if( !strcasecmp( word1, "tachyon_res" ) )
 			block->tachyon_res = atoi( word2 );
+		else if( !strcasecmp( word1, "tachyon_tri_center" ) )
+			block->tachyon_tri_center = atoi( word2 );
 		else if( !strcasecmp( word1, "tachyon_interp" ) )
 			block->tachyon_interp = atoi( word2 );
 		else if( !strcasecmp( word1, "sphere" ) )
