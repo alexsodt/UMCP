@@ -24,6 +24,7 @@ static int do_cyl = 0;
 static int resolution = 1024;
 static double color[3] = { 0, 1, 0 };
 static double fixed_updir[3] = {0,0,1};
+static double fixed_center[3] = {0,0,0};
 static double fixed_view[3] = {0,0,1};
 static int fixed_views_set = 0;
 
@@ -34,6 +35,7 @@ int surface::writeTachyon( const char *name,
 				pcomplex **allComplexes,
 				int ncomplex,
 				parameterBlock *params,
+				srd_integrator *srd,
 				int face_center // put the origin on this face.
 			)
 {
@@ -123,9 +125,14 @@ int surface::writeTachyon( const char *name,
 
 	double *use_frame = (double *)malloc( sizeof(double) * 3 * (nsites_total) );
 
-	use_frame[3*np+0] = 1.0;
-	use_frame[3*np+1] = 1.0;
-	use_frame[3*np+2] = 1.0;
+
+	use_frame[3*nv+0] = r[3*nv+0];	
+	use_frame[3*nv+1] = r[3*nv+1];	
+	use_frame[3*nv+2] = r[3*nv+2];	
+
+//	use_frame[3*np+0] = 1.0;
+//	use_frame[3*np+1] = 1.0;
+//	use_frame[3*np+2] = 1.0;
 
 	if( n_frames_to_write == 1 )
 	{
@@ -236,7 +243,7 @@ int surface::writeTachyon( const char *name,
 	//	zoom = 2.0;
 	}
 	
-	double bg[3] = {0,0,0};
+	double bg[3] = {1,1,1};
 
 	if( do_cyl )
 	{
@@ -283,12 +290,13 @@ int surface::writeTachyon( const char *name,
 
 		evaluateRNRM( face_center, 1.0/3.0, 1.0/3.0, rcen, ncen, use_frame );
 
-		center[0] = rcen[0] * scale;
-		center[1] = rcen[1] * scale;
-		center[2] = rcen[2] * scale;
 
 		if( !fixed_views_set )
 		{
+			center[0] = rcen[0] * scale;
+			center[1] = rcen[1] * scale;
+			center[2] = rcen[2] * scale;
+
 			updir[0] = ncen[0];
 			updir[1] = ncen[1];
 			updir[2] = ncen[2];
@@ -332,6 +340,9 @@ int surface::writeTachyon( const char *name,
 			fixed_updir[1] = updir[1];
 			fixed_updir[2] = updir[2];
 
+			fixed_center[0] = center[0] ;
+			fixed_center[1] = center[1] ;
+			fixed_center[2] = center[2] ;
 			fixed_views_set = 1;
 		}
 		else
@@ -343,6 +354,10 @@ int surface::writeTachyon( const char *name,
 			updir[0] = fixed_updir[0];
 			updir[1] = fixed_updir[1];
 			updir[2] = fixed_updir[2];
+
+			center[0] = fixed_center[0];
+			center[1] = fixed_center[1];
+			center[2] = fixed_center[2];
 		}
 			
 		center[0] -= view[0];
@@ -360,8 +375,8 @@ int surface::writeTachyon( const char *name,
 "  Projection Orthographic\n"
 "  Zoom %lf\n"
 "  Aspectratio 1\n"
-"  Antialiasing 12\n"
-"  Raydepth 50\n"
+"  Antialiasing 4\n"
+"  Raydepth 10\n"
 "  Center  %lf %lf %lf \n"
 "  Viewdir %lf %lf %lf \n"
 "  Updir   %lf %lf %lf \n"
@@ -521,7 +536,7 @@ int surface::writeTachyon( const char *name,
 					fprintf(theFile, "Center %lf %lf %lf\n", use_frame[3*i+0]*scale +dx*Lx*scale, use_frame[3*i+1]*scale +dy*Ly*scale, use_frame[3*i+2]*scale + dz * Lz*scale );
 					fprintf(theFile, "Rad %lf\n", 9.0 * scale );
 					fprintf(theFile, "Texture\n"
-							"Ambient 0.1 Diffuse 0.4 Specular 0.8 Opacity 1.0\n"
+							"Ambient 0.1 Diffuse 0.4 Specular 0.0 Opacity 1.0\n"
 							 "Phong Metal 0.5 Phong_size 40 Color 1.0 1.0 1.0 TexFunc 0\n");
 					for( int e = 0; e < theVertices[i].valence; e++ )
 					{
@@ -536,14 +551,61 @@ int surface::writeTachyon( const char *name,
 						fprintf(theFile, "Apex %lf %lf %lf\n", rj[0], rj[1], rj[2] );
 						fprintf(theFile, "Rad %lf\n", 5.0 * scale ); // six angstroms
 						fprintf(theFile, "Texture\n"
-							"Ambient 0.1 Diffuse 0.4 Specular 0.8 Opacity 1\n"
+							"Ambient 0.1 Diffuse 0.4 Specular 0.0 Opacity 1\n"
 							 "Phong Metal 0.5 Phong_size 40 Color 0 0 1.0 TexFunc 0\n");
 					}
 				}
 
 			}	
-		}
+			int off = nv+1;
+			for( int c = 0; c < ncomplex; c++ )
+			{
+				for( int p = 0; p < allComplexes[c]->nsites; p++ )
+				{
+			//		interp_data[3*(off+p)+0] = allComplexes[c]->rall[3*p+0] + dr[0];
+			//		interp_data[3*(off+p)+1] = allComplexes[c]->rall[3*p+1] + dr[1];
+			//		interp_data[3*(off+p)+2] = allComplexes[c]->rall[3*p+2] + dr[2];
+
+					double p_rad = allComplexes[c]->sigma[p];
+					double pcolor[3] = { 1, 0, 1 };
+
+					if( allComplexes[c]->att_sigma[p] > 0 )
+					{
+						pcolor[0] = 0;
+						pcolor[1] = 0;
+						pcolor[2] = 1;
+					}
+
+						// wrap PBC
 	
+						double pbc_w[3] = { use_frame[3*(off+p)+0], 
+								    use_frame[3*(off+p)+1],						
+								    use_frame[3*(off+p)+2] };
+
+//						while( pbc_w[0] < 0  ) pbc_w[0] += Lx;						
+//						while( pbc_w[0] >  Lx ) pbc_w[0] -= Lx;						
+						
+//						while( pbc_w[1] < 0 ) pbc_w[1] += Ly;						
+//						while( pbc_w[1] >  Ly ) pbc_w[1] -= Ly;						
+						
+						while( pbc_w[2] < 0 ) pbc_w[2] += Lz;						
+						while( pbc_w[2] >  Lz ) pbc_w[2] -= Lz;						
+
+						fprintf(theFile, "Sphere\n");
+						fprintf(theFile, "Center %lf %lf %lf\n",  
+	pbc_w[0]*scale +dx*Lx*scale, pbc_w[1]*scale +dy*Ly*scale, pbc_w[2]*scale + dz * Lz*scale );
+						fprintf(theFile, "Rad %lf\n", p_rad * scale );
+						fprintf(theFile, "Texture\n"
+							"Ambient 0.1 Diffuse 0.4 Specular 0.0 Opacity 1.0\n"
+							 "Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", pcolor[0], pcolor[1], pcolor[2] );
+				}
+	
+				off += allComplexes[c]->nsites;
+			}
+		}
+
+		
+
 		fprintf(theFile, "End_Scene\n");
 
 		fclose(theFile );

@@ -23,7 +23,7 @@
 
 struct pcomplex;
 struct parameterBlock;
-
+struct srd_integrator;
 //const double KA = 0.215;
 //const double kc = 7.2;
 
@@ -503,6 +503,7 @@ struct surface
 				pcomplex **allComplexes,
 				int ncomplex,
 				parameterBlock *params,
+				srd_integrator *srd,
 				int face_center=-1
 			);
 	
