@@ -13,7 +13,7 @@ extern double kc;
 static double default_particle_area = 65;
 static double default_mass = 20000;
 
-#define DISABLE_ATTACH
+//#define DISABLE_ATTACH
 #define PART_A
 #define PART_B
 //#define TURN_OFF_TERM2
@@ -1134,6 +1134,8 @@ pcomplex *loadComplex( const char *name )
 		the_complex = new elasticCrowder;
 	else if( !strcasecmp( name, "simple" ) )
 		the_complex = new simpleParticle;
+	else if( !strcasecmp( name, "simpleLipid" ) )
+		the_complex = new simpleLipid;
 	else
 	{
 		printf("Unknown complex name '%s'.\n", name );
@@ -1356,7 +1358,22 @@ void pcomplex::fd_grad_debug(surface *theSurface, double *rsurf )
 
 void pcomplex::loadParams( parameterBlock *block )
 {
+	
+	
 }
+
+void simpleLipid::loadParams( parameterBlock *block )
+{
+	c0_val = block->c0;
+}
+
+void simpleLipid::init( surface *theSurface, double *rsurf, int f, double u, double v )
+{
+	pcomplex::init( theSurface, rsurf, f, u, v );
+
+	p_c0[0] = c0_val;
+}
+
 
 void pcomplex::evaluate_momentum( surface *theSurface, double *rsurf, double *pout )
 {

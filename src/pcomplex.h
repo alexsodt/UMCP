@@ -118,6 +118,13 @@ struct simpleParticle : pcomplex
 {
 };
 
+struct simpleLipid : pcomplex
+{
+	double c0_val;
+	void loadParams( parameterBlock *block );
+	virtual void init( surface *theSurface, double *, int f, double u, double v ); 
+};
+
 struct NBAR : pcomplex
 {
 	double bond_length;
