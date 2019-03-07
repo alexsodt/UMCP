@@ -1,0 +1,14 @@
+time_step 		1e-11
+jobname			full
+#add simplelipid nbound 100 outside
+c0			-0.03
+mesh 			sphere2.mesh
+mode_min 		2
+mode_max 		6	
+sphere 			yes
+do_ld 			yes
+o_lim 			100
+nequil			200
+nsteps			1000
+movie			yes	
+gamma_langevin 		100
