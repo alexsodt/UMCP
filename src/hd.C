@@ -1362,6 +1362,9 @@ int temp_main( int argc, char **argv )
 		double time_1 = tnow.tv_sec + (1e-6) * tnow.tv_usec;
 		
 		step_rate = block.o_lim / (time_1-time_0+1e-10);
+		
+		if( block.lipid_mc_period > 0 )
+			sub_surface->measureLipidCurvature(r, o < nequil );
 
 		if( collect_hk )
 		{

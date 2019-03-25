@@ -12,6 +12,8 @@ struct localLipidComposition
 struct bilayerComposition
 {
 	int nlipidTypes;
+	double *sum_C;
+	double *num_C;
 	double *c0;
 	double *APL;
 	char **names;

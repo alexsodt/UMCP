@@ -1887,8 +1887,12 @@ double surface::c( int f, double u, double v, double *r )
 			printf("ERROR trying to evaluate ru outside of irregular domain.\n");
 			exit(1);
 		}
+		
+		double u_u = u, u_v=0, v_u=0, v_v = v;
+		theKernel->get_map_transform( &u_u, &u_v, &v_u, &v_v );
 
 		double *theMap = theKernel->get_map( &fu, &fv );
+		
 
 		double u = fu;
 		double v = fv;
@@ -2024,25 +2028,25 @@ double surface::c( int f, double u, double v, double *r )
 		{
 			for( int y = 0; y < 12; y++ )
 			{
-				Ru[0] += (r[3*cset[x]+0] + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * alpha_x;
-				Ru[1] += (r[3*cset[x]+1] + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * alpha_y;
-				Ru[2] += (r[3*cset[x]+2] + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * alpha_z;
+				Ru[0] += (r[3*cset[x]+0] + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * alpha_x * u_u;
+				Ru[1] += (r[3*cset[x]+1] + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * alpha_y * u_u;
+				Ru[2] += (r[3*cset[x]+2] + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * alpha_z * u_u;
 				
-				Rv[0] += (r[3*cset[x]+0] + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * alpha_x;
-				Rv[1] += (r[3*cset[x]+1] + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * alpha_y;
-				Rv[2] += (r[3*cset[x]+2] + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * alpha_z;
+				Rv[0] += (r[3*cset[x]+0] + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * alpha_x * v_v;
+				Rv[1] += (r[3*cset[x]+1] + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * alpha_y * v_v;
+				Rv[2] += (r[3*cset[x]+2] + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * alpha_z * v_v;
 				
-				tSuu[0] += (r[3*cset[x]+0]  + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_duu[y] * alpha_x;
-				tSuu[1] += (r[3*cset[x]+1]  + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_duu[y] * alpha_y;
-				tSuu[2] += (r[3*cset[x]+2]  + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_duu[y] * alpha_z;
+				tSuu[0] += (r[3*cset[x]+0]  + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_duu[y] * alpha_x * u_u * u_u;
+				tSuu[1] += (r[3*cset[x]+1]  + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_duu[y] * alpha_y * u_u * u_u;
+				tSuu[2] += (r[3*cset[x]+2]  + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_duu[y] * alpha_z * u_u * u_u;
 				
-				tSuv[0] += (r[3*cset[x]+0]  + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_duv[y] * alpha_x;
-				tSuv[1] += (r[3*cset[x]+1]  + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_duv[y] * alpha_y;
-				tSuv[2] += (r[3*cset[x]+2]  + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_duv[y] * alpha_z;
+				tSuv[0] += (r[3*cset[x]+0]  + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_duv[y] * alpha_x * u_u * v_v;
+				tSuv[1] += (r[3*cset[x]+1]  + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_duv[y] * alpha_y * u_u * v_v;
+				tSuv[2] += (r[3*cset[x]+2]  + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_duv[y] * alpha_z * u_u * v_v;
 				
-				tSvv[0] += (r[3*cset[x]+0]  + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_dvv[y] * alpha_x;
-				tSvv[1] += (r[3*cset[x]+1]  + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_dvv[y] * alpha_y;
-				tSvv[2] += (r[3*cset[x]+2]  + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_dvv[y] * alpha_z;
+				tSvv[0] += (r[3*cset[x]+0]  + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_dvv[y] * alpha_x * v_v * v_v;
+				tSvv[1] += (r[3*cset[x]+1]  + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_dvv[y] * alpha_y * v_v * v_v;
+				tSvv[2] += (r[3*cset[x]+2]  + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_dvv[y] * alpha_z * v_v * v_v;
 			}
 		}
 		cross( Ru, Rv, nrm );
