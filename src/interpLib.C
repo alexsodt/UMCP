@@ -5491,44 +5491,8 @@ void surface::generatePlan( void )
 
 					//double ulim = 1-(fv+dv); 
 					
-//#define WEIGHT_DEBUG
-#ifdef WEIGHT_DEBUG
-					for( int u = 0; u < n_u_gauss; u++ )
-					{
-						u_pts[u] = (u+0.5) * (1.0-fv)/(n_u_gauss);
-						w_pts[u] = (1.0-fv)/(double)(n_u_gauss); // du
-					}
-#else
 					get_u_pts( u_pts, w_pts, n_u_gauss, k, fv );
-#endif
 			
-
-// Gauss debug.
-
-#ifdef GAUSS_DEBUG
-					if( v_pt == 0 )
-					{
-						double f0 = 1.333;
-						double f1 = -0.3;
-						double f2 = 0.5;
-						double f3 = 0.4;
-			
-						double f_check = 0;
-						for( int u_pt = 0; u_pt < n_u_gauss; u_pt++ )
-						{
-//						printf("u: %lf w: %lf\n", u_pts[u_pt], w_pts[u_pt] );
-							double fv = 0;
-							double fu = u_pts[u_pt];
-
-							double factor = pow( 1.0 / (fu+fv) * pow( k, -log2( fu+fv) ), 2.0 );
-							double weight = w_pts[u_pt] / factor; 
-
-							f_check += weight * factor * (f0 + f1 * fu + f2 * fu * fu + f3 * fu * fu * fu ); 
-						}
-						printf("f_Check: %le\n", f_check );
-						exit(1);
-					}
-#endif
 
 //					printf("v: %lf\n", fv );
 					for( int u_pt = 0; u_pt < n_u_gauss; u_pt++ )
@@ -5540,9 +5504,6 @@ void surface::generatePlan( void )
 						double factor = pow( 1.0 / (fu+fv) * pow( k, -log2( fu+fv) ), 4.0 );
 						double u_weight = w_pts[u_pt] * factor; 
 						double weight = v_weight * u_weight;
-#ifdef WEIGHT_DEBUG
-						weight = dv * w_pts[u_pt];
-#endif
 						double fw = 1-fu-fv;
 		
 						double o_fu = fu;
@@ -5671,13 +5632,13 @@ void surface::generatePlan( void )
 						double A_prev[ncoords_base*ncoords_base];	
 	
 						
-						for( int e = 0; e < ncoords_base; e++ )
+						for( int ex = 0; ex < ncoords_base; ex++ )
 						for( int j = 0; j < ncoords_base; j++ )
 						{
-							A_prev[e*ncoords_base+j] = 0;
+							A_prev[ex*ncoords_base+j] = 0;
 	
 							for( int i = 0; i < ncoords_base; i++ )
-								A_prev[e*ncoords_base+j] += Aevec[val][i*ncoords_base+j] * pow( Aval[val][i], domain-1 ) * Aevec_R[val][i*ncoords_base+e];
+								A_prev[ex*ncoords_base+j] += Aevec[val][i*ncoords_base+j] * pow( Aval[val][i], domain-1 ) * Aevec_R[val][i*ncoords_base+ex];
 						}
 						
 						
@@ -6524,6 +6485,9 @@ void surface::generatePlan( void )
 	double alpha_x = 1.0;
 	double alpha_y = 1.0;
 	double alpha_z = 1.0;
+	
+	double sum_reg_g = 0;
+
 	for( int f = 0; f < nf; f++ )
 	{
 		double r[3] = {0,0,0};
@@ -6547,6 +6511,14 @@ void surface::generatePlan( void )
 			rv[1] += theFormulas[f].r_v[p] * alpha_y*(theVertices[cp[p]].r[1] + theFormulas[f].r_pbc[3*p+1]); 
 			rv[2] += theFormulas[f].r_v[p] * alpha_z*(theVertices[cp[p]].r[2] + theFormulas[f].r_pbc[3*p+2]); 
 		}
+	
+		double ruru = ru[0] * ru[0] + ru[1] * ru[1] + ru[2]*ru[2];
+		double rurv = ru[0] * rv[0] + ru[1] * rv[1] + ru[2]*rv[2];
+		double rvrv = rv[0] * rv[0] + rv[1] * rv[1] + rv[2]*rv[2];
+	
+		double g = sqrt(ruru*rvrv-rurv*rurv);
+
+		sum_reg_g += g;
 
 		normalize( ru );
 		normalize( rv );
@@ -6556,6 +6528,8 @@ void surface::generatePlan( void )
 		cross( ru, rv, nrm );
 		normalize(nrm);
 	}
+		
+	std_metric = sum_reg_g / nf;
 
 	constructIrregularKernels();
 }

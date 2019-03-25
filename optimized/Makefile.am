@@ -3,7 +3,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 EMAIL = alexander.sodt@nih.gov
 
 
-bin_PROGRAMS = hd.opt makeHexSquare.opt min.opt subdivide.opt scale.opt icosahedron.opt makeBud.opt makeBump.opt makeHexCylinder.opt  writeBiasPotential.opt writeCylRTraj.opt
+bin_PROGRAMS = hd.opt makeHexSquare.opt min.opt subdivide.opt scale.opt icosahedron.opt makeBud.opt makeBump.opt makeHexCylinder.opt  writeBiasPotential.opt writeCylRTraj.opt rd.opt
 
 AM_CPPFLAGS = -include ../config.h -include ../src/local_config.h $(AM_INCLUDE) 
 AM_CFLAGS = -O2
@@ -20,8 +20,11 @@ util_SRCS    = mutil.C util.C
 
 interp_SRCS = interpLib.C grad.C pboxing.C irr_kernel.C uv_map.C gauss.C modes.C write_structures.C min_distance.cpp GJK.cpp gjk_gudrun.cpp GJK_min2.cpp functions.cpp NearestSimplexR2.cpp NearestSimplexR.cpp  subdivide3.C fast_mm.C random_global.C height.C pcomplex.C minimize.C gsl_random_globals.C dynamics.C restart.C p_p.C sparse.C global_boxing.C lipid_density.C tachyon.C npt.C lipid_composition.C vpass.C get_regions.C parallel.C input.C l-bfgs.C srd.C alignSet.C compilation_time.C meshCollisionLib.C
 
+rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutines/pirr_pfree_ratio_psF.cpp 
+
 hull_SRCS = dovoronoi.c clusterv.C
 
+rd_opt_SOURCES        = rd.C $(rd_SRCS) $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
 hd_opt_SOURCES        = hd.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
 min_opt_SOURCES       = min.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
 subdivide_opt_SOURCES = subdivide.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
@@ -36,6 +39,7 @@ writeCylRTraj_opt_SOURCES      = writeCylRTraj.C $(util_SRCS)
 
 hd_opt_LDFLAGS		  = $(AM_LDFLAGS) 
 
+rd_opt_LDADD		  = $(AM_LDADD) -lstdc++ 
 hd_opt_LDADD              = $(AM_LDADD) -lstdc++
 min_opt_LDADD             = $(AM_LDADD) -lstdc++
 subdivide_opt_LDADD       = $(AM_LDADD) -lstdc++
@@ -47,5 +51,8 @@ makeHexCylinder_opt_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
 makeHexSquare_opt_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
 writeBiasPotential_opt_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
 writeCylRTraj_opt_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
+
+compilation_time.o: .FORCE
+.PHONY: .FORCE
 
 

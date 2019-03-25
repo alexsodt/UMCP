@@ -284,6 +284,8 @@ struct surface
 	int zlength;
 	//int zBlength;
 
+	double std_metric;
+
 	int loadLattice( const char *fileName, double noise, surface *copyFrom=NULL );
 	int loadAndCopyLattice( const char *fileName, surface *altSurface );
 	void setg0(double *r);
@@ -465,6 +467,7 @@ struct surface
 	void dKE_dx_and2( force_set *theForceSet,SparseMatrix *effM, double *vp, double *unit_f_vec, int f, double u, double v, double *dKEdx, double *d2KEdx2 );
 	void getEffectiveMass( force_set * theForceSet, double *effective_mass );
 	void getSparseEffectiveMass( force_set * theForceSet, int *use_map, int *nuse, SparseMatrix **, double *gen_transform=NULL, int NQ=-1, double *mass_scaling=NULL);
+	void approxSparseEffectiveMass( force_set * theForceSet, int *use_map, int *nuse, SparseMatrix **, double *gen_transform=NULL, int NQ=-1, double *mass_scaling=NULL);
 	void applyForceAtPoint( int f, double u, double v, double *dp, double *force_vector, force_set *theForceSet );
 	void velocityAtPoint( int f, double u, double v, double *vp, double *velocity_out );
 	void fdiff_check_grad( double *r );
@@ -477,8 +480,8 @@ struct surface
 	void timestep_analysis( double *r, force_set *theForceSet, double *Minv, pcomplex **allComplexes, int ncomplex, double approx_timestep );
 
 	// restarts
-	void saveRestart( FILE *theFile, double *rsurf, double *pp, pcomplex **allComplexes, int ncomplex );
-	void saveRestart( char **buf, double *rsurf, double *pp, pcomplex **allComplexes, int ncomplex );
+	void saveRestart( FILE *theFile, double *rsurf, double *pp, pcomplex **allComplexes, int ncomplex, int NQ, int seed );
+	void saveRestart( char **buf, double *rsurf, double *pp, pcomplex **allComplexes, int ncomplex, int NQ, int seed );
 
 	double cellVolume( void );
 	void evaluate_momentum( force_set *theForceSet, double *vq, double *pmesh, double *pout );

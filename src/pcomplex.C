@@ -13,7 +13,7 @@ extern double kc;
 static double default_particle_area = 65;
 static double default_mass = 20000;
 
-//#define DISABLE_ATTACH
+#define DISABLE_ATTACH
 #define PART_A
 #define PART_B
 //#define TURN_OFF_TERM2
@@ -230,13 +230,15 @@ double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *mesh_
 	if( is_irreg && time_step > 0 )
 	{
 		double fraction = 1.0;
+
 		for( int s = 0; s < nattach; s++ )
 		{
 			int f = grad_fs[s];
 	
 			double u = grad_puv[2*s+0];
 			double v = grad_puv[2*s+1];
-	
+
+#ifdef USE_KIN_E	
 			double P_uv[4] = {
 				0,	0,
 				0,	0
@@ -287,15 +289,82 @@ double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *mesh_
 			double dPv_dt = inter2[0] * qdot0[0] + inter2[1] * qdot0[1];
 	
 			double dKE = 0.25 * (dPu_dt * qdot0[0] + dPu_dt * qdot0[1])*time_step*AKMA_TIME;
-
-			double fr = fabs(0.592/dKE); // just use 300K for now.
+			double tolerance = 0.1;
+			double fr = tolerance * fabs(0.592/dKE); // just use 300K for now.
 
 			if( fr < fraction )
+			{
+				printf("f u v %d %le %le dKE_exp %.14le fraction %le\n", f, u, v, dKE, fr ); 
 				fraction = fr;
-
-//			printf("f u v %d %le %le dKE exp %.14le\n", f, u, v, dKE ); 
+			}
 
 			free(d_P_duv);
+#else
+
+			double P_uv[4] = {
+				0,	0,
+				0,	0
+			};
+	
+			theSurface->fetchPuv( f, u, v, P_uv, rsurf );
+		
+			P_uv[0] *= mass[s];
+			P_uv[1] *= mass[s];
+			P_uv[2] *= mass[s];
+			P_uv[3] *= mass[s];
+	
+			double Pdet = P_uv[0] * P_uv[3] - P_uv[1] * P_uv[2];
+			double Pinv[4] = { P_uv[3]/Pdet, -P_uv[2]/Pdet, -P_uv[1]/Pdet, P_uv[0]/Pdet };
+	
+			double qdot0[2] = { Pinv[0] * p[2*s+0] + Pinv[1] * p[2*s+1],
+					    Pinv[2] * p[2*s+0] + Pinv[3] * p[2*s+1] };
+
+			// from propagating qdot:
+			double expected_dq[2] = { AKMA_TIME * time_step * qdot0[0], AKMA_TIME * time_step * qdot[1] };
+
+			
+
+			// d(Minv)_{uv}_u
+
+			double *d_P_duv;
+	
+			int nc = theSurface->fetchdP_duv( f, u, v, &d_P_duv, rsurf );
+			for( int t = 0; t < 8; t++ )
+				d_P_duv[t] *= mass[s];
+			
+			// ratio of determinants, before and after: det(M0^-1 + d M0^-1)/det(M0^-1)
+		
+			double machine_scale = sqrt(Pinv[0]*Pinv[0]+Pinv[1]*Pinv[1]);
+
+			double ax[2] = { d_P_duv[0], d_P_duv[4] };
+			double bx[2] = { d_P_duv[1], d_P_duv[5] };
+			double cx[2] = { d_P_duv[2], d_P_duv[6] };
+			double dx[2] = { d_P_duv[3], d_P_duv[7] };
+			double a=Pinv[0]/machine_scale; double b=Pinv[1]/machine_scale; double c = Pinv[2]/machine_scale; double d = Pinv[3]/machine_scale;
+
+			double dM0_det[2] = 
+			{ 
+				ax[0]*b*b*c*c*d - bx[0]*a*a*c*d*d - cx[0] * a*a*b*d*d + dx[0]*a*b*b*c*c,
+				ax[1]*b*b*c*c*d - bx[1]*a*a*c*d*d - cx[1] * a*a*b*d*d + dx[1]*a*b*b*c*c 
+			};
+
+			dM0_det[0] /= (a*b*c*d)*(a*d-b*c);
+			dM0_det[1] /= (a*b*c*d)*(a*d-b*c);
+
+			dM0_det[0] *= machine_scale;
+			dM0_det[1] *= machine_scale;
+
+			double fr = fabs(dM0_det[0] * expected_dq[0] + dM0_det[1] * expected_dq[1]);
+			double tolerance = 0.05;
+
+			if( tolerance/fr < fraction )
+			{
+			//	printf("f u v %d %le %le d_metric: %le setting fraction\n", f, u, v, fr, tolerance/fr ); 
+				fraction = tolerance/fr;
+			}
+
+			free(d_P_duv);
+#endif
 		}
 
 		time_step *= fraction;
@@ -830,13 +899,22 @@ void pcomplex::propagate_surface_q( surface *theSurface, double *rsurf, double d
 
 	for( int s = 0; s < nattach; s++ )
 	{
+		int last_f = fs[s];
+		double last_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
 		double duv[2] = { qdot[2*s+0] * dt * AKMA_TIME, qdot[2*s+1] * dt * AKMA_TIME };
 
 		puv[2*s+0] += duv[0];
 		puv[2*s+1] += duv[1];
 
 		refresh(theSurface, rsurf );
-
+		
+		double new_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
+		double fr = fabs(1-new_metric/last_metric);
+		if( fr > 0.1 )
+		{
+			printf("dMetric: %.14le last_f %d new_f %d u v %le %le\n",
+				new_metric/last_metric, last_f, fs[s], puv[2*s+0], puv[2*s+1] );
+		}
 	}
 /*
 	for( int s = nattach; s < nsites; s++ )
@@ -860,6 +938,7 @@ void pcomplex::propagate_p( surface *theSurface, double *rsurf, double dt )
 {
 	// move a step.
 
+	double T_before = T(theSurface,rsurf);
 
 	for( int s = 0; s < nattach; s++ )
 	{
@@ -872,6 +951,13 @@ void pcomplex::propagate_p( surface *theSurface, double *rsurf, double dt )
 		p[3*s+0] -= save_grad[3*s+0] * dt * AKMA_TIME;
 		p[3*s+1] -= save_grad[3*s+1] * dt * AKMA_TIME;
 		p[3*s+2] -= save_grad[3*s+2] * dt * AKMA_TIME;
+	}
+	
+	double T_after = T(theSurface,rsurf);
+
+	if( fabs(T_after-T_before) > 0.592  )
+	{
+		printf("dKE: %le f: %d u: %le v: %le\n", T_after-T_before, fs[0], puv[0], puv[1] );
 	}
 
 	if( bound )	

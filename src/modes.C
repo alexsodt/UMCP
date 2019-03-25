@@ -10,6 +10,8 @@
 #include "parallel.h"
 #include "sparse.h"
 
+#define OUTPUT_EM
+
 static int maxv = 13;
 static double rel_tol = 1e-20;
 
@@ -1740,6 +1742,17 @@ double surface::evaluate_T( double *vq, double *pmesh, double *vq_m1, double *pm
 
 void surface::getSparseEffectiveMass( force_set * theForceSet, int *use_map, int *nuse, SparseMatrix **theMatrix, double *gen_transform, int ngen, double * mass_scaling )
 {
+
+	if( ngen <= 0 && (double)nv * (double)par_info.nprocs > 500 )
+	{
+		printf("Calculating approximate effective mass matrix using parallel/sparse method.\n");
+		approxSparseEffectiveMass( theForceSet, use_map, nuse, theMatrix, gen_transform, 8, mass_scaling );
+		printf("Done.\n");
+		return;
+	}
+	
+	printf("Calculating truncated effective mass matrix.\n");
+
 	int used_transform = 0;
 	double *effective_mass = (double *)malloc( sizeof(double)*nv*nv);
 	memset( effective_mass, 0, sizeof(double) * nv * nv );
@@ -1913,6 +1926,57 @@ void surface::getSparseEffectiveMass( force_set * theForceSet, int *use_map, int
 			}
 		}
 	}
+
+	
+#ifdef OUTPUT_EM
+	if(  ! used_transform )
+	{
+		FILE *dbgFile = fopen("trunc_sparse.txt","w");
+	
+		for( int v = 0; v < nv; v++ )
+		{
+			int nnz = (*theMatrix)->nnz[v];
+		
+			int sorter[nnz];
+			for( int t = 0; t < nnz; t++ )
+				sorter[t] = t;
+			int done = 0;
+			int *nzl = (*theMatrix)->nzl[v];
+			while (! done )
+			{
+				done = 1;
+	
+				for( int x = 0; x < nnz-1; x++ )
+				{
+					if( nzl[sorter[x]] > nzl[sorter[x+1]] )
+					{
+						int t = sorter[x];
+						sorter[x] = sorter[x+1];
+						sorter[x+1] = t;
+						done = 0;
+					}
+				}
+			}
+	
+			int cur = 0;
+			int get = 0;
+	
+			while( cur < nv )
+			{
+				if( cur == nzl[sorter[get]] )
+				{
+					fprintf(dbgFile, " %le", (*theMatrix)->nzv[v][sorter[get]] );
+					get++;
+				}
+				else
+					fprintf(dbgFile, " 0.0" );
+				cur++;
+			}
+			fprintf(dbgFile, "\n");
+		}
+		fclose(dbgFile);
+	}
+#endif	
 	
 	(*theMatrix)->setNeedSource();
 	(*theMatrix)->compress();
@@ -2001,6 +2065,7 @@ void surface::getSparseEffectiveMass( force_set * theForceSet, int *use_map, int
 #endif
 */
 	free(effective_mass);	
+	printf("Done.\n");
 }
 
 void surface::getEffectiveMass( force_set * theForceSet, double *effective_mass )
@@ -2231,4 +2296,424 @@ void surface::debugDeformation( double *r )
 	}	
 }
 
+
+void surface::approxSparseEffectiveMass( force_set * theForceSet, int *use_map, int *nuse, SparseMatrix **theMatrix, double *gen_transform, int useVertDist, double * mass_scaling )
+{
+	// for each vertex, find the list of vertices within useVertDist of it.
+	
+	double **vertex_coeff = (double **)malloc( sizeof( double *) * nv );
+	int **c_vertex_list = (int **)malloc( sizeof(int *) * nv );
+	int *c_vertex_space = (int *)malloc( sizeof(int) * nv );
+	int *c_nuse_verts = (int *)malloc( sizeof(int) * nv );
+
+	int **vertex_list = (int **)malloc( sizeof(int *) * nv );
+	int *vertex_space = (int *)malloc( sizeof(int) * nv );
+	int *nuse_verts = (int *)malloc( sizeof(int) * nv );
+
+	for( int v = 0; v < nv; v++ )
+	{
+		vertex_space[v] = useVertDist;
+		nuse_verts[v] = 0;
+		vertex_list[v] = (int *)malloc( sizeof(int) * vertex_space[v] );
+
+		c_vertex_space[v] = 20;
+		c_nuse_verts[v] = 0;
+		vertex_coeff[v] = (double *)malloc( sizeof(double) * c_vertex_space[v] );
+		memset( vertex_coeff[v], 0, sizeof(double) * c_vertex_space[v] );
+		c_vertex_list[v] = (int *)malloc( sizeof(int) * c_vertex_space[v] );
+	}
+	
+	/* first get the coefficients, this is banded and very sparse */
+	
+	for( int x = 0; x < theForceSet->npts; x++ )
+	{
+		for( int c1x = 0; c1x < theForceSet->frc_ncoef[x]; c1x++ )
+		for( int c2x = 0; c2x < theForceSet->frc_ncoef[x]; c2x++ )
+		{
+			int v1 = theForceSet->frc_coef_list[x*maxv+c1x];
+			int v2 = theForceSet->frc_coef_list[x*maxv+c2x];
+
+			int pv2_in_v1 = -1;
+
+			for( int vx1 = 0; vx1 < c_nuse_verts[v1]; vx1++ )
+			{
+				if( c_vertex_list[v1][vx1] == v2 )
+					pv2_in_v1 = vx1;
+			}
+
+			if( pv2_in_v1 == -1 )
+			{
+				if( c_nuse_verts[v1] == c_vertex_space[v1] )
+				{
+					c_vertex_space[v1] += 6;
+					vertex_coeff[v1] = (double *)realloc( vertex_coeff[v1], sizeof(double) * c_vertex_space[v1] );
+					for( int t = c_nuse_verts[v1]; t < c_vertex_space[v1]; t++ )
+						vertex_coeff[v1][t] = 0;
+
+					c_vertex_list[v1] = (int *)realloc( c_vertex_list[v1], sizeof(int) * c_vertex_space[v1] );
+				}
+					
+				c_vertex_list[v1][c_nuse_verts[v1]] = v2;
+				pv2_in_v1 = c_nuse_verts[v1];
+				c_nuse_verts[v1] += 1;
+			}
+			
+			int pv1_in_v2 = -1;
+
+			for( int vx2 = 0; vx2 < c_nuse_verts[v2]; vx2++ )
+			{
+				if( c_vertex_list[v2][vx2] == v1 )
+					pv1_in_v2 = vx2;
+			}
+
+			if( pv1_in_v2 == -1 )
+			{
+				if( c_nuse_verts[v2] == c_vertex_space[v2] )
+				{
+					c_vertex_space[v2] += 6;
+					vertex_coeff[v2] = (double *)realloc( vertex_coeff[v2], sizeof(double) * c_vertex_space[v2] );
+					c_vertex_list[v2] = (int *)realloc( c_vertex_list[v2], sizeof(int) * c_vertex_space[v2] );
+					for( int t = c_nuse_verts[v2]; t < c_vertex_space[v2]; t++ )
+						vertex_coeff[v2][t] = 0;
+				}
+
+				pv1_in_v2 = c_nuse_verts[v2];
+				c_vertex_list[v2][c_nuse_verts[v2]] = v1;
+				c_nuse_verts[v2] += 1;
+			}
+
+			vertex_coeff[v1][pv2_in_v1] += theForceSet->frc_coef[x*maxv+c1x] * theForceSet->frc_coef[x*maxv+c2x] * theForceSet->mass[x];
+		}
+	}	
+
+	
+	/* brute force for now */
+	int *hop_mat = (int *)malloc( sizeof(int) * nv * nv );
+
+	for( int v = 0; v < nv; v++ )
+	{
+		int min_hops[nv];
+	
+		for( int v2 = 0; v2 < nv; v2++ )
+			min_hops[v2] = nv;
+		min_hops[v] = 0;
+
+		int done = 0;
+
+		while( !done )
+		{
+			done = 1;
+
+			for( int v1 = 0; v1 < nv; v1++ )
+			{
+				int val = theVertices[v1].valence;
+
+				for( int e = 0; e < val; e++ )
+				{
+					if( min_hops[theVertices[v1].edges[e]]+1 <
+					    min_hops[v1] )
+					{
+						min_hops[v1] = min_hops[theVertices[v1].edges[e]]+1;
+						done = 0;
+					}
+				}
+			}
+		}
+	
+		memcpy( hop_mat + v * nv, min_hops, sizeof(int) * nv ); 
+
+		for( int tv = 0; tv < nv; tv++ )
+		{
+			if( hop_mat[v*nv+tv] < useVertDist )
+			{
+				if( vertex_space[v] == nuse_verts[v] )
+				{
+					vertex_space[v] += 6;
+					vertex_list[v] = (int *)realloc( vertex_list[v], sizeof(int) * vertex_space[v] );
+				}
+
+				vertex_list[v][nuse_verts[v]] = tv;
+
+				nuse_verts[v]++;
+			}
+		}
+	}
+	
+	// build the sparse matrix.
+	(*theMatrix) = new SparseMatrix;
+	(*theMatrix)->init( nv ); 
+
+
+	// vertex_list is the space of the final sparse matrix inverse.
+	// this algorithm is slow for dense matrices but can be parallelized trivially.
+
+	for( int v = 0; v < nv; v++ )
+	{
+#ifdef PARALLEL
+		if( v % par_info.nprocs != par_info.my_id )
+			continue;
+#endif
+
+		int v_coeff_ind = -1;
+
+		for( int vx = 0; vx < nuse_verts[v]; vx++ )
+		{
+			if( vertex_list[v][vx] == v )
+				v_coeff_ind = vx;
+		}
+
+		if( v_coeff_ind == -1 )
+		{
+			printf("LOGICAL ERROR.\n");
+			exit(1);
+		}
+
+		// solve for the approximate inverse in this space.
+
+/*
+		double *Acoeff = (double *)malloc( sizeof(double) * nuse_verts[v] * nuse_verts[v] );
+		memset( Acoeff, 0, sizeof(double) * nuse_verts[v] * nuse_verts[v] );
+		for( int jx = 0; jx < nuse_verts[v]; jx++ )
+		for( int kx = 0; kx < nuse_verts[v]; kx++ )
+		{
+			int j = vertex_list[v][jx];
+			int k = vertex_list[v][kx];
+
+			for( int t = 0; t < c_nuse_verts[j]; t++ )
+			{
+				if( c_vertex_list[j][t] == k )
+					Acoeff[jx*nuse_verts[v]+kx] = vertex_coeff[j][t]; 
+			}
+		}
+*/	
+		// coeff is the row of the inverse
+		
+		double *Aspace = (double *)malloc( sizeof(double) * nuse_verts[v] * nuse_verts[v] );
+		memset( Aspace, 0, sizeof(double) * nuse_verts[v] * nuse_verts[v] );
+		double *bspace = (double *)malloc( sizeof(double) * nuse_verts[v] );
+		memset( bspace, 0, sizeof(double) * nuse_verts[v] );
+
+		// v is the index whose space we are doing.
+		//
+#if 0
+		for( int jx = 0; jx < nuse_verts[v]; jx++ )
+		{
+			int j = vertex_list[v][jx];
+ 
+			// this is the j'th equation.
+			bspace[jx] = Acoeff[v_coeff_ind*nuse_verts[v]+jx];// A_{vj} 
+
+			for( int kx = 0; kx < nuse_verts[v]; kx++ )
+			for( int lx = 0; lx < nuse_verts[v]; lx++ )
+				Aspace[jx*nuse_verts[v]+kx] += Acoeff[lx*nuse_verts[v]+jx] * Acoeff[lx*nuse_verts[v]+kx];
+		}
+#endif
+		int nvl = nuse_verts[v];
+
+		int sorted_vertex_list[nvl];
+		for( int t = 0; t < nvl; t++ )
+			sorted_vertex_list[t] = t;
+		int done = 0;
+		while(!done)	
+		{
+			done = 1;
+
+			for( int x = 0; x < nvl-1; x++ )
+			{
+				if( vertex_list[v][sorted_vertex_list[x]] > vertex_list[v][sorted_vertex_list[x+1]] )
+				{
+					done = 0;
+					int t =sorted_vertex_list[x];
+					sorted_vertex_list[x] = sorted_vertex_list[x+1];
+					sorted_vertex_list[x+1] = t;
+				}
+			}
+		}
+
+		for( int jx = 0; jx < nvl; jx++ )
+		{
+			int j = vertex_list[v][jx];
+			bspace[jx] = 0;
+
+			for( int c = 0; c < c_nuse_verts[j]; c++ )	
+			{
+				if( c_vertex_list[j][c] == v )
+					bspace[jx] = vertex_coeff[j][c];
+			}
+		}
+
+		for( int lx = 0; lx < nuse_verts[v]; lx++ )
+		{
+			// lx is the shared index.
+			int l = vertex_list[v][lx];
+
+			int map[c_nuse_verts[l]];
+
+			// this search could be done in log(nuse_verts[v]) time with a sorted list.
+
+			for( int px = 0; px < c_nuse_verts[l]; px++ )
+			{
+				map[px] = -1;
+				int j = c_vertex_list[l][px];
+
+				// find j
+			
+				int low = 0;
+				int high = nuse_verts[v]-1;
+				
+				int done = 0;
+
+				while(!done)
+				{
+					int midp = (low+high)/2;
+
+					if( j < vertex_list[v][sorted_vertex_list[midp]] )
+						high = midp;
+					else if( j > vertex_list[v][sorted_vertex_list[midp]] )
+						low = midp;
+					else
+					{
+						done = 1;
+						map[px] = sorted_vertex_list[midp];
+					}
+
+					if( high == low + 1 )
+					{
+						done = 1;
+						if( j == vertex_list[v][sorted_vertex_list[low]] )	
+							map[px] = sorted_vertex_list[low];
+						else if( j == vertex_list[v][sorted_vertex_list[high]] )	
+							map[px] = sorted_vertex_list[high];
+					}
+					else if( high == low )
+					{
+						done = 1;
+						if( j == vertex_list[v][sorted_vertex_list[low]] )	
+							map[px] = sorted_vertex_list[low];
+					}
+				}
+/*
+				for( lx2 = 0; lx2 < nuse_verts[v]; lx2++ )
+				{
+					if( vertex_list[v][lx2] == j )
+						map[px] = lx2;
+				}*/
+			}
+
+			for( int jx = 0; jx < c_nuse_verts[l]; jx++ )
+			{
+				if( map[jx] < 0 ) continue;
+				for( int kx = 0; kx < c_nuse_verts[l]; kx++ )
+				{
+					if( map[kx] < 0 ) continue;
+
+					Aspace[map[jx]*nuse_verts[v]+map[kx]] += vertex_coeff[l][jx] * vertex_coeff[l][kx];
+				}
+			}
+		}
+
+		// solve
+		char uplo = 'U';
+		int N = nuse_verts[v];
+		int nrhs = 1;
+		int info = -1;
+		dposv( &uplo, &N, &nrhs, Aspace, &N, bspace, &N, &info );
+
+		printf("DPOSV info: %d\n", info );
+
+		// fill in sparse matrix.
+					
+		for( int jx = 0; jx < nuse_verts[v]; jx++ )
+			(*theMatrix)->coupleParameters( v, vertex_list[v][jx], bspace[jx] );
+
+		free(bspace);
+//		free(Acoeff);
+		free(Aspace);
+	}
+//	 broadcast it.
+
+#ifdef PARALLEL
+	for( int v = 0; v < nv; v++ )
+	{
+		int proc = v % par_info.nprocs;
+
+		if( proc != par_info.my_id )
+		{
+			int nnz;
+
+			MPI_Bcast( &nnz, 1, MPI_INT, proc, MPI_COMM_WORLD );	
+			int *nzl = (int *)malloc( sizeof(int) * nnz );
+			double *nzv = (double *)malloc( sizeof(double) * nnz );
+		
+			MPI_Bcast( nzl, nnz, MPI_INT, proc, MPI_COMM_WORLD );
+			MPI_Bcast( nzv, nnz, MPI_DOUBLE, proc, MPI_COMM_WORLD );
+
+			for( int t = 0; t < nnz; t++ )
+				(*theMatrix)->coupleParameters( v, nzl[t], nzv[t] );
+
+			free(nzl);
+			free(nzv);
+		}
+		else
+		{
+			int nnz = (*theMatrix)->nnz[v];
+					
+			MPI_Bcast( &nnz, 1, MPI_INT, proc, MPI_COMM_WORLD );
+			MPI_Bcast( (*theMatrix)->nzl[v], nnz, MPI_INT, proc, MPI_COMM_WORLD );
+			MPI_Bcast( (*theMatrix)->nzv[v], nnz, MPI_DOUBLE, proc, MPI_COMM_WORLD );
+		}	
+	}
+#endif 
+#ifdef OUTPUT_EM
+	FILE *dbgFile = fopen("approx_sparse.txt","w");
+
+	for( int v = 0; v < nv; v++ )
+	{
+		int nnz = (*theMatrix)->nnz[v];
+	
+		int sorter[nnz];
+		for( int t = 0; t < nnz; t++ )
+			sorter[t] = t;
+		int done = 0;
+		int *nzl = (*theMatrix)->nzl[v];
+		while (! done )
+		{
+			done = 1;
+
+			for( int x = 0; x < nnz-1; x++ )
+			{
+				if( nzl[sorter[x]] > nzl[sorter[x+1]] )
+				{
+					int t = sorter[x];
+					sorter[x] = sorter[x+1];
+					sorter[x+1] = t;
+					done = 0;
+				}
+			}
+		}
+
+		int cur = 0;
+		int get = 0;
+
+		while( cur < nv )
+		{
+			if( get < nnz && cur == nzl[sorter[get]] )
+			{
+				fprintf(dbgFile, " %le", (*theMatrix)->nzv[v][sorter[get]] );
+				get++;
+			}
+			else
+				fprintf(dbgFile, " 0.0" );
+			cur++;
+		}
+		fprintf(dbgFile, "\n");
+	}
+	fclose(dbgFile);
+#endif	
+
+	
+	(*theMatrix)->setNeedSource();
+	(*theMatrix)->compress();
+
+}
 

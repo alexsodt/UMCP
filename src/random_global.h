@@ -5,7 +5,7 @@
 #include "gsl/gsl_randist.h"
 
 void init_random( int seed );
-
+void my_gsl_reseed( int seed );
 #ifdef __randomglobalc__
 
 const gsl_rng_type *rng_T = gsl_rng_default;

@@ -443,7 +443,7 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 		{
 			block->concentration = atof( word2 );
 			// input as molar.
-			block->concentration *= (1e-30) * (6.022e23); // particles per cubic angstrom.
+//			block->concentration *= (1e-30) * (6.022e23); // particles per cubic angstrom.
 		}
 		else if( !strcasecmp( word1, "lipid_mc_period" ) )
 			block->lipid_mc_period = atoi( word2 );
@@ -739,6 +739,8 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->kinetic_corr_period = atoi(word2);
 		else if( !strcasecmp( word1, "diffc" ) )
 			block->diffc = atof(word2);
+		else if( !strcasecmp( word1, "aqueous_diffc" ) )
+			block->aqueous_diffc = atof(word2);
 		else if( !strcasecmp( word1, "Sq_res" ) )
 			block->Sq_res = atoi( word2 );
 		else if( !strcasecmp( word1, "b_av" ) )

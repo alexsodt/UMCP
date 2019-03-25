@@ -18,14 +18,15 @@
 #include "pcomplex.h"
 #include "p_p.h"
 #include "npt.h"
+#include "random_global.h"
 #define MM_METHOD_1
 #define BOXED
 
 //#define FIX_MEMBRANE
 //#define MONTE_CARLO_HACK
 
-//#define SAVE_RESTARTS
-#define NUM_SAVE_BUFFERS 20
+#define SAVE_RESTARTS
+#define NUM_SAVE_BUFFERS 50
 //#define DEBUG_MOMENTUM_CHANGE
 #define NO_DIFF_R
 #ifdef FFTW
@@ -591,8 +592,8 @@ int temp_main( int argc, char **argv )
 		srd_i->clearDKE();
 
 
+	int use_seed = block.random_seed;
 	int debug_seed = -1;
-
 	if( block.loadName )
 	{
 		printf("Loading %s\n", block.loadName );
@@ -638,9 +639,13 @@ int temp_main( int argc, char **argv )
 				pp[Q] = genp;
 		}
 
-		int nr=	fscanf( xyzLoad, "seed %d", &debug_seed );
+		int nr = fscanf( xyzLoad, "seed %d", &debug_seed );
+
 		if( nr > 0 )
+		{
 			printf("Loaded seed %d\n", debug_seed );
+			use_seed = debug_seed;
+		}
 	}
 	
 
@@ -821,7 +826,8 @@ int temp_main( int argc, char **argv )
 		alphaFile = fopen(fileName,"w");
 	}
 
-
+	srand(use_seed);
+	my_gsl_reseed( use_seed );
 
 	int global_cntr = 0;
 	struct timeval tnow;
@@ -859,16 +865,24 @@ int temp_main( int argc, char **argv )
 			int new_seed = rand();
 			fprintf(debugSave, "seed %d\n", new_seed );
 			srand(new_seed);
+			my_gsl_reseed(new_seed);
 			fclose(debugSave);
-		}
-		else if( debug_seed >= 0 )
-		{
-			srand(debug_seed);
-			debug_seed = -1;
 		}
 
 		for( int t = 0; t < block.o_lim; t++, cur_t += time_step, global_cntr++ )
 		{
+#ifdef SAVE_RESTARTS
+			int save_seed = rand();
+			srand(save_seed);
+			my_gsl_reseed(save_seed);
+#endif
+			if( debug_seed >= 0 )
+			{
+				srand(debug_seed);
+				my_gsl_reseed(debug_seed);
+				debug_seed = -1;
+			}
+
 			// leapfrog
 
 			sub_surface->put(r);			
@@ -900,7 +914,7 @@ int temp_main( int argc, char **argv )
 			if( buffer_cycle[cur_save] )
 				free(buffer_cycle[cur_save]);
 			if( par_info.my_id == BASE_TASK )
-				sub_surface->saveRestart( buffer_cycle+cur_save, r, pp, allComplexes, ncomplex, NQ );
+				sub_surface->saveRestart( buffer_cycle+cur_save, r, pp, allComplexes, ncomplex, NQ, save_seed );
 			cur_save++;
 			if( cur_save == NUM_SAVE_BUFFERS )
 				cur_save = 0;

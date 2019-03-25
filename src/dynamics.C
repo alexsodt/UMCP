@@ -140,10 +140,10 @@ void surface::debug_dynamics( double *r, force_set *theForceSet,  double *Minv, 
 			{
 				r[3*v+c] += meshd[dx];
 				epm[dx] = energy( r, NULL );
-				for( int c = 0; c < ncomplex; c++ )
+				for( int cx = 0; cx < ncomplex; cx++ )
 				{	
-					epm[dx] += allComplexes[c]->V( this, r );
-					epm[dx] += allComplexes[c]->AttachV( this, r );
+					epm[dx] += allComplexes[cx]->V( this, r );
+					epm[dx] += allComplexes[cx]->AttachV( this, r );
 				}
 #ifdef DO_PP
 				double pp_v = Boxed_PP_V( this, r, allComplexes, ncomplex );
@@ -301,8 +301,8 @@ void surface::debug_dynamics( double *r, force_set *theForceSet,  double *Minv, 
 				memset( mesh_qdot_temp, 0, sizeof(double ) * 3 * nv );
 				memcpy( mesh_qdot, mesh_qdot0, sizeof(double) * 3 * nv );
 
-				for( int c = 0; c < ncomplex; c++ )
-					allComplexes[c]->compute_qdot( this, r, mesh_qdot0, mesh_qdot_temp );
+				for( int cx = 0; cx < ncomplex; cx++ )
+					allComplexes[cx]->compute_qdot( this, r, mesh_qdot0, mesh_qdot_temp );
 
 				for( int c1 = 0; c1 < nv; c1++ )
 				for( int c2 = 0; c2 < nv; c2++ )
@@ -315,8 +315,8 @@ void surface::debug_dynamics( double *r, force_set *theForceSet,  double *Minv, 
 				
 	
 				epm[dx] = evaluate_T( mesh_qdot, mesh_p,NULL,NULL,r+3*nv );
-				for( int c = 0; c < ncomplex; c++ )
-					epm[dx] += allComplexes[c]->T(this,r);
+				for( int cx = 0; cx < ncomplex; cx++ )
+					epm[dx] += allComplexes[cx]->T(this,r);
 				r[3*v+c] -= meshd[dx];
 			}
 
