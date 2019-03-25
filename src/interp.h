@@ -359,6 +359,7 @@ struct surface
 	int getSphericalHarmonicModes( double *ro, int l_min, int l_max, double **gen_transform, double **output_qvals, double **scaling_factors );
 	int origSphericalHarmonicModes( double *ro, int l_min, int l_max, double **gen_transform, double **output_qvals, double **scaling_factors );
 	int getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int mode_min, int mode_max, double **gen_transform, double **output_qvals, double **scaling_factors );
+	int origPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int mode_min, int mode_max, double **gen_transform, double **output_qvals, double **scaling_factors );
 
 
 	void mode_perturb( double *r, double *ro, int qi, int qj, int nx, int ny, double Lx, double Ly, double mag, int do_cosine);

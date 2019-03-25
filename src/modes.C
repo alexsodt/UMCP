@@ -174,10 +174,6 @@ void surface::getAMAT( double *Amat, double *ro, double *r0_pos)
 		} 
 		else
 		{
-			if( v == nv-1 )
-			{
-				printf("check here.\n");
-			}
 			for( int e = 0; e < theVertices[lowv].valence; e++ )
 			{	
 				int ep1 = e+1;
@@ -202,9 +198,6 @@ void surface::getAMAT( double *Amat, double *ro, double *r0_pos)
 			r0_pos[3*v+0] - ro[3*v+0],	
 			r0_pos[3*v+1] - ro[3*v+1],	
 			r0_pos[3*v+2] - ro[3*v+2] };
-		printf("greta r: %lf %lf %lf dr %lf\n",
-				ro[3*v+0], ro[3*v+1], ro[3*v+2],
-			sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2] ) );
 	}
 }
 
@@ -323,6 +316,141 @@ int surface::origSphericalHarmonicModes( double *ro, int l_min, int l_max, doubl
 	return NQ;
 }
 
+int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_min, int l_max, double **gen_transform, double **output_qvals, double **scaling_factor )
+{
+	double *Amat = NULL; 
+	double *r0_pos = NULL;
+	double *weights = NULL;
+	double Lx = PBC_vec[0][0]*ro[3*nv+0];
+	double Ly = PBC_vec[1][1]*ro[3*nv+1];
+ 
+	int NFRM = getFormulaAMAT( &Amat, ro, &r0_pos, &weights );
+	
+// Count the number of modes (NQ)
+	int NQ = 0;
+
+	for( int pass = 0; pass < 2; pass++ )
+	{
+		if( pass == 1 ) *output_qvals = (double *)malloc( sizeof(double) * NQ );
+
+		NQ = 0;
+
+		for( int lx = 0; lx < (l_max+1); lx++ )
+		for( int ly = 0; ly < (l_max+1); ly++ )
+		for( int sc = 0; sc < 2; sc++ )
+		{
+			if( lx < l_min && ly < l_min )
+				continue;
+
+			if( mode_x >= 0 && lx != mode_x ) continue;
+			if( mode_y >= 0 && ly != mode_y ) continue;
+	
+			int lx_mag = lx;
+			int ly_mag = ly;
+			
+			if( lx_mag == 0 && ly_mag == 0 )
+				continue;
+	
+			if( pass == 1 ) (*output_qvals)[NQ] = sqrt(lx*lx+ly*ly);
+		
+			NQ++;
+		}
+	}
+	
+// where we store gen_transform for its computation 
+
+	double *t_g_t = (double *)malloc( sizeof(double) * NQ * 3 * nv );
+
+	int vec=0;	
+	for( int lx = 0; lx < (l_max+1); lx++ )
+	for( int ly = 0; ly < (l_max+1); ly++ )
+	for( int sc = 0; sc < 2; sc++ )
+	{
+		if( lx < l_min && ly < l_min )
+			continue;
+
+		int lx_mag = lx; 
+		int ly_mag = ly; 
+		
+		if( lx_mag == 0 && ly_mag == 0 )
+			continue;
+			
+		if( mode_x >= 0 && lx != mode_x ) continue;
+		if( mode_y >= 0 && ly != mode_y ) continue;
+
+		double qx = 2 * M_PI * lx_mag / Lx;
+		double qy = 2 * M_PI * ly_mag / Ly;
+
+		for( int j = 0; j < nv; j++ )
+		{		
+			// the spot
+			double rc[3] = { 0,0, cos(qx*ro[3*j+0]+qy*ro[3*j+1]) };
+			if( sc == 1 )
+				rc[2] = sin(qx*ro[3*j+0]+qy*ro[3*j+1]);
+
+			// h_q Exp( I q )
+			// h_q exp( I (n-q)
+
+			for( int vc = 0; vc < 3; vc++ )	
+				t_g_t[vec*3*nv+vc*nv+j] = rc[vc];
+		}
+		
+		vec++;
+	}
+	
+	double *outer_Amat = (double *)malloc( sizeof(double) * nv * nv );
+	memset( outer_Amat, 0, sizeof(double) * nv * nv );
+
+	char notrans = 'N';
+	char trans = 'T';
+	double one = 1.0;
+	double zero = 0.0;
+
+	// Amat[nv,Q]
+	// Amat^T[Q,nv] -> OA[nv,nv]
+	dgemm( &notrans, &trans, &nv, &nv, &NFRM, &one, Amat, &nv, Amat, &nv, &zero, outer_Amat, &nv );  
+	
+	char uplo = 'U';
+	int nrhs = 3*NQ;
+	int N = nv;
+	int info=0;
+	dposv( &uplo, &N, &nrhs, outer_Amat, &N, t_g_t, &N, &info );
+
+	(*gen_transform) = (double *)malloc( sizeof(double) * NQ * 3 * nv );
+
+	for( int vec = 0; vec < NQ; vec++ )
+	{
+		for( int vc = 0; vc < 3; vc++ )
+		for( int v = 0; v < nv; v++ )
+		{
+			(*gen_transform)[vec*(3*nv)+3*v+vc] = t_g_t[vec*3*nv+vc*nv+v];
+		}
+	}
+
+	// normalize them.
+	
+	(*scaling_factor) = (double *)malloc( sizeof(double) * NQ );
+
+	for( int v = 0; v < NQ; v++ )
+	{
+		double r2 = 0;
+
+		for( int x = 0; x < 3*nv; x++ )
+			r2 += (*gen_transform)[v*3*nv+x] * (*gen_transform)[v*3*nv+x];
+		double r = sqrt(r2);
+		(*scaling_factor)[v] = 1.0/r;
+		for( int x = 0; x < 3*nv; x++ )
+			(*gen_transform)[v*3*nv+x] *= (*scaling_factor)[v];
+		 
+	}
+
+	free(outer_Amat);
+	free(Amat);
+	free(t_g_t);
+	free(r0_pos);
+	free(weights);
+	return NQ;
+}
 
 
 int surface::getSphericalHarmonicModes( double *ro, int l_min, int l_max, double **gen_transform, double **output_qvals, double **scaling_factor )
@@ -454,7 +582,7 @@ int surface::getSphericalHarmonicModes( double *ro, int l_min, int l_max, double
 	return NQ;
 }
 
-int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_min, int l_max, double **gen_transform, double **output_qvals, double **scaling_factor )
+int surface::origPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_min, int l_max, double **gen_transform, double **output_qvals, double **scaling_factor )
 {
 	double *Amat = (double *)malloc( sizeof(double) * (nv) * (nv) );
 	double *r0_pos = (double *)malloc( sizeof(double) * 3 * nv );

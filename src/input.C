@@ -41,7 +41,7 @@ void setDefaults( parameterBlock *block )
 	block->KA = -1;
 	block->kc = 14;
 	block->kg = 0;
-	block->mode_min = 2;
+	block->mode_min = -1;
 	block->mode_max = -1;
 	block->T = 298;
 	block->mab_k_theta = 1;
@@ -238,11 +238,23 @@ int resolveParameters( parameterBlock *block )
 		}
 	}
 	
-	if(block->sphere && block->mode_max >= 0 && (block->mode_min < 2 || block->mode_min > block->mode_max) )
+	if( block->sphere && block->mode_max >= 0 && block->mode_min < 0 )
+		block->mode_min = 2;
+	if( !block->sphere && block->mode_max >= 0 && block->mode_min < 0 )
+		block->mode_min = 0;
+
+	if( block->mode_min > block->mode_max )
 	{
 		printf("Invalid mode_min/max: %d %d.\n", block->mode_min, block->mode_max );
 		if( block->mode_min < 2 )
 			printf("Min cannot be less than 2 for spherical harmonics.\n");
+		exit(1);
+	}
+
+
+	if(block->sphere && block->mode_max >= 0 && (block->mode_min < 2 || block->mode_min > block->mode_max) )
+	{
+		printf("Invalid mode_min/max: %d %d.\n", block->mode_min, block->mode_max );
 		exit(1);
 	}
 
