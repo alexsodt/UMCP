@@ -369,3 +369,62 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 	printf("\n");
 */
 }
+
+void surface::measureLipidCurvature( double *r, int pre_equil )
+{
+	double inst_sum_c[2*bilayerComp.nlipidTypes];
+	double inst_num_c[2*bilayerComp.nlipidTypes];
+
+	memset( inst_sum_c, 0, sizeof(double) * 2 * bilayerComp.nlipidTypes );
+	memset( inst_num_c, 0, sizeof(double) * 2 * bilayerComp.nlipidTypes );
+
+	for( int t = 0; t < nt; t++ )
+	{
+		int f = theTriangles[t].f;
+		
+		double cmid = c(f,1.0/3.0,1.0/3.0, r);	
+
+		for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+		{
+			inst_sum_c[2*x] += theTriangles[t].composition.innerLeaflet[x] * (cmid * -1);
+			inst_num_c[2*x] += theTriangles[t].composition.innerLeaflet[x];
+
+			inst_sum_c[2*x+1] += theTriangles[t].composition.outerLeaflet[x] * cmid;
+			inst_num_c[2*x+1] += theTriangles[t].composition.outerLeaflet[x];
+		}	
+	}
+
+	printf("(Inst) averaged lipid curvature:" );
+
+	for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+	{
+		printf(" %s %le (inner) %le (outer)",
+			bilayerComp.names[x], inst_sum_c[2*x+0] / inst_num_c[2*x+0],
+					      inst_sum_c[2*x+1] / inst_num_c[2*x+1] );
+		if( !pre_equil )
+		{
+			bilayerComp.sum_C[2*x] += inst_sum_c[2*x+0];
+			bilayerComp.num_C[2*x] += inst_num_c[2*x+0];
+
+			bilayerComp.sum_C[2*x+1] += inst_sum_c[2*x+1];
+			bilayerComp.num_C[2*x+1] += inst_num_c[2*x+1];
+		}
+	}
+	printf("\n");
+	
+	if( ! pre_equil )
+	{
+		printf("(Running) averaged lipid curvature:");
+		for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+		{
+			printf(" %s %le (inner) %le (outer)",
+				bilayerComp.names[x], 
+					bilayerComp.sum_C[2*x+0] / bilayerComp.num_C[2*x+0],
+					bilayerComp.sum_C[2*x+1] / bilayerComp.num_C[2*x+1]
+						       );
+		}
+		printf("\n");
+	}
+}
+
+

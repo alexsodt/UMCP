@@ -497,6 +497,7 @@ struct surface
 	void lipidMCMove( double *r, pcomplex **allComplexes, int ncomplex, double dt, double beta);
 	void local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomplex, double dt, double beta);
 	void area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, double beta, double *qdot, double *pp, int move_type, parameterBlock *block );
+	void measureLipidCurvature( double *r, int pre_equil /* don't do running average */ ); // part of lipid redistribution
 
 
 	/* writing tachyon object file*/

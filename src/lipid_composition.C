@@ -65,6 +65,10 @@ void surface::readLipidComposition( FILE *inputFile )
 		bilayerComp.nlipidTypes = 1;	
 		bilayerComp.c0 = (double *)malloc( sizeof(double) );
 		bilayerComp.APL = (double *)malloc( sizeof(double) );
+		bilayerComp.num_C = (double *)malloc( sizeof(double) );
+		bilayerComp.sum_C = (double *)malloc( sizeof(double) );
+		memset( bilayerComp.num_C, 0, sizeof(double) );
+		memset( bilayerComp.sum_C, 0, sizeof(double) );
 		bilayerComp.names = (char **)malloc( sizeof(char *) );
 		bilayerComp.names[0] = (char *)malloc( sizeof(char) * (1 + strlen(library_fixed[0].name) ) );
 		strcpy( bilayerComp.names[0], library_fixed[0].name);
@@ -96,11 +100,16 @@ void surface::readLipidComposition( FILE *inputFile )
 				bilayerComp.c0  = (double *)malloc( sizeof(double) * nlipids ); 
 				bilayerComp.APL = (double *)malloc( sizeof(double) * nlipids ); 
 				bilayerComp.names = (char **)malloc( sizeof(char *) * nlipids );
+		
+				bilayerComp.num_C = (double *)malloc( sizeof(double) *nlipids );
+				bilayerComp.sum_C = (double *)malloc( sizeof(double) *nlipids );
+				memset( bilayerComp.num_C, 0, sizeof(double) *nlipids );
+				memset( bilayerComp.sum_C, 0, sizeof(double) *nlipids );
 			}
 			if( pass == 2 )
 			{
 				printf("nlipidtypes: %d\n", bilayerComp.nlipidTypes );
-				if( bilayerComp.nlipidTypes == 0 )
+				if( bilayerComp.nlipidTypes == 0  )
 				{
 					bilayerComp.nlipidTypes = 1;	
 					bilayerComp.c0 = (double *)malloc( sizeof(double) );
@@ -110,6 +119,11 @@ void surface::readLipidComposition( FILE *inputFile )
 					strcpy( bilayerComp.names[0], library_fixed[0].name);
 					bilayerComp.c0[0] = library_fixed[0].c0;
 					bilayerComp.APL[0] = library_fixed[0].APL;
+				
+					bilayerComp.num_C = (double *)malloc( sizeof(double) );
+					bilayerComp.sum_C = (double *)malloc( sizeof(double) );
+					memset( bilayerComp.num_C, 0, sizeof(double)  );
+					memset( bilayerComp.sum_C, 0, sizeof(double)  );
 				}
 				for( int t = 0; t < nt; t++ )
 				{
@@ -141,19 +155,36 @@ void surface::readLipidComposition( FILE *inputFile )
 							junk, command, lipidName, &APL, &c0 );
 						if( nr == 5 )
 						{
-							printf("Adding lipid %s with c0 %lf and area-per-lipid %lf to the library.\n", lipidName, c0, APL );
-							if( nlipids == nlipid_space )
+							int found = -1;
+
+							for( int l = 0; l < nlipids; l++ )
 							{
-								nlipid_space *= 2;
-				
-								lipidLibrary = (lipid *)realloc( lipidLibrary, sizeof(lipid) * nlipid_space );
-							}								
-	
-							lipidLibrary[nlipids].name = (char *)malloc( sizeof(char) * ( 1 + strlen(lipidName)) );
-							strcpy( lipidLibrary[nlipids].name, lipidName );
-							lipidLibrary[nlipids].c0 = c0;
-							lipidLibrary[nlipids].APL = APL;
-							nlipids++;
+								if( !strcasecmp( lipidLibrary[l].name, lipidName ) )
+									found = l;
+							}
+			
+							if( found == -1 )
+							{
+								printf("Adding lipid %s with c0 %lf and area-per-lipid %lf to the library.\n", lipidName, c0, APL );
+								if( nlipids == nlipid_space )
+								{
+									nlipid_space *= 2;
+					
+									lipidLibrary = (lipid *)realloc( lipidLibrary, sizeof(lipid) * nlipid_space );
+								}								
+		
+								lipidLibrary[nlipids].name = (char *)malloc( sizeof(char) * ( 1 + strlen(lipidName)) );
+								strcpy( lipidLibrary[nlipids].name, lipidName );
+								lipidLibrary[nlipids].c0 = c0;
+								lipidLibrary[nlipids].APL = APL;
+								nlipids++;
+							}
+							else
+							{
+								printf("Replacing lipid %s with c0 %lf and area-per-lipid %lf in the library.\n", lipidName, c0, APL );
+								lipidLibrary[found].c0 = c0;
+								lipidLibrary[found].APL = APL;
+							}
 						}	
 						else
 						{
