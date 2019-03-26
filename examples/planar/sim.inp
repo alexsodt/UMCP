@@ -8,7 +8,7 @@ nequil			100
 movie			no	
 mode_max		1
 gamma_langevin 		5
-KA			0.2
+KA			0	
 lipid library GM1 77.5 0.05
 lipid inner GM1	        4.0
 lipid inner DOPC 	96.0

@@ -3,8 +3,8 @@ mesh 			planar.mesh
 sphere 			no	
 do_ld 			yes
 o_lim 			100
-nsteps 			500
-nequil			100
+nsteps 			2500
+nequil			500
 movie			no	
 gamma_langevin 		5
 KA			0.2
