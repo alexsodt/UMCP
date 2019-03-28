@@ -11,7 +11,11 @@
 
 extern double kc;
 static double default_particle_area = 65;
+
+// For doing Newtonian/Langevin dynamics:
 static double default_mass = 20000;
+// For doing brownian dynamics:
+static double default_dc   = (1e-6)*(1e8)*(1e8); // cm^2/s to Angstroms^2/s
 
 #define DISABLE_ATTACH
 #define PART_A
@@ -294,7 +298,7 @@ double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *mesh_
 
 			if( fr < fraction )
 			{
-				printf("f u v %d %le %le dKE_exp %.14le fraction %le\n", f, u, v, dKE, fr ); 
+	//			printf("f u v %d %le %le dKE_exp %.14le fraction %le\n", f, u, v, dKE, fr ); 
 				fraction = fr;
 			}
 
@@ -912,8 +916,8 @@ void pcomplex::propagate_surface_q( surface *theSurface, double *rsurf, double d
 		double fr = fabs(1-new_metric/last_metric);
 		if( fr > 0.1 )
 		{
-			printf("dMetric: %.14le last_f %d new_f %d u v %le %le\n",
-				new_metric/last_metric, last_f, fs[s], puv[2*s+0], puv[2*s+1] );
+	//		printf("dMetric: %.14le last_f %d new_f %d u v %le %le\n",
+	//			new_metric/last_metric, last_f, fs[s], puv[2*s+0], puv[2*s+1] );
 		}
 	}
 /*

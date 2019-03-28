@@ -1,5 +1,5 @@
 
-EXECS = hamiltonian.pdf doc.pdf
+EXECS = doc.pdf
 
 all: $(EXECS)
 
@@ -10,7 +10,7 @@ hamiltonian.pdf: hamiltonian_chapter.tex hamiltonian.tex
 	pdflatex hamiltonian_chapter
 	cp hamiltonian_chapter.pdf hamiltonian.pdf
 
-doc.pdf: doc.tex running.tex hamiltonian.tex preamble.tex lipid_composition.tex npt.tex introduction.tex srd.tex dynamics.tex
+doc.pdf: doc.tex running.tex hamiltonian.tex preamble.tex lipid_composition.tex npt.tex introduction.tex srd.tex dynamics.tex timescales.tex
 	pdflatex doc
 	pdflatex doc
 	bibtex doc
