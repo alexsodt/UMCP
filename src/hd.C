@@ -717,6 +717,14 @@ int temp_main( int argc, char **argv )
 //	if( block.timestep_analysis && taskid == BASE_TASK )
 //		sub_surface->timestep_analysis( r, theForceSet, effective_mass, allComplexes, ncomplex, dt );
 
+	double	navc = 0;
+	double *avc = NULL;
+	if( block.record_curvature )
+	{
+		avc = (double *)malloc( sizeof(double) * ncomplex );
+		memset( avc, 0, sizeof(double) * ncomplex );
+	}
+
 	if( block.nsteps == 0 )
 	{
 		printf("Requested no dynamics, exitting.\n");
@@ -1365,6 +1373,14 @@ int temp_main( int argc, char **argv )
 
 			last_misc_time += misc_time_stop - misc_time_start;
 			switched=0;
+
+			if( block.record_curvature && o >= nequil  )
+			{
+				for( int c = 0; c < ncomplex; c++ )
+					avc[c] += allComplexes[c]->local_curvature( sub_surface, r );
+				navc+=1;
+			}
+
 		}
 		
 #ifdef PARALLEL
@@ -1463,6 +1479,8 @@ int temp_main( int argc, char **argv )
 			printf(" av: %lf\n", tsum / (nmodes*nmodes-1) );
 
 			free(q_sorter);
+
+		
 		}
 	
 #ifdef PARALLEL
@@ -1574,6 +1592,17 @@ int temp_main( int argc, char **argv )
 			fprintf(saveFile, "GQ %.14le\n", pp[Q] );
 
 		fclose(saveFile);
+	}
+
+	if( block.record_curvature )
+	{
+		for( int c = 0; c < ncomplex; c++ )
+		{
+			char *typeName = NULL;
+			allComplexes[c]->print_type(&typeName);
+			printf("Complex %d type %s average curvature %lf\n", c, typeName, avc[c]/(navc+1e-11) );
+			if( typeName) free(typeName);
+		}
 	}
 
 	if( doing_spherical_harmonics || doing_planar_harmonics )

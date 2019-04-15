@@ -82,6 +82,7 @@ struct pcomplex
 	
 	virtual int isElastic(void) { return 0; }	
 
+	void printType( char **type );
 	void cacheVelocities( void );
 	void prepareForGradient( void );
 	void loadCoords( surface *theSurface, double *rsurf, double *r, double *n );
@@ -113,6 +114,9 @@ struct pcomplex
 	double AttachV( surface *theSurface, double *rsurf );
 	double AttachG( surface *theSurface, double *rsurf, double *gr, double *pg );
 	void evaluate_momentum( surface *theSurface, double *rsurf, double *pout );
+	double local_curvature( surface *theSurface, double *rsurf );
+	void print_type( char **outp );
+
 };
 
 struct simpleParticle : pcomplex

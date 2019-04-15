@@ -1,0 +1,14 @@
+time_step 		1e-12
+mesh 			planar.mesh
+add simpleLipid nbound 20 outside
+sphere 			no	
+do_ld 			yes
+o_lim 			100
+nsteps 			10
+nequil			5
+movie			no	
+mode_max		1
+gamma_langevin 		5
+KA			0	
+record_curvature	yes
+c0			0.05
