@@ -468,6 +468,7 @@ struct surface
 	void dKE_dx_and2( force_set *theForceSet,SparseMatrix *effM, double *vp, double *unit_f_vec, int f, double u, double v, double *dKEdx, double *d2KEdx2 );
 	void getEffectiveMass( force_set * theForceSet, double *effective_mass );
 	void getSparseEffectiveMass( force_set * theForceSet, int *use_map, int *nuse, SparseMatrix **, double *gen_transform=NULL, int NQ=-1, double *mass_scaling=NULL);
+	void getSparseMass( force_set * theForceSet, SparseMatrix **theMatrix );
 	void approxSparseEffectiveMass( force_set * theForceSet, int *use_map, int *nuse, SparseMatrix **, double *gen_transform=NULL, int NQ=-1, double *mass_scaling=NULL);
 	void applyForceAtPoint( int f, double u, double v, double *dp, double *force_vector, force_set *theForceSet );
 	void velocityAtPoint( int f, double u, double v, double *vp, double *velocity_out );

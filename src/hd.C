@@ -651,12 +651,14 @@ int temp_main( int argc, char **argv )
 
 	setupParallel( sub_surface, allComplexes, ncomplex, ( do_gen_q ? NQ : 0) );
 	SparseMatrix *EFFM;
+	SparseMatrix *MMat;
 	int max_mat = nv;
 	if( NQ > nv )
 		max_mat = NQ;
 	int *sparse_use = (int *)malloc( sizeof(int) * (NQ > nv ? NQ : nv) );
 	int n_vuse = 0;
 	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
+	sub_surface->getSparseMass( theForceSet, &MMat ); 
 	setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
 
 
@@ -825,6 +827,10 @@ int temp_main( int argc, char **argv )
 		
 		alphaFile = fopen(fileName,"w");
 	}
+
+#ifndef OLD_LANGEVIN
+	double *noise_vec = (double *)malloc( sizeof(double) * 3 * nv );
+#endif
 
 	srand(use_seed);
 	my_gsl_reseed( use_seed );
@@ -1136,7 +1142,14 @@ int temp_main( int argc, char **argv )
 					if( do_gen_q )
 						GenQMatVecIncrScale( next_pp, pp, EFFM, -gamma_langevin*AKMA_TIME*time_step );
 					else
+					{
+#ifdef OLD_LANGEVIN
 						AltSparseCartMatVecIncrScale( next_pp, pp, EFFM, -gamma_langevin*AKMA_TIME * time_step, r+3*nv );
+#else
+						for( int xv = 0; xv < 3*nv; xv++ ) // here, gamma_langevin has units per time.
+							next_pp[xv] -= gamma_langevin*AKMA_TIME * time_step * next_pp[xv];
+#endif
+					}
 				}
 			}
 
@@ -1220,9 +1233,25 @@ int temp_main( int argc, char **argv )
 			{
 				if( do_ld || o < nequil )
 				{
+#ifdef OLD_LANGEVIN
 					for( int Q = 0; Q < NQ; Q++ )
 						next_pp[Q] += gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
+#else
+					if( do_gen_q )
+					{
+						for( int Q = 0; Q < NQ; Q++ )
+							next_pp[Q] += gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
+					}
+					else
+					{
 
+						for( int Q = 0; Q < 3*nv; Q++ )
+							noise_vec[Q] = gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
+
+						AltSparseCartMatVecIncrScale( next_pp, noise_vec, MMat, 1.0, r+3*nv  );
+						
+					}
+#endif
 #ifdef PARALLEL
 					ParallelBroadcast(next_pp,NQ);
 #endif
@@ -1506,7 +1535,12 @@ int temp_main( int argc, char **argv )
 			switched = 1;
 		}
 	}
+
+#ifndef OLD_LANGEVIN
+	free(noise_vec);
+#endif
 	}
+
 	
 	if( tFile ) 
 		fclose(tFile);
