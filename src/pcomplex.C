@@ -8,12 +8,14 @@
 #include <string.h>
 #include "parallel.h"
 #include "p_p.h"
+#include <typeinfo>
+#include <ctype.h>
 
 extern double kc;
 static double default_particle_area = 65;
 static double default_mass = 20000;
 
-#define DISABLE_ATTACH
+//#define DISABLE_ATTACH
 #define PART_A
 #define PART_B
 //#define TURN_OFF_TERM2
@@ -76,6 +78,26 @@ void pcomplex::alloc( void )
 	memset( last_pos, 0, sizeof(double) * 3 * nsites );
 
 }
+
+void pcomplex::print_type( char **outp )
+{
+	// override this if you want a better name printed.
+	int len = strlen(typeid(*this).name());
+	char *temp = (char *)malloc( sizeof(char) * (len+1) );
+
+	sprintf(temp, "%s", typeid(*this).name());
+
+	char *p = temp;
+	while( *p && !isalpha(*p) ) p += 1;
+
+	*outp = (char *)malloc( sizeof(char) * (len+1) );
+	sprintf(*outp, "%s", p );
+	
+	free(temp);
+}
+
+
+
 void pcomplex::move_inside( void )
 {
 	is_inside = 1;
@@ -1766,7 +1788,6 @@ void pcomplex::applyLangevinFriction( surface *theSurface, double *rsurf, double
 		double ppre[2] = { p[2*s+0], p[2*s+1] };
 		p[2*s+0] -= qdot[2*s+0] * gamma * AKMA_TIME * dt;
 		p[2*s+1] -= qdot[2*s+1] * gamma * AKMA_TIME * dt;
-
 	}
 		
 	for( int s = nattach; s < nsites; s++ )
@@ -1946,6 +1967,19 @@ double pcomplex::AttachG( surface *theSurface, double *rsurf, double *gr, double
 
 	return pot;
 	
+}
+
+double pcomplex::local_curvature( surface *theSurface, double *rsurf )
+{
+	double av = 0;
+
+	for( int s = 0; s < nattach; s++ )
+	{
+		double curv = theSurface->c( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
+
+		av += curv/nattach;
+	}
+	return av;
 }
 
 void pcomplex::setrall( surface *theSurface, double *rsurf )

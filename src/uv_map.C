@@ -1888,8 +1888,6 @@ double surface::c( int f, double u, double v, double *r )
 			exit(1);
 		}
 		
-		double u_u = u, u_v=0, v_u=0, v_v = v;
-		theKernel->get_map_transform( &u_u, &u_v, &v_u, &v_v );
 
 		double u_u = u, u_v=0, v_u=0, v_v = v;
 		

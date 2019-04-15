@@ -29,7 +29,9 @@ void setDefaults( parameterBlock *block )
 	block->loadName = NULL;
 	block->concentration = 0;
 	block->rho = 0;
-
+	
+	block->record_curvature = 0;
+	
 
 	block->mass_scaling = 0;
 	block->mode_x = -1;
@@ -481,6 +483,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				block->mass_scaling = 1;
 			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
 				block->mass_scaling = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
+		else if( !strcasecmp( word1, "record_curvature" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->record_curvature = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->record_curvature = 0;
 			else
 			{
 				printf("Could not interpret input line '%s'.\n", tbuf );
