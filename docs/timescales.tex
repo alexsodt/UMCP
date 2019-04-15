@@ -1,0 +1,59 @@
+
+\section{ Timescales } \label{sec:timescales}
+
+\subsection{Langevin dynamics}
+
+Newton's equation of motion is:
+\begin{equation}
+m \dot{\vek{v}} = \vek{f}
+\end{equation}
+where $\vek{v}$ and $\vek{f}$ are time dependent quantities.
+With {\bf Langevin dynamics}, a frictional drag and stochastic force are introduced.
+This is frequently justified as arising from implied collisions with solvent, itself in thermal equilibrium with a bath.
+The modified equations are
+\begin{equation}
+m \dot{\vek{v}} = -\frac{\vek{v}}{B} + \vek{f} + \vek{\tilde{f}}
+\end{equation}
+or often with a friction coefficient $\gamma$ replacing the mobility $B$:
+\begin{equation}
+\label{eq:langevind}
+m \dot{\vek{v}} = -\gamma \vek{v} + \vek{f} + \vek{\tilde{f}}
+\end{equation}
+where $\vek{\tilde{f}}$ is the stochastic force.
+
+Consider modeling a particle diffusing with Langevin dynamics.
+In the absence of any forces, $\vek{f}$, the diffusion constant is
+\begin{equation}
+D = B \kT
+\end{equation}
+To simulate a lipidic diffusion constant, e.g., $10^{-6} \textrm{cm}^2/\textrm{s}$, requires specifying $B$ appropriately.
+Note that in Eq.~\ref{eq:langevind} the velocity is reduced by a fraction equal to $\frac{-\Delta t}{m B}$,
+where $\Delta t$ is the simulation timestep.
+This fraction must be much less than one or the particle will experience uncontrolled feedback and therefore improper integration.
+
+\subsection{Brownian dynamics}
+
+Under constant force, the velocity obeys
+\begin{equation}
+\dot{v} = -\gamma v + f/m
+\end{equation}
+The solution to this simple differential equation is
+\begin{equation}
+v(t) = v_0 \exp(-\gamma t) + \frac{f}{\gamma m}
+\end{equation}
+That is, the velocity decays with characteristic timescale $\tau=\frac{1}{\gamma}$.
+If timesteps on the order of (or larger than) $\tau$ are desired, {\it it makes no sense to attempt to propagate the velocity}.
+During the integration period the velocity will decorrelate completely from its initial value.
+Rather, consider an approximate dynamics that is displacement-based, that is, that attempts to model a particle's motion under thermal agitation in the presence of external forces.
+This is {\bf Brownian dynamics}. 
+Here the equation of motion is 
+\begin{equation}
+\dot{\vek{r}} = -\frac{D}{\kT} \vek{f} + \sqrt{2 D} R(t)
+\end{equation}
+where $R(t)$ is a so-called ``Gaussian process'', a mathematical object equivalent to selecting {\it uncorrelated} random numbers from a Gaussian distribution with zero mean and standard deviation one.
+
+\subsection{Membrane relaxation timescales}
+
+
+
+

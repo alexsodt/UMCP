@@ -968,6 +968,7 @@ void GenQMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, do
 
 void PartialSyncGenQ( double *pp )
 {
+#ifdef PARALLEL
 	if( par_info.nprocs > 1 )
 	{
 		printf("sync of genq not implemented.\n");
@@ -975,6 +976,7 @@ void PartialSyncGenQ( double *pp )
 		MPI_Finalize();
 		exit(1);
 	}
+#endif
 }
 
 void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double scale, double *alphas  )

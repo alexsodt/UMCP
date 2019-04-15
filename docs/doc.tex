@@ -1,4 +1,7 @@
-\documentclass[11pt,notitlepage]{revtex4}
+%\documentclass[11pt,notitlepage]{revtex4}
+\documentclass[11pt]{article}
+\usepackage{geometry}
+\usepackage[bottom]{footmisc}
 \usepackage{amsmath}
 \usepackage{graphicx}
 \usepackage{xcolor}
@@ -11,11 +14,14 @@
 \usepackage{wrapfig}
 \usepackage{newfloat}
 \usepackage{mdframed}
-%\usepackage{calc}
-%\usepackage{regexpatch}
-%\usepackage{ifxetex,ifluatex}
+\usepackage{cleveref}
+\usepackage{calc}
+\usepackage{regexpatch}
+\usepackage{ifxetex,ifluatex}
 %\usepackage[resetlabels]{multibib}
-%\usepackage{filecontents}
+\usepackage{filecontents}
+
+\geometry{margin=0.75in}
 
   \newenvironment{bcomment}[1]{%
 %    {\def\cl@bgcolor{gray!12}}
@@ -28,7 +34,8 @@
 
 \newcommand{\vek}[1]{\boldsymbol{#1}}          % vector symbol
 \newcommand{\code}[1]{\texttt{#1}}
-
+\newcommand{\diff}{\textrm{d}}
+\newcommand{\kT}{k_B T}
 %%%%%%%%%
 \newcounter{command}
 \renewcommand\thecommand{C\,\arabic{command}}
@@ -99,7 +106,9 @@
   {}
   {}
 
+
 \begin{document}
+\bibliographystyle{unsrt}
 
 \pagenumbering{roman}
 
@@ -117,7 +126,7 @@
 \input{preamble.tex}
 
 \input{introduction.tex}
-
+~\cite{Feng2006}
 \input{running.tex}
 
 \input{lipid_composition.tex}
@@ -127,6 +136,8 @@
 \input{hamiltonian.tex}
 
 \input{dynamics.tex}
+
+\input{timescales.tex}
 
 % Ensembles, thermostatting and hydrodynamics.
 

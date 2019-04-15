@@ -20,8 +20,8 @@
 //#define MOVE_MEMBRANE
 
 double rtol = 1E-10;
-double kr_on = 1e11;
-double kr_off = 1e4;
+double kr_on = 1e11; //AKMA units
+double kr_off = 1e4; //AKMA units
 double binding_radius = 0;
 double sp_ap_displacement = 10.0;
 
@@ -66,13 +66,14 @@ int main( int argc, const char **argv )
 	char buffer[4096];
 
 	printf("No options are required:\n");
-	printf("Syntax: rd_vesicle [input file] [options ...]\n");
+	printf("Syntax: rd [input file] [options ...]\n");
 	printf("See input.C for options.\n");
-
-	parameterBlock block;
 	
+	// block is a structure containing all the parameters that can be set from the input file or command line.
+	parameterBlock block;
 	setDefaults(&block);	
 	
+	// We change the default name of the mesh to sphere.mesh:
 	const char *defaultMesh = "sphere.mesh";
 	free(block.meshName);
 	block.meshName = (char *)malloc( sizeof(char) * (strlen(defaultMesh)+1) );
@@ -80,18 +81,21 @@ int main( int argc, const char **argv )
 
 	block.sphere = 1;
 	block.mode_max = 6;
-//	block.fix_alpha = 1;
 	block.sigma = sp_ap_displacement;
-
+	
+	// here is where the parameters are loaded from the file/command line
 	int nwarnings = getInput( argv, argc, &block );
 
 	sp_ap_displacement = block.sigma;
-	kr_on = block.k_on;
+
+	// units: nm^3 per microsecond.
+	double unit_conv = (1e3) * (1e6); // nm^3 to A^3, per microsecond to per second.
+	kr_on = block.k_on * unit_conv;
+	// off rates are in per-second.
 	kr_off = block.k_off;
 
 	printf("On-rate: %le Off-rate: %le\n", kr_on, kr_off );
 
-//	srand(1);	
 	srand(block.random_seed);
 
 	/* copy parameters */
@@ -193,42 +197,46 @@ int main( int argc, const char **argv )
 		}
 	}
 
-#ifdef TEST
-	sub_surface->load_least_squares_fitting( theForceSet );
-	sub_surface->test_force_set( theForceSet );
-
-	exit(1);	
-#endif
 	double LA = sub_surface->PBC_vec[0][0];
 	double LB = sub_surface->PBC_vec[1][1];
 	double LC = sub_surface->PBC_vec[2][2];
 
-
-	
-
-
-
 	double *ro = (double *)malloc( sizeof(double) * nc );
 	memcpy( ro, r, sizeof(double) * nc );	
 
-	double T = 300;
-
-	
-	double temperature = 5.92E-01;
+	double T = block.T;
+	double temperature = 5.92E-01 * (T/300);
 
 	double V0 = 0;
 	
 	double sphere_rad = 1.0;
 
+	int do_planar = 0;
+	int nrm_sign_factor = 1; // switch to negative one to flip the norm.
 	if( block.sphere )
 	{	
 		V0 =fabs(sub_surface->volume( r));
 		sphere_rad = sqrt(area0/(4*M_PI));
-			printf("Area: %lf (R: %lf)\n", area0, sqrt(area0/(4*M_PI))  );
-			printf("Volume: %lf (R: %lf)\n", V0, pow( V0/(4*M_PI/3.0), 1.0/3.0) );
+		printf("Area: %lf (R: %lf)\n", area0, sqrt(area0/(4*M_PI))  );
+		printf("Volume: %lf (R: %lf)\n", V0, pow( V0/(4*M_PI/3.0), 1.0/3.0) );
+
+		double pt[3],nrm[3];
+		
+		sub_surface->evaluateRNRM(0,1.0/3.0,1.0/3.0, pt, nrm, r );
+		
+		double dp = pt[0] * nrm[0] + pt[1] * nrm[1] + pt[2] * nrm[2];
+
+		if( dp > 0 ) // points out, make sure we put particles inside.
+			nrm_sign_factor *= -1; 
+		
 	}
 	else
 	{
+		printf("Configuring for a planar system.\n");
+		do_planar = 1;
+
+		// planar system only other case handled.
+
 		double tvec[3];
 		cross( sub_surface->PBC_vec[0], sub_surface->PBC_vec[1], tvec );
 
@@ -236,7 +244,30 @@ int main( int argc, const char **argv )
 			sub_surface->PBC_vec[2][0] * tvec[0] + 
 			sub_surface->PBC_vec[2][1] * tvec[1] + 
 			sub_surface->PBC_vec[2][2] * tvec[2];
+
+		// shift the surface so that its average position is at z=0.
+
+		double av_z = 0;
+
+		for( int v = 0; v < sub_surface->nv; v++ )
+			av_z += ro[3*v+2];
+		av_z /= sub_surface->nv;
+
+		for( int v = 0; v < sub_surface->nv; v++ )
+		{
+			ro[3*v+2] -= av_z;
+			r[3*v+2] -= av_z;
+		}
+		
+		double pt[3],nrm[3];
+		
+		sub_surface->evaluateRNRM(0,1.0/3.0,1.0/3.0, pt, nrm, r );
+		
+		if( nrm[2] < 0 ) // points down.
+			nrm_sign_factor *= -1; 
+
 	}
+	
 	b = particle_radius / pow(2., 1.0/6.0);
 
 	char fileName[1024];
@@ -296,7 +327,6 @@ int main( int argc, const char **argv )
 
 	sub_surface->setupBoxing( NULL, NULL, surface_np+aqueous_np , Rmax, 1 );
 
-	printf("SURFACE NP %d AQUEOUS NP %d\n", surface_np, aqueous_np );
 
 	int *pfaces = (int *)malloc( sizeof(int) * surface_np );
 	int *pleaflet = (int *)malloc( sizeof(int) * surface_np );
@@ -580,13 +610,19 @@ int main( int argc, const char **argv )
 			{
 				aqueous_r_last[3*i+0] = aqueous_r[3*i+0] = -LA/2 + LA * rand() / (double)RAND_MAX;	
 				aqueous_r_last[3*i+1] = aqueous_r[3*i+1] = -LB/2 + LB * rand() / (double)RAND_MAX;	
-				aqueous_r_last[3*i+2] = aqueous_r[3*i+2] = -LC/2 + LC * rand() / (double)RAND_MAX;	
-			
+				if( do_planar )
+					aqueous_r_last[3*i+2] = aqueous_r[3*i+2] = LC * rand() / (double)RAND_MAX;	
+				else
+					aqueous_r_last[3*i+2] = aqueous_r[3*i+2] = -LC/2 + LC * rand() / (double)RAND_MAX;	
+		
+					
 		
 				int f;
 				double u,v;
 				
-				if( sub_surface->withinBoxedSurface( aqueous_r+3*i, &f, &u, &v, M, mlow, mhigh, distance+i, -1 ) )
+				double rc = sqrt(aqueous_r[0]*aqueous_r[0]+aqueous_r[1]*aqueous_r[1]+aqueous_r[2]*aqueous_r[2] );
+
+				if( sub_surface->withinBoxedSurface( aqueous_r+3*i, &f, &u, &v, M, mlow, mhigh, distance+i, -1, -nrm_sign_factor, do_planar /* disables pbc z */ ) )
 				{
 					outside = 0; 
 			
@@ -657,7 +693,7 @@ int main( int argc, const char **argv )
 							int npts = 0;
 
 							// returns a list of triangles that are near the particle.
-							sub_surface->assembleNearList( aqueous_r+3*ap, &f_list, &puv_list, &areas, &npts, M, mlow, mhigh, Rmax, 4 );
+							sub_surface->assembleNearList( aqueous_r+3*ap, &f_list, &puv_list, &areas, &npts, M, mlow, mhigh, Rmax, 4, do_planar /* disables pbc z */ );
 							if( npts > 0 )
 							{
 							double *probs = (double *)malloc( sizeof(double) * (npts+1) );
@@ -708,7 +744,7 @@ int main( int argc, const char **argv )
 	
 							int sf;
 							double su,sv;
-							sub_surface->nearPointOnBoxedSurface( aqueous_r+3*ap, &sf, &su, &sv, M, mlow, mhigh, distance+ap, -1 );
+							sub_surface->nearPointOnBoxedSurface( aqueous_r+3*ap, &sf, &su, &sv, M, mlow, mhigh, distance+ap, -1, do_planar /* disables pbc z */ );
 	
 							double c_tot = sub_surface->c(sf, su, sv, r );
 	
@@ -826,9 +862,9 @@ int main( int argc, const char **argv )
 	
 								sub_surface->evaluateRNRM( sf, su, sv, surface_p_r_m+3*ap, surface_p_r_n+3*ap, r );
 	
-								aqueous_r[3*ap+0] = surface_p_r_m[3*ap+0] + surface_p_r_n[3*ap+0] * sp_ap_displacement;
-								aqueous_r[3*ap+1] = surface_p_r_m[3*ap+1] + surface_p_r_n[3*ap+1] * sp_ap_displacement;
-								aqueous_r[3*ap+2] = surface_p_r_m[3*ap+2] + surface_p_r_n[3*ap+2] * sp_ap_displacement;
+								aqueous_r[3*ap+0] = surface_p_r_m[3*ap+0] + surface_p_r_n[3*ap+0] * sp_ap_displacement * nrm_sign_factor;
+								aqueous_r[3*ap+1] = surface_p_r_m[3*ap+1] + surface_p_r_n[3*ap+1] * sp_ap_displacement * nrm_sign_factor;
+								aqueous_r[3*ap+2] = surface_p_r_m[3*ap+2] + surface_p_r_n[3*ap+2] * sp_ap_displacement * nrm_sign_factor;
 	
 								mean_field_activated[ap] = 1;
 								aqueous_status[ap] = STATE_IN_COMPLEX + REACTED_BIT;
@@ -880,7 +916,7 @@ int main( int argc, const char **argv )
 	#ifdef DO_HISTOGRAM
 							int sf;
 							double su,sv;
-							sub_surface->nearPointOnBoxedSurface( aqueous_r+3*ap, &sf, &su, &sv, M, mlow, mhigh, distance+ap, -1 );
+							sub_surface->nearPointOnBoxedSurface( aqueous_r+3*ap, &sf, &su, &sv, M, mlow, mhigh, distance+ap, -1, do_planar /* disables pbc z */ );
 							int dbin = distance[ap] * N_BINS_PHIST / Rmax;
 							if( dbin >= N_BINS_PHIST )
 								dbin = N_BINS_PHIST-1;
@@ -895,9 +931,9 @@ int main( int argc, const char **argv )
 			
 								// move the aqueous particle into ``complex'' position.
 			
-								aqueous_r[3*ap+0] = surface_p_r_m[3*sp+0] + surface_p_r_n[3*sp+0] * sp_ap_displacement;
-								aqueous_r[3*ap+1] = surface_p_r_m[3*sp+1] + surface_p_r_n[3*sp+1] * sp_ap_displacement;
-								aqueous_r[3*ap+2] = surface_p_r_m[3*sp+2] + surface_p_r_n[3*sp+2] * sp_ap_displacement;
+								aqueous_r[3*ap+0] = surface_p_r_m[3*sp+0] + surface_p_r_n[3*sp+0] * sp_ap_displacement * nrm_sign_factor;
+								aqueous_r[3*ap+1] = surface_p_r_m[3*sp+1] + surface_p_r_n[3*sp+1] * sp_ap_displacement * nrm_sign_factor;
+								aqueous_r[3*ap+2] = surface_p_r_m[3*sp+2] + surface_p_r_n[3*sp+2] * sp_ap_displacement * nrm_sign_factor;
 		
 								tot_on += 1;
 								surface_status[sp] = STATE_IN_COMPLEX + REACTED_BIT;
@@ -1098,9 +1134,9 @@ int main( int argc, const char **argv )
 								printf("MAJOR PROBLEM here.\n");
 								exit(1);
 							}	
-							aqueous_r[3*ap+0] = surface_p_r_m[3*p+0] + surface_p_r_n[3*p+0] * sp_ap_displacement;	
-							aqueous_r[3*ap+1] = surface_p_r_m[3*p+1] + surface_p_r_n[3*p+1] * sp_ap_displacement;	
-							aqueous_r[3*ap+2] = surface_p_r_m[3*p+2] + surface_p_r_n[3*p+2] * sp_ap_displacement;	
+							aqueous_r[3*ap+0] = surface_p_r_m[3*p+0] + surface_p_r_n[3*p+0] * sp_ap_displacement * nrm_sign_factor;	
+							aqueous_r[3*ap+1] = surface_p_r_m[3*p+1] + surface_p_r_n[3*p+1] * sp_ap_displacement * nrm_sign_factor;	
+							aqueous_r[3*ap+2] = surface_p_r_m[3*p+2] + surface_p_r_n[3*p+2] * sp_ap_displacement * nrm_sign_factor;	
 								
 							sub_surface->updateParticle( aqueous_r+3*ap, surface_np+ap, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
 						}
@@ -1122,10 +1158,25 @@ int main( int argc, const char **argv )
 		
 							double dx = gsl_ran_gaussian(rng_x,  sqrt(2 * block.aqueous_diffc * time_step) );
 							double dy = gsl_ran_gaussian(rng_x,  sqrt(2 * block.aqueous_diffc * time_step) );
-							double dz = gsl_ran_gaussian(rng_x,  sqrt(2 * block.aqueous_diffc * time_step) );
+
 		
 							aqueous_r[3*p+0] += dx;
 							aqueous_r[3*p+1] += dy;
+							
+							double dz=0;
+					
+							int ok = 0;
+							while( !ok )
+							{
+								dz = gsl_ran_gaussian(rng_x,  sqrt(2 * block.aqueous_diffc * time_step) );
+
+								if( do_planar && aqueous_r[3*p+2] + dz > Lz )
+								{
+
+								}
+								else
+									ok = 1;
+							}
 							aqueous_r[3*p+2] += dz;
 		
 							double dmove[3] = { 
@@ -1133,13 +1184,16 @@ int main( int argc, const char **argv )
 								aqueous_r[3*p+1] - aqueous_r_last[3*p+1],
 								aqueous_r[3*p+2] - aqueous_r_last[3*p+2] };
 							double r_move = sqrt(dmove[0]*dmove[0]+dmove[1]*dmove[1]+dmove[2]*dmove[2]);
+
+							// did it move farther than the distance it was from the membrane? if so we may need to check the collision.
+	
 							if( r_move > distance[p] )
 							{
 								int f;
 								double u,v;
 								double dist;
 			
-								double rad = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, 1 );
+								double rad = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar /* disables pbc z */ );
 							
 								if( rad < 0 )
 								{
@@ -1167,9 +1221,16 @@ int main( int argc, const char **argv )
 						while( aqueous_r[3*p+0] > LA/2 )  { aqueous_r[3*p+0] -= LA; aqueous_r_last[3*p+0] -= LA; }
 						while( aqueous_r[3*p+1] < -LB/2 ) { aqueous_r[3*p+1] += LB; aqueous_r_last[3*p+1] += LB; }
 						while( aqueous_r[3*p+1] > LB/2 )  { aqueous_r[3*p+1] -= LB; aqueous_r_last[3*p+1] -= LB; }
-						while( aqueous_r[3*p+2] < -LC/2 ) { aqueous_r[3*p+2] += LC; aqueous_r_last[3*p+2] += LC; }
-						while( aqueous_r[3*p+2] > LC/2 )  { aqueous_r[3*p+2] -= LC; aqueous_r_last[3*p+2] -= LC; }
-		
+
+						if( do_planar )
+						{
+						}
+						else
+						{
+							while( aqueous_r[3*p+2] < -LC/2 ) { aqueous_r[3*p+2] += LC; aqueous_r_last[3*p+2] += LC; }
+							while( aqueous_r[3*p+2] > LC/2 )  { aqueous_r[3*p+2] -= LC; aqueous_r_last[3*p+2] -= LC; }
+						}
+
 						okay_aqueous_flag[p] = 1;
 					}
 	

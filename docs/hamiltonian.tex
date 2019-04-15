@@ -3,13 +3,12 @@
 
 \subsection{Lagrangian mechanics}
 
-This section is adapted from wikipedia.
 
 The Lagrangian $L$ is defined as:
 \begin{equation}
 L = T - V
 \end{equation}
-with $V$ the potential energy.
+with $V$ the potential energy.\footnote{This section is adapted from the English language Wikipedia, beginning around 2019.}
 The kinetic energy
 \begin{equation}
 T = \frac{1}{2} \sum m_k \nu_k^2
@@ -202,6 +201,26 @@ The kinetic energy now depends on $u$ through $\frac{\partial T}{\partial u}$ an
 
 
 \subsection{Further generalized coordinates: Normal modes }
+
+\subsection{Langevin thermostatting}
+
+The generic Langevin equation\footnote{The form of this equation was adapted from the English language Wikipedia page for the Langevin Equation on March 27th, 2019.}
+is
+\begin{equation}
+\dot{A}_i = \sum_j \{ A_i, A_j \} \frac{\diff H}{\diff A_j} - \lambda_i \frac{\diff H}{\diff A_i} + \eta_i(t)
+\end{equation}
+where here $\{ \cdot, \cdot \}$ is the Poisson bracket, $\lambda_i$ is the friction coefficient for degree-of-freedom $A_i$, and $\eta(t)$ is the random noise process with
+\begin{equation}
+\langle \eta_i(t) \eta_i(t') \rangle = 2 \lambda_i \delta(t-t')
+\end{equation}
+and zero mean.
+The units of the damping coefficients $\lambda_i$ are $\frac{\textrm{time}}{\textrm{mass}}$.
+For a simple Hamiltonian like $\frac{p^2}{2 m}$ the friction can be applied directly to the momentum trivially, i.e.:
+\begin{align}
+\dot{p} &= \frac{\diff H}{\diff q} - \lambda_p \frac{\diff H}{\diff p} + \eta_p(t) \\
+\dot{p} &= - \lambda_p \frac{p}{m} + \eta_p(t) 
+\end{align}
+However, for a more complicated kinetic energy the quantity $\dot{q}$ is a convenient intermediate, see Eq.~\ref{eq:qdotp}, with $\dot{q}$, itself computed from $p$, taking the place of $\frac{p}{m}$. 
 
 % normally computed as nv by nv matrix.
 
