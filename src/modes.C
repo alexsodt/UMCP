@@ -10,7 +10,7 @@
 #include "parallel.h"
 #include "sparse.h"
 
-#define OUTPUT_EM
+//#define OUTPUT_EM
 
 static int maxv = 13;
 static double rel_tol = 1e-20;
@@ -1871,7 +1871,8 @@ double surface::evaluate_T( double *vq, double *pmesh, double *vq_m1, double *pm
 void surface::getSparseEffectiveMass( force_set * theForceSet, int *use_map, int *nuse, SparseMatrix **theMatrix, double *gen_transform, int ngen, double * mass_scaling )
 {
 
-	if( ngen <= 0 && (double)nv * (double)par_info.nprocs > 500 )
+
+	if( 0 && ngen <= 0 && (double)nv * (double)par_info.nprocs > 500 )
 	{
 		printf("Calculating approximate effective mass matrix using parallel/sparse method.\n");
 		approxSparseEffectiveMass( theForceSet, use_map, nuse, theMatrix, gen_transform, 8, mass_scaling );
@@ -1891,6 +1892,7 @@ void surface::getSparseEffectiveMass( force_set * theForceSet, int *use_map, int
 		for( int c2 = 0; c2 < theForceSet->frc_ncoef[x]; c2++ )
 			effective_mass[theForceSet->frc_coef_list[x*maxv+c1]*nv+theForceSet->frc_coef_list[x*maxv+c2]] += theForceSet->frc_coef[x*maxv+c1] * theForceSet->frc_coef[x*maxv+c2] * theForceSet->mass[x];
 	}	
+
 
 	int NQ = nv;
 
@@ -1943,7 +1945,6 @@ void surface::getSparseEffectiveMass( force_set * theForceSet, int *use_map, int
 
 		NQ = ngen;
 	}
-	
 	if( 1 && used_transform )
 	{
 		double *copy = (double *)malloc( sizeof(double) * ngen*ngen);
@@ -2004,6 +2005,7 @@ void surface::getSparseEffectiveMass( force_set * theForceSet, int *use_map, int
 	(*theMatrix) = new SparseMatrix;
 
 	(*theMatrix)->init( NQ ); 
+	
 
 	if( used_transform )
 	{
@@ -2057,7 +2059,7 @@ void surface::getSparseEffectiveMass( force_set * theForceSet, int *use_map, int
 
 	
 #ifdef OUTPUT_EM
-	if(  ! used_transform )
+	if(  ! used_transform && par_info.nprocs == 1 )
 	{
 		FILE *dbgFile = fopen("trunc_sparse.txt","w");
 	

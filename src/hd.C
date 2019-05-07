@@ -19,6 +19,8 @@
 #include "p_p.h"
 #include "npt.h"
 #include "random_global.h"
+#include "sans.h"
+
 #define MM_METHOD_1
 #define BOXED
 
@@ -98,6 +100,7 @@ int temp_main( int argc, char **argv )
 
 	int nwarnings = getInput( (const char **)argv, argc, &block );
 	
+
 	srand(block.random_seed);
 
 	/* copy parameters */
@@ -242,6 +245,23 @@ int temp_main( int argc, char **argv )
 		printf("Area: %lf (R: %lf)\n", area0, sqrt(area0/(4*M_PI))  );
 		printf("Volume: %lf (R: %lf)\n", V0, pow( V0/(4*M_PI/3.0), 1.0/3.0) );
 		sphere_rad = sqrt(area0/(4*M_PI));
+	}
+
+	sub_surface->processSANS( &block );
+	double *B_hist = NULL;
+	double sans_max_r = 0;
+	double sans_bin_width = 0.5;
+	int nsans_bins = 0;
+
+	if( block.s_q )
+	{
+		sans_max_r = sub_surface->PBC_vec[0][0];
+		if( sans_max_r < sub_surface->PBC_vec[1][1] )
+			sans_max_r = sub_surface->PBC_vec[1][1];
+		if( sans_max_r < sub_surface->PBC_vec[2][2] )
+			sans_max_r = sub_surface->PBC_vec[2][2];
+		nsans_bins = sans_max_r / sans_bin_width;
+		B_hist = (double *)malloc( sizeof(double) * nsans_bins );
 	}
 
 
@@ -922,7 +942,7 @@ int temp_main( int argc, char **argv )
 			if( buffer_cycle[cur_save] )
 				free(buffer_cycle[cur_save]);
 			if( par_info.my_id == BASE_TASK )
-				sub_surface->saveRestart( buffer_cycle+cur_save, r, pp, allComplexes, ncomplex, NQ, save_seed );
+				sub_surface->saveRestart( buffer_cycle+cur_save, r, pp, allComplexes, ncomplex, (do_gen_q ? NQ : 0), save_seed );
 			cur_save++;
 			if( cur_save == NUM_SAVE_BUFFERS )
 				cur_save = 0;
@@ -1352,6 +1372,12 @@ int temp_main( int argc, char **argv )
 				navc+=1;
 			}
 
+			if( block.s_q && global_cntr % block.s_q_period == 0 && o >= nequil)
+			{
+				// Update SANS B-histogram.
+				sub_surface->sample_B_hist( r, B_hist, SANS_SAMPLE_NRM, 10000, sans_max_r, nsans_bins );  
+			}
+
 		}
 		
 #ifdef PARALLEL
@@ -1523,6 +1549,18 @@ int temp_main( int argc, char **argv )
 			n_temp = 0;
 			switched = 1;
 		}
+
+		if( block.s_q && o >= block.nequil)
+		{
+			// update SANS-intensity on disk.
+				
+			char fileName[256];
+			sprintf(fileName, "%s.sq", block.jobName );
+
+			writeSq( fileName, B_hist, sans_max_r, nsans_bins, block.q_min, block.q_max, block.nq );
+			
+		}
+
 	}
 	}
 	

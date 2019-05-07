@@ -26,7 +26,7 @@ void surface::saveRestart( char **buf, double *rsurf, double *pp, pcomplex **all
 		if( NQ == 0 )
 			sprintf( tbuf, "%lf %lf %lf %lf %lf %lf\n", rsurf[3*v+0], rsurf[3*v+1], rsurf[3*v+2], pp[3*v+0], pp[3*v+1], pp[3*v+2] );
 		else
-			sprintf( tbuf, "%lf %lf %lf %lf %lf %lf\n", rsurf[3*v+0], rsurf[3*v+1], rsurf[3*v+2] );
+			sprintf( tbuf, "%lf %lf %lf\n", rsurf[3*v+0], rsurf[3*v+1], rsurf[3*v+2] );
 
 		if( put + strlen(tbuf) >= buffer_size )
 		{

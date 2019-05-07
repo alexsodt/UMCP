@@ -93,7 +93,6 @@ int skipvert( vertex *overt, int i, int e, int *the_vert, int *mid, int *erev )
 void surface::subdivideTriangle3( surface *copy_surface, int center_i, int center_e, int *new_center, int *new_edge  )
 {
 	disable_PBC = 0;
-	Sq_cache = NULL;
 	cumulative_area = NULL;
 	max_valence = 15; // points used.
 	opencl_init = 0;
@@ -495,7 +494,6 @@ int surface::subdividePath3( surface *copy_surface, int *path, int npath )
 
 	exit(1);
 	disable_PBC = 0;
-	Sq_cache = NULL;
 	cumulative_area = NULL;
 	max_valence = 15; // points used.
 	opencl_init = 0;

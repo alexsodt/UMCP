@@ -2306,7 +2306,7 @@ int nearMembraneWorker( double *r1, int nv1, double *r2, double **M, int mlow, i
 
 // returns 0 for no collision.
 
-int surface::linearCollisionPoint( double *pt1_in, double *pt2_in, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh )
+int surface::linearCollisionPoint( double *pt1_in, double *pt2_in, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, int disable_PBC_z )
 {
 	double Lx = PBC_vec[0][0];
 	double Ly = PBC_vec[1][1];
@@ -2488,8 +2488,22 @@ int surface::linearCollisionPoint( double *pt1_in, double *pt2_in, int *col_f, d
                         			pts1[3*x+2] = theVertices[indices1[x]].r[2] + pbc1[3*x+2];;
 						
                 			}
+				
+					double usep1[3] = { pt1[0], pt1[1], pt1[2] };
+					double usep2[3] = { pt2[0], pt2[1], pt2[2] };
+					double usep[3] = { pt[0], pt[1], pt[2] };
+
+					while( usep1[0] - pts1[0] < -Lx/2 ) { usep1[0] += Lx; usep2[0] += Lx; usep[0] += Lx; }
+					while( usep1[1] - pts1[1] < -Ly/2 ) { usep1[1] += Ly; usep2[1] += Ly; usep[1] += Ly; }
+					if( !disable_PBC_z ) 
+						while( usep1[2] - pts1[2] < -Lz/2 ) { usep1[2] += Lz; usep2[2] += Lz; usep[2] += Lz; }
+					while( usep1[0] - pts1[0] > Lx/2 ) { usep1[0] -= Lx; usep2[0] -= Lx; usep[0] -= Lx; }
+					while( usep1[1] - pts1[1] > Ly/2 ) { usep1[1] -= Ly; usep2[1] -= Ly; usep[1] -= Ly; }
+					if( !disable_PBC_z ) 
+						while( usep1[2] - pts1[2] > Lz/2 ) {usep1[2] -= Lz; usep2[2] -= Lz; usep[2] -= Lz; }
 					
-                			if(  checkLinearCollision( pts1, np1, pt1, pt2, pt, M, mlow, mhigh, 0, COLLISION_LEVEL, trial_R,
+	
+                			if(  checkLinearCollision( pts1, np1, usep1, usep2, usep, M, mlow, mhigh, 0, COLLISION_LEVEL, trial_R,
                         			1.0, 0., 0., col_u, col_v ) )
                 			{
                         			*col_f =tri1->f;

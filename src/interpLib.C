@@ -1135,7 +1135,6 @@ int surface::loadAndCopyLattice( const char *fileName, surface *copyFrom )
 int surface::loadLattice( const char *fileName, double noise, surface *copyFrom )
 {
 	disable_PBC = 0;
-	Sq_cache = NULL;
 	cumulative_area = NULL;
 	max_valence = 15; // points used.
 	opencl_init = 0;
@@ -2665,7 +2664,6 @@ void surface::subdivideSurface( surface *copy_surface )
 */
 
 	disable_PBC = 0;
-	Sq_cache = NULL;
 	cumulative_area = NULL;
 	max_valence = 15; // points used.
 	opencl_init = 0;
@@ -6534,6 +6532,42 @@ void surface::generatePlan( void )
 	constructIrregularKernels();
 }
 
+void surface::updateFaceInfoForRandom( void )
+{
+	if( cumulative_area ) free(cumulative_area);
+	if( cumulative_face ) free(cumulative_face);
+
+	nfaces = nf_faces  + nf_irr_faces;
+	cumulative_area = (double *)malloc( sizeof(double) * nfaces );
+	cumulative_face = (int *)malloc( sizeof(int ) * nfaces );
+	
+	int xf = 0;
+	
+	double prev = 0;
+	for( int f = 0; f < nf_faces; f++, xf++ )
+	{
+		double a = 0;
+	
+		for( int p = 0; p < nf_g_q_p; p++ )
+			a += 0.5 * theFormulas[f*nf_g_q_p+p].g0 * theFormulas[f*nf_g_q_p+p].weight;
+		prev += a;
+		cumulative_area[xf] = prev;
+	}
+	
+	for( int f = 0; f < nf_irr_faces; f++, xf++ )
+	{
+		double a = 0;
+	
+		for( int p = 0; p < nf_irr_pts; p++ )
+			a += theIrregularFormulas[f*nf_irr_pts+p].g0 * theIrregularFormulas[f*nf_irr_pts+p].weight;
+		prev += a;
+		cumulative_area[xf] = prev;
+	}
+	
+	for( int f = 0; f < nfaces; f++ )
+		cumulative_area[f] /= prev;
+	
+}
 
 void surface::randomPointOnSurface( int *face, double *u, double *v )
 {

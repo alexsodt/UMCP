@@ -105,15 +105,19 @@ class parameterBlock
 	double k_on;
 	double sigma;
 
+	char *betazFile;
 	double b_particle; // scattering length of ``particle'' -- probably sum over all lipid atoms minus background.	
 	double b_av; // scattering length per unit area.
 	int s_q;     // should we compute s_q?
 	int nse;     // should we compute the auto-correlation function to mimic spin echo?
 	double q_min; // q_min to compute s_q
 	double q_max; // q_max to compute s_q
-	int Sq_res;
+	int s_q_res;
 	int nq;
+	double maxr;
+	double binw;
 	double max_time; // the max time before it resets computation of the correlation function.
+	int s_q_period;
 	
 	int ncorr;     // should we compute the auto-correlation function of the membrane normal?
 
