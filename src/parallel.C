@@ -149,6 +149,9 @@ void setupParallel( surface *theSurface, pcomplex **allComplexes, int ncomplex, 
 	par_info.nf = theSurface->nt;
 	par_info.faces  = (int *)malloc( sizeof(int) * nt );
 	for( int f = 0; f < nt; f++ )
+		par_info.faces[f] = f;
+	par_info.nf = nt;
+
 	par_info.complexes = (int *)malloc( sizeof(int) * ncomplex );
 	for( int c = 0; c < ncomplex; c++ )
 		par_info.complexes[c] = c;

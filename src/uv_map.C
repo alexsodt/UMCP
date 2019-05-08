@@ -2437,5 +2437,277 @@ int surface::fetchdP_duv( int f, double u, double v, double **dP_duv, double *rs
 }
 
 
+void surface::localMoveReflect( int *f_in, double *u_in, double *v_in, double sigma, double *r, double *frc_duv, double dt, double *fstep, int max_correct_iterations )
+{
+	int f = *f_in;
+	double u = *u_in;
+	double v = *v_in;
+	double drdu[3];
+	double drdv[3];
+
+	ru(f, u, v, r, drdu );
+	rv(f, u, v, r, drdv );
+
+	double lu = sqrt(drdu[0]*drdu[0]+drdu[1]*drdu[1]+drdu[2]*drdu[2]);
+	double lv = sqrt(drdv[0]*drdv[0]+drdv[1]*drdv[1]+drdv[2]*drdv[2]);
+
+	double U[3] = { drdu[0],drdu[1],drdu[2]};
+	double V[3] = {0,0,0};
+	double proj;
+
+	proj = (drdv[0] * U[0] + drdv[1] * U[1] + drdv[2] * U[2])/(U[0] * U[0] + U[1] * U[1] + U[2] * U[2]);
+
+	V[0] += drdv[0] - proj * U[0];
+	V[1] += drdv[1] - proj * U[1];
+	V[2] += drdv[2] - proj * U[2];
+
+	double nrm_U = normalize(U);
+	double nrm_V = normalize(V);
+	
+	if( ! rng_x )
+		init_random(0);
+
+	double theta = 2 * M_PI * rand() / (double)RAND_MAX;
+	double l = gsl_ran_gaussian(rng_x, sqrt(2.0) * sigma);
+
+	double cvec[3] = { U[0] * cos(theta) + V[0] * sin(theta),
+			   U[1] * cos(theta) + V[1] * sin(theta),
+			   U[2] * cos(theta) + V[2] * sin(theta) };
+	cvec[0] *= l;
+	cvec[1] *= l;
+	cvec[2] *= l;
+
+	double cvu = cvec[0] * drdu[0] + cvec[1] * drdu[1] + cvec[2] * drdu[2];
+	double cvv = cvec[0] * drdv[0] + cvec[1] * drdv[1] + cvec[2] * drdv[2];
+	
+	double coeff_cross = (cvv - cvu * proj)/nrm_V/nrm_V;
+	
+	double du = cvu/lu/lu - coeff_cross * proj;
+	double dv = coeff_cross;  
+
+//	double du = (cvec[0] * drdu[0] + cvec[1] * drdu[1] + cvec[2] * drdu[2])/lu/lu;
+//	double dv = (drdv[0] * cvec[0] + drdv[1] * cvec[1] + drdv[2] * cvec[2])/nrm_V/nrm_V;
+//	dv -= 
+
+	
+
+/*
+	// dudr * lam == vec
+	double du = (cvec[0] * drdu[0] + cvec[1] * drdu[1] + cvec[2] * drdu[2])/lu;
+	cvec[0] -= du * drdu[0]/lu;
+	cvec[1] -= du * drdu[1]/lu;
+	cvec[2] -= du * drdu[2]/lu;
+	double dv = (cvec[0] * drdv[0] + cvec[1] * drdv[1] + cvec[2] * drdv[2])/lv;
+
+	cvec[0] -= dv * drdv[0]/lv;
+	cvec[1] -= dv * drdv[1]/lv;
+	cvec[2] -= dv * drdv[2]/lv;
+*/
+	cvec[0] -= du * drdu[0] + dv * drdv[0];
+	cvec[1] -= du * drdu[1] + dv * drdv[1];
+	cvec[2] -= du * drdu[2] + dv * drdv[2];
+
+//	printf("resid: %le\n", cvec[0]*cvec[0]+cvec[1]*cvec[1]+cvec[2]*cvec[2] );
 
 
+
+	// x1 r1 + x2 r2 == z
+
+	/*	double theta = 0;
+	double dx,dy;
+       	while( theta <= 2 * M_PI )
+	{
+		dx = (U[0] * cos(theta) + V[0] * sin(theta));
+		dy = (U[1] * cos(theta) + V[1] * sin(theta));
+		printf("%lf %lf\n", dx, dy);
+		theta += M_PI/16;
+		}*/
+
+        int i;
+	
+//	double du, dv;
+
+
+	// sigma r 
+
+//	du = gsl_ran_gaussian(rng_x, sigma/nrm_U); // dr * / (dr/du) == du
+//	dv = gsl_ran_gaussian(rng_x, sigma/nrm_V);
+//	printf("%lf %lf %lf %lf\n", du, dv, sigma, nrm_U);
+
+//        gsl_rng_free(x);
+	du /= sqrt(dt);
+	dv /= sqrt(dt);
+
+	du *= dt;
+	dv *= dt;
+
+	int pbc_done = 0;
+
+	double requested_move[3] = { du * drdu[0] + dv * drdv[0],
+				     du * drdu[1] + dv * drdv[1],
+				     du * drdu[2] + dv * drdv[2] };
+
+	int hopeless = 0;	
+	while( !pbc_done && hopeless < 10)
+	{
+		pbc_done = 1;
+	
+		double drdu[3];
+		double drdv[3];
+	
+		ru(f, u, v, r, drdu );
+		rv(f, u, v, r, drdv );
+		
+		// compute du and dv 
+		
+		double lenRU = sqrt(drdu[0]*drdu[0]+drdu[1]*drdu[1]+drdu[2]*drdu[2]);
+		double lenRV = sqrt(drdv[0]*drdv[0]+drdv[1]*drdv[1]+drdv[2]*drdv[2]);
+		double RUdRV = drdu[0]*drdv[0]+drdu[1]*drdv[1]+drdu[2]*drdv[2];
+		double RUdT = drdu[0]*requested_move[0] + drdu[1] * requested_move[1] + drdu[2]*requested_move[2]; 
+		double RVdT = drdv[0]*requested_move[0] + drdv[1] * requested_move[1] + drdv[2]*requested_move[2]; 
+
+		double du = -(4*lenRV*lenRV*RUdT-4*RUdRV*RVdT)/(-4*lenRU*lenRU*lenRV*lenRV+4*RUdRV*RUdRV);
+		double dv = -(4*lenRU*lenRU*RVdT-4*RUdRV*RUdT)/(-4*lenRU*lenRU*lenRV*lenRV+4*RUdRV*RUdRV);
+
+		if( max_correct_iterations > 0 && f >= nf_faces ) // only on irregular faces.
+		{
+			// what is the cartesian length we expect to take? 
+		
+			double expec[3] = { du * drdu[0] + dv * drdv[0],
+					    du * drdu[1] + dv * drdv[1],	
+					    du * drdu[2] + dv * drdv[2] };	
+			double basep[3], basen[3];
+			evaluateRNRM( f,u,v,basep,basen,r);
+			double le = sqrt( expec[0]*expec[0]+expec[1]*expec[1]+expec[2]*expec[2]);
+				
+			double lambda_low = 0;
+			double lambda_mid = 1.0;
+			double lambda_high = 2.0;		
+	
+			if(  f >= nf_faces )
+			{
+				lambda_mid = 0.5;
+				lambda_high = 1.0;
+			}
+	
+			double rlow = 0, rmid, rhigh;
+			int tf = f;
+			double tu = u;
+			double tv = v;	
+			double duv[2] = { du, dv };
+			tf = f; tu = u; tv = v; rmid  = trialMove( &tf, &tu, &tv, duv, lambda_mid, r, basep );
+	
+			int bestf = tf;
+			double bestu = tu;
+			double bestv = tv; 
+	
+			tf = f; tu = u; tv = v; rhigh = trialMove( &tf, &tu, &tv, duv, lambda_high, r, basep );
+	//		printf("Start: rlow: %le rmid: %le rhigh: %le\n", rlow, rmid, rhigh );
+			while( rhigh < le  )
+			{
+				lambda_high *= 1.25;
+				tf = f; tu = u; tv = v; rhigh = trialMove( &tf, &tu, &tv, duv, lambda_high, r, basep );
+	//			printf("iterating lambda_high up to %le got %le trying for %le\n", lambda_high, rhigh, le );
+			}
+		
+			for( int ir = 0; ir < max_correct_iterations; ir++ )
+			{
+				double rtest;	
+				double ltest = (lambda_mid+lambda_high)/2;
+				tf = f; tu = u; tv = v; rtest  = trialMove( &tf, &tu, &tv, duv, ltest, r, basep );
+				
+				if( rtest < le )
+				{
+					rlow = rmid;
+					lambda_low = lambda_mid;
+					rmid = rtest;
+					lambda_mid = ltest;
+					bestf = tf;
+					bestu = tu;
+					bestv = tv;
+	//				printf("testing mid-high and we are on the left, moving bracket up to %le %le %le\n", lambda_low, lambda_mid, lambda_high ); 
+				}
+				else
+				{	
+					rhigh = rtest;
+					lambda_high = ltest;
+	//				printf("testing mid-high and we are on the right, moving bracket down a bit to %le %le %le\n", lambda_low, lambda_mid, lambda_high ); 
+				}
+				
+				ltest = (lambda_mid+lambda_low)/2;
+				tf = f; tu = u; tv = v; rtest  = trialMove( &tf, &tu, &tv, duv, ltest, r, basep );
+				
+				if( rtest > le )
+				{
+					rhigh = rmid;
+					lambda_high= lambda_mid;
+					rmid = rtest;
+					lambda_mid = ltest;
+					bestf = tf;
+					bestu = tu;
+					bestv = tv;
+	//				printf("testing mid-low and we are on the right, moving bracket down to to %le %le %le\n", lambda_low, lambda_mid, lambda_high ); 
+				}
+				else
+				{	
+					rlow = rtest;
+					lambda_low = ltest;
+	//				printf("testing mid-low and we are on the left, moving bracket up a bit to %le %le %le\n", lambda_low, lambda_mid, lambda_high ); 
+				}
+	
+				if( fabs(le-rmid) < 1e-6 )
+					break;
+			}
+	
+	//#define DEBUG_IRR
+	#ifdef DEBUG_IRR
+			if( f >= nf_faces )
+				printf(" irr lambda_scale %le Found step %le trying for %le del %le\n", lambda_mid, rmid, le, rmid-le ); 
+			else
+				printf(" reg lambda_scale %le Found step %le trying for %le del %le\n", lambda_mid, rmid, le, rmid-le ); 
+	#endif
+			*f_in = bestf;
+			*u_in = bestu;
+			*v_in = bestv; 
+		}
+		else
+		{
+			int f_1 = f, nf = f;
+			do {
+				f_1 = nf;
+				nf = nextFace( f_1, &u, &v, &du, &dv, r );
+			} while( nf != f_1 );
+		
+			u += du;
+			v += dv;
+			*f_in = nf;
+			*u_in = u;
+			*v_in = v;
+		}
+	
+		// Did we end up on the wrong side of the PBCs?
+		
+		double rout[3];
+		double nout[3];
+		evaluateRNRM( *f_in, *u_in, *v_in, rout, nout, r );
+
+		requested_move[0]=0;	
+		requested_move[1]=0;	
+		requested_move[2]=0;	
+	
+		if( rout[0] < -PBC_vec[0][0]/2 ) { pbc_done = 0;
+			requested_move[0] = 2*(- PBC_vec[0][0]/2 - rout[0]);
+		}
+		else if( rout[0] > PBC_vec[0][0]/2 ) { pbc_done = 0;
+			requested_move[0] = 2*(PBC_vec[0][0]/2 - rout[0]);
+		}
+		if( rout[1] < -PBC_vec[1][1]/2 ) { pbc_done = 0;
+			requested_move[1] = 2*(- PBC_vec[1][1]/2 - rout[1]);
+		}
+		else if( rout[1] > PBC_vec[0][0]/2 ) { pbc_done = 0;
+			requested_move[1] = 2*(PBC_vec[1][1]/2 - rout[1]);
+		}
+		hopeless++;
+	}
+
+}

@@ -357,16 +357,18 @@ double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *mesh_
 			int nc = theSurface->fetchdP_duv( f, u, v, &d_P_duv, rsurf );
 			for( int t = 0; t < 8; t++ )
 				d_P_duv[t] *= mass[s];
-			
-			// ratio of determinants, before and after: det(M0^-1 + d M0^-1)/det(M0^-1)
-		
-			double machine_scale = sqrt(Pinv[0]*Pinv[0]+Pinv[1]*Pinv[1]);
+	
 
 			double ax[2] = { d_P_duv[0], d_P_duv[4] };
 			double bx[2] = { d_P_duv[1], d_P_duv[5] };
 			double cx[2] = { d_P_duv[2], d_P_duv[6] };
 			double dx[2] = { d_P_duv[3], d_P_duv[7] };
+
+#if 0		
+			// ratio of determinants, before and after: det(M0^-1 + d M0^-1)/det(M0^-1)
+			double machine_scale = sqrt(Pinv[0]*Pinv[0]+Pinv[1]*Pinv[1]);
 			double a=Pinv[0]/machine_scale; double b=Pinv[1]/machine_scale; double c = Pinv[2]/machine_scale; double d = Pinv[3]/machine_scale;
+		
 
 			double dM0_det[2] = 
 			{ 
@@ -379,13 +381,23 @@ double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *mesh_
 
 			dM0_det[0] *= machine_scale;
 			dM0_det[1] *= machine_scale;
+#else
+			double a=P_uv[0];
+			double b=P_uv[1];
+			double c=P_uv[2];
+			double d=P_uv[3];
 
+			double dM0_det[2] = { ax[0]*d-bx[0]*c-cx[0]*b+dx[0]*a,
+					      ax[1]*d-bx[1]*c-cx[1]*b+dx[1]*a };
+			dM0_det[0] /= (b*c-a*d);
+			dM0_det[1] /= (b*c-a*d);		
+#endif
 			double fr = fabs(dM0_det[0] * expected_dq[0] + dM0_det[1] * expected_dq[1]);
-			double tolerance = 0.05;
+			double tolerance = 0.005;
 
 			if( tolerance/fr < fraction )
 			{
-			//	printf("f u v %d %le %le d_metric: %le setting fraction\n", f, u, v, fr, tolerance/fr ); 
+//				printf("f u v %d %le %le d_metric: %le setting fraction\n", f, u, v, fr, tolerance/fr ); 
 				fraction = tolerance/fr;
 			}
 
@@ -1529,8 +1541,8 @@ double pcomplex::T( surface *theSurface, double *rsurf )
 
 		// T = 0.5 * p * qdot
 #ifndef DISABLE_ON_MEMBRANE_T
-		T += 0.5 * (p[2*s+0]) * (qdot0[2*s+0]);
-		T += 0.5 * (p[2*s+1]) * (qdot0[2*s+1]);
+		T += 0.5 * (p[2*s+0]) * (qdot0[0]);
+		T += 0.5 * (p[2*s+1]) * (qdot0[1]);
 #endif
 	}
 
@@ -1962,8 +1974,19 @@ double pcomplex::AttachG( surface *theSurface, double *rsurf, double *gr, double
 	for( int s = 0; s < nattach; s++ )
 	{
 		theSurface->particle_H_grad( rsurf, gr, grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], p_area[s], p_c0[s], pg + 2 *s );
-
 		double curv = theSurface->c( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], rsurf );
+
+//#define C0_DEBUG
+#ifdef C0_DEBUG
+		if( grad_fs[s] >= theSurface->nf_faces )
+		{
+			double *temp = (double *)malloc( sizeof(double) * (3*theSurface->nv+3) );
+			memset(temp,0,sizeof(double)*(3*theSurface->nv+3));
+			double gtest[2]={0,0};
+			theSurface->particle_H_grad( rsurf, temp, grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], p_area[s], p_c0[s], gtest );
+			printf("IRREGULAR FACE GRADIENT: curv: %le f %d uv %le %le, %le %le\n", curv, grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], gtest[0], gtest[1] );
+		}
+#endif
 
 		pot += 0.5 * kc * p_area[s] * ( curv - p_c0[s]) * (curv - p_c0[s]); 
 	}

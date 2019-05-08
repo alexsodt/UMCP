@@ -26,6 +26,10 @@ void setDefaults( parameterBlock *block )
 	block->jobName = (char *)malloc( sizeof(char) * (strlen(defaultName)+1) );
 	sprintf(block->jobName, "%s", defaultName );
 
+	const char *defaultBZ = "beta.z";
+	block->betazFile = (char *)malloc( sizeof(char) * ( strlen(defaultBZ)+1) );
+	sprintf(block->betazFile, defaultBZ );
+
 	block->loadName = NULL;
 	block->concentration = 0;
 	block->rho = 0;
@@ -138,18 +142,19 @@ void setDefaults( parameterBlock *block )
 	block->del = 3.0;
 	block->sigma = 10.0;
 
-	block->Sq_res = 5;	
+	block->s_q_res = 5;	
 	block->s_q = 0;
 	block->b_particle = -2.325053524; // protiated POPC 
 	block->b_av = 0.281376608; // perdeuterated POPC
 	block->nse = 0;
 	block->ncorr = 0;
 	block->q_min = 0.001;
-	block->q_max = 0.05;
-	block->nq    = 100;
+	block->q_max = 0.5;
+	block->nq    = 1000;
 	block->non_interacting = 1;
 	block->max_time = 1; // one second.
-	
+	block->s_q_period = 1000; // 1000 steps per S_q	
+
 	// request a timestep analysis
 	block->timestep_analysis = 0;
 
@@ -212,13 +217,6 @@ int resolveParameters( parameterBlock *block )
 	{
 		printf("ERROR: Particles 1 and 2 on the same inclusion overlap (r1+r2 < dist_nrm).\n");
 		exit(1);
-	}
-
-	if( block->mode_x == -1 && block->mode_y == -1 && block->KA < 1e-8 && block->z_only == 0 && block->mode_max == -1)
-	{
-		printf("ERROR: KA is too small for lateral control point Monte Carlo moves.\n");
-		exit(1);
-		return 1;
 	}
 
 
@@ -438,6 +436,12 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			free(block->meshName);
 			block->meshName = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
 			strcpy( block->meshName, word2 );
+		}
+		else if( !strcasecmp( word1, "betaz" ) )
+		{
+			free(block->betazFile);
+			block->betazFile = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->betazFile, word2 );
 		}
 		else if( !strcasecmp( word1, "jobname" ) )
 		{
@@ -767,8 +771,10 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->diffc = atof(word2);
 		else if( !strcasecmp( word1, "aqueous_diffc" ) )
 			block->aqueous_diffc = atof(word2);
-		else if( !strcasecmp( word1, "Sq_res" ) )
-			block->Sq_res = atoi( word2 );
+		else if( !strcasecmp( word1, "s_q_res" ) )
+			block->s_q_res = atoi( word2 );
+		else if( !strcasecmp( word1, "s_q_period" ) )
+			block->s_q_period = atoi( word2 );
 		else if( !strcasecmp( word1, "b_av" ) )
 			block->b_av = atof( word2 );
 		else if( !strcasecmp( word1, "b_particle" ) )

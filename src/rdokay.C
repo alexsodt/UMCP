@@ -15,12 +15,10 @@
 #include "fpr_subroutines/fpr.h"
 #include "fpr_subroutines/Faddeeva.hh"
 
-#define XY_DIFFUSION
-
 //#define DEBUG_DIFFC
 
 #define NUMERICAL_INTEGRATION
-#define DO_HISTOGRAM
+//#define DO_HISTOGRAM
 //#define MOVE_MEMBRANE
 
 int do_planar_global = 0;
@@ -86,7 +84,7 @@ int main( int argc, const char **argv )
 
 	block.sphere = 1;
 	block.mode_max = 6;
-	block.sigma = 10;
+	block.sigma = sp_ap_displacement;
 	
 	// here is where the parameters are loaded from the file/command line
 	int nwarnings = getInput( argv, argc, &block );
@@ -345,8 +343,6 @@ int main( int argc, const char **argv )
 	
 	binding_radius = sp_ap_displacement;
 	double Rmax = binding_radius + 3 * sqrt( 6 * block.aqueous_diffc * time_step); 
-	if( Rmax < 15 )
-		Rmax = 15;
 
 	sub_surface->setupBoxing( NULL, NULL, surface_np+aqueous_np , Rmax, 1 );
 
@@ -543,7 +539,6 @@ int main( int argc, const char **argv )
 	int *pfaces_cache = (int *)malloc( sizeof(int) * surface_np );
 	double *puv_cache = (double *)malloc( sizeof(double) * surface_np*2 );
 	double *aqueous_r_cache = (double *)malloc( sizeof(double) * aqueous_np*3 );
-	double *surface_p_r_m_cache = (double *)malloc( sizeof(double) * surface_np*3 );
 
 	int ncomplex_size = 2000;
 	double *ncomplex = (double *)malloc( sizeof(double) * ncomplex_size );
@@ -553,19 +548,6 @@ int main( int argc, const char **argv )
 	double t_per_complex = time_step; 
 
 	int nruns = block.nruns;
-
-	FILE *debug_file = NULL;
-
-	if( aqueous_np + surface_np == 2 )
-		debug_file = fopen("debug.txt","w");
-
-	#define N_HIST 	200
-	double zdist[N_HIST];
-	memset( zdist, 0, sizeof(double) * N_HIST );
-
-	double rdist[N_HIST];
-	memset( rdist, 0, sizeof(double) * N_HIST );
-
 
 
 	for( int run = 0; run < nruns; run++ )
@@ -583,9 +565,7 @@ int main( int argc, const char **argv )
 			free(apair);
 		}	
 		tracked_pairs = NULL;
-
-		double *initial_pos = (double *)malloc( sizeof(double) * 3 * aqueous_np );
-		double av_z = 0, nav_z = 0, min_z = 0;
+		
 
 		for( int sp = 0; sp < surface_np; sp++ )
 			surface_status[sp] = STATE_FREE;
@@ -618,17 +598,6 @@ int main( int argc, const char **argv )
 			
 	
 			sub_surface->evaluateRNRM( f, u, v, rp, nrm, r);
-
-#ifdef XY_DIFFUSION
-			surface_p_r_m[3*p+0] = -LA/2 + LA * (rand()/(double)RAND_MAX);	
-			surface_p_r_m[3*p+1] = -LB/2 + LB * (rand()/(double)RAND_MAX);		
-			surface_p_r_m[3*p+2] = 0;	
-			
-			surface_p_r_n[3*p+0] = 0;			
-			surface_p_r_n[3*p+1] = 0;			
-			surface_p_r_n[3*p+2] = 1;			
-
-#else
 	
 			surface_p_r_m[3*p+0] = rp[0];			
 			surface_p_r_m[3*p+1] = rp[1];			
@@ -637,7 +606,7 @@ int main( int argc, const char **argv )
 			surface_p_r_n[3*p+0] = nrm[0];			
 			surface_p_r_n[3*p+1] = nrm[1];			
 			surface_p_r_n[3*p+2] = nrm[2];			
-#endif	
+	
 	
 			if( run == 0 )	
 				sub_surface->addParticle( surface_p_r_m+3*p, p, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
@@ -647,11 +616,10 @@ int main( int argc, const char **argv )
 		for( int p = 0; p < surface_np; p++ )
 			sub_surface->addParticleToFace( pfaces[p], p, particle_c0 * pleaflet[p], particle_footprint );
 		// initialize 
-
-#ifndef XY_DIFFUSION	
+	
 		for( int p = 0; p < surface_np; p++ )
 			updateParticleR( p, pfaces, puv, surface_p_r_m, r, sub_surface, surface_np ); 
-#endif	
+	
 		for (int i = 0; i < aqueous_np; i++) {
 			double radius;
 			radius = defaultR;
@@ -660,18 +628,13 @@ int main( int argc, const char **argv )
 
 			while( outside )
 			{
+				aqueous_r_last[3*i+0] = aqueous_r[3*i+0] = -LA/2 + LA * rand() / (double)RAND_MAX;	
+				aqueous_r_last[3*i+1] = aqueous_r[3*i+1] = -LB/2 + LB * rand() / (double)RAND_MAX;	
 				if( do_planar )
-				{
-					aqueous_r_last[3*i+0] = aqueous_r[3*i+0] = -LA/2 + LA * rand() / (double)RAND_MAX;	
-					aqueous_r_last[3*i+1] = aqueous_r[3*i+1] = -LB/2 + LB * rand() / (double)RAND_MAX;	
 					aqueous_r_last[3*i+2] = aqueous_r[3*i+2] = LC * rand() / (double)RAND_MAX;	
-				}
 				else
-				{
-					aqueous_r_last[3*i+0] = aqueous_r[3*i+0] = -LA/2 + LA * rand() / (double)RAND_MAX;	
-					aqueous_r_last[3*i+1] = aqueous_r[3*i+1] = -LB/2 + LB * rand() / (double)RAND_MAX;	
 					aqueous_r_last[3*i+2] = aqueous_r[3*i+2] = -LC/2 + LC * rand() / (double)RAND_MAX;	
-				}
+		
 					
 		
 				int f;
@@ -690,26 +653,12 @@ int main( int argc, const char **argv )
 				}
 				
 			}
-
 			
 			if( run == 0 )
 				sub_surface->addParticle( aqueous_r+3*i, surface_np+i, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
 			else
 				sub_surface->updateParticle( aqueous_r+3*i, surface_np+i, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
-
 		}
-
-		memcpy( initial_pos, aqueous_r, sizeof(double) * 3 * aqueous_np );
-
-		min_z = 1e10;
-		for( int a = 0; a < aqueous_np; a++ )
-		{
-			if( aqueous_r[3*a+2] < min_z )
-				min_z = aqueous_r[3*a+2];
-			av_z += aqueous_r[3*a+2];
-			nav_z += 1;
-		}
-		av_z /= nav_z;
 
 		double cur_t = 0;
 		int run_done = 0;
@@ -724,79 +673,19 @@ int main( int argc, const char **argv )
 			fflush(stdout);
 			for( int t = 0; t < block.o_lim; t++, cur_t += time_step )
 			{
-				for( int ap = 0; ap < aqueous_np; ap++ )
-				{
-					if( aqueous_r[3*ap+2] > 12.0 && aqueous_r[3*ap+2] < 15.0 )
-					{
-						for( int sp = 0; sp < surface_np; sp++ )
-						{
-							double dr[3] = { 
-								surface_p_r_m[3*sp+0] - aqueous_r[3*ap+0],
-								surface_p_r_m[3*sp+1] - aqueous_r[3*ap+1],
-								surface_p_r_m[3*sp+2] - aqueous_r[3*ap+2] };
-							double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
-
-							int rbin = (r/3000) * N_HIST;
-
-							if( rbin >= N_HIST ) {
-								rbin = N_HIST-1;
-							}
-							rdist[rbin] += 1;
-							rdist[0] += 1;
-						}
-					}
-				}
-
-
-				for( int ap = 0; ap < aqueous_np; ap++ )
-				{
-					int zbin = N_HIST * aqueous_r[3*ap+2] / LC;
-
-					if( zbin < 0 ) zbin = 0;
-					if( zbin >= N_HIST ) zbin = N_HIST-1;
-
-					zdist[zbin] += 1;
-				}
-
-				if( 0 && t % 1000 == 0 )
-				{
-					printf("HIST");
-					for( int i = 0; i < N_HIST; i++ )
-						printf(" %lf", zdist[i] );
-					printf("\n");
-					
-					printf("RDIST");
-					for( int i = 0; i < N_HIST; i++ )
-						printf(" %lf", rdist[i] );
-					printf("\n");
-					fflush(stdout);
-				}
-
-				if( debug_file )
-				{
-					double dr[3] = { aqueous_r[0] - surface_p_r_m[0], aqueous_r[1] - surface_p_r_m[1], aqueous_r[2] - surface_p_r_m[2] };
-					double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
-					fprintf(debug_file, "%lf %lf state: %d\n", aqueous_r[2], r, aqueous_status[0] ); 
-					if( t == 0 ) fflush(debug_file);
-				}
-
-
-				if( aqueous_np == 1 && surface_np == 1 && ! debug_file )
+				if( aqueous_np == 1 && surface_np == 1 )
 				{
 					double dr[3] = { aqueous_r[0] - surface_p_r_m[0], aqueous_r[1] - surface_p_r_m[1], aqueous_r[2] - surface_p_r_m[2] };
 
-					if( !do_planar )
-					{
-						while( dr[0] < -LA/2 ) dr[0] += LA;
-						while( dr[0] >  LA/2 ) dr[0] -= LA;
-						while( dr[1] < -LB/2 ) dr[1] += LB;
-						while( dr[1] >  LB/2 ) dr[1] -= LB;
-					}
-					double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+					while( dr[0] < -LA/2 ) dr[0] += LA;
+					while( dr[0] >  LA/2 ) dr[0] -= LA;
+					while( dr[1] < -LB/2 ) dr[1] += LB;
+					while( dr[1] >  LB/2 ) dr[1] -= LB;
 
+					double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
 
 					if( tracked_pairs )
-					printf("TRACKED %lf %lf %lf and %lf %lf %lf r: %lf prevr: %lf state: %s prev_norm: %lf ps_prev: %lf tpnext %p\n",
+						printf("TRACKED %lf %lf %lf and %lf %lf %lf r: %lf prevr: %lf state: %s prev_norm: %lf ps_prev: %lf tpnext %p\n",
 						aqueous_r[0], aqueous_r[1], aqueous_r[2], surface_p_r_m[0], surface_p_r_m[1], surface_p_r_m[2], 
 							r, tracked_pairs->prev_sep, 
 			( tracked_pairs->state == STATE_FREE ? "free" : (tracked_pairs->state == STATE_IN_COMPLEX ? "in_complex" : "reacting") ) 
@@ -805,7 +694,6 @@ int main( int argc, const char **argv )
 					else
 						printf("untracked %lf %lf %lf and %lf %lf %lf r: %lf Rmax: %lf\n",
 						aqueous_r[0], aqueous_r[1], aqueous_r[2], surface_p_r_m[0], surface_p_r_m[1], surface_p_r_m[2], r, Rmax ); 
-					
 				}
 				for( int sp = 0; sp < surface_np; sp++ )
 					surface_status[sp] -= (surface_status[sp] & REACTED_BIT);
@@ -849,9 +737,7 @@ int main( int argc, const char **argv )
 							// returns a list of triangles that are near the particle.
 							sub_surface->assembleNearList( aqueous_r+3*ap, &f_list, &puv_list, &areas, &npts, M, mlow, mhigh, Rmax, 4, do_planar /* disables pbc z */ );
 							if( npts > 0 )
-#endif
 							{
-#ifdef NUMERICAL_INTEGRATION
 							double *probs = (double *)malloc( sizeof(double) * (npts+1) );
 
 							double running_prob = 0;
@@ -885,21 +771,11 @@ int main( int argc, const char **argv )
 										 aqueous_r[3*ap+1] - rmid[1],
 										 aqueous_r[3*ap+2] - rmid[2] };
 								double sep = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
-								if( sep < binding_radius ) continue;
 								// the main integrand.	
 								double val = particle_density * passocF(sep, time_step, Dtot, binding_radius, alpha, kact/(kact+kdiff));
 
-
 								probs[dA+1] = running_prob + val * g * dudv; // zeroeth order integration.
 								running_prob = probs[dA+1];
-
-#ifdef DO_HISTOGRAM
-								int dbin = sep * N_BINS_PHIST / Rmax;
-								if( dbin >= N_BINS_PHIST )
-									dbin = N_BINS_PHIST-1;
-								sum_prob_distance[dbin] += val * g * dudv;
-								n_prob_distance[dbin] += g * dudv * particle_density; 
-#endif						
 
 							}
 						
@@ -965,19 +841,20 @@ int main( int argc, const char **argv )
 	
 	//						printf("testing: %le distance: %le\n", probvec1, distance[ap] );
 	
+	#ifdef DO_HISTOGRAM
+							int dbin = dz * N_BINS_PHIST / Rmax;
+							if( dbin >= N_BINS_PHIST )
+								dbin = N_BINS_PHIST-1;
+							sum_prob_distance[dbin] += probvec1;
+	//						n_prob_distance[dbin] += 1; 
+	#endif						
 	
-							//double rn = rand() / (double)RAND_MAX;
-							double rn = gsl_rng_uniform(rng_x);	
+							double rn = rand() / (double)RAND_MAX;
 
 
 #ifdef NUMERICAL_INTEGRATION
 							if( rn < running_prob )
-#else
-							if( rn < probvec1 )
-#endif
 							{
-
-#ifdef NUMERICAL_INTEGRATION
 								int lower_p = 0;
 								int upper_p = npts;
 
@@ -1008,6 +885,10 @@ int main( int argc, const char **argv )
 									(puv_list[6*lower_p+1]+puv_list[6*lower_p+3]+puv_list[6*lower_p+5])/3 };
 								double su = xpuv[0];							
 								double sv = xpuv[1];							
+#else
+							if( rn < probvec1 )
+							{
+
 #endif
 								// move the aqueous particle into ``complex'' position.
 								
@@ -1023,10 +904,42 @@ int main( int argc, const char **argv )
 	
 								sub_surface->evaluateRNRM( sf, su, sv, surface_p_r_m+3*ap, surface_p_r_n+3*ap, r );
 	
-								aqueous_r[3*ap+0] = surface_p_r_m[3*ap+0] + surface_p_r_n[3*ap+0] * binding_radius; 
-								aqueous_r[3*ap+1] = surface_p_r_m[3*ap+1] + surface_p_r_n[3*ap+1] * binding_radius;
-								aqueous_r[3*ap+2] = surface_p_r_m[3*ap+2] + surface_p_r_n[3*ap+2] * binding_radius; 
+								int placement_done = 0;
+					
+								while( !placement_done )
+								{
+									placement_done = 1;
+									double random_dir[3] = { (double)rand(), (double)rand(), (double)rand() };
+									normalize(random_dir);
+									if( (random_dir[0] * surface_p_r_n[0] + random_dir[1] * surface_p_r_n[1] + random_dir[2] * surface_p_r_n[2]) * nrm_sign_factor < 0 )
+										placement_done = 0;
 
+									if( placement_done )
+									{
+										aqueous_r[3*ap+0] = surface_p_r_m[3*ap+0] + random_dir[0] * sp_ap_displacement;
+										aqueous_r[3*ap+1] = surface_p_r_m[3*ap+1] + random_dir[1] * sp_ap_displacement;
+										aqueous_r[3*ap+2] = surface_p_r_m[3*ap+2] + random_dir[2] * sp_ap_displacement;
+
+										int nnear = sub_surface->getNear( aqueous_r+3*ap, ap, r, sp_ap_displacement, 1., 1., 1., global_plist, global_rads);	
+
+										for( int x = 0; x < nnear && !placement_done; x++ )
+										{			
+											int p2 = global_plist[x];
+
+											if( p2 >= surface_np ) continue;
+
+											double dr[3] = { 
+												aqueous_r[3*ap+0] - surface_p_r_m[3*p2+0],
+												aqueous_r[3*ap+1] - surface_p_r_m[3*p2+1],
+												aqueous_r[3*ap+2] - surface_p_r_m[3*p2+2] };
+											double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+				
+											if( r < sp_ap_displacement )
+												placement_done = 0;
+													
+										}
+									}
+								}	
 								mean_field_activated[ap] = 1;
 								aqueous_status[ap] = STATE_IN_COMPLEX + REACTED_BIT;
 	
@@ -1037,10 +950,7 @@ int main( int argc, const char **argv )
 							
 #ifdef NUMERICAL_INTEGRATION
 								free(probs);
-#endif
 							}
-
-#ifdef NUMERICAL_INTEGRATION
 							free(f_list);
 							free(puv_list);
 							free(areas);
@@ -1050,6 +960,7 @@ int main( int argc, const char **argv )
 				}
 				else
 				{
+
 					tracked_pair *prev = NULL;
 					tracked_pair *next = NULL;
 					for( tracked_pair *apair = tracked_pairs; apair; apair = next )
@@ -1066,9 +977,9 @@ int main( int argc, const char **argv )
 							    (aqueous_status[ap]&STATE_MASK) == STATE_IN_COMPLEX )		
 								continue;
 							if( surface_status[sp] & REACTED_BIT) continue;	
-							if( aqueous_status[ap] & REACTED_BIT) continue;	
+							if( aqueous_status[sp] & REACTED_BIT) continue;	
 
-							if( apair->sep < binding_radius - 1e-5)
+							if( apair->sep < binding_radius )
 							{
 								printf("CATASTROPHE.\n");
 								exit(1);
@@ -1076,43 +987,58 @@ int main( int argc, const char **argv )
 
 							double probvec1 = passocF(apair->sep, time_step, Dtot, binding_radius, alpha, kact/(kact+kdiff));
 							double currnorm = 1.0;
-//							printf("grep %le %le\n", apair->sep, probvec1 );
-							int sp = apair->surface_id;
-							int ap = apair->aqueous_id;
+
+						int sp = apair->surface_id;
+						int ap = apair->aqueous_id;
+
+		
+						if( apair->state== STATE_REACTING || apair->state == STATE_FREE )
+						{
+							if( (surface_status[sp]&STATE_MASK) == STATE_IN_COMPLEX ||
+							    (aqueous_status[ap]&STATE_MASK) == STATE_IN_COMPLEX )		
+								continue;
+							if( surface_status[sp] & REACTED_BIT) continue;	
+							if( aqueous_status[sp] & REACTED_BIT) continue;	
+
+							if( apair->sep < binding_radius )
+							{
+								printf("CATASTROPHE.\n");
+								exit(1);
+							}
+
+							double probvec1 = passocF(apair->sep, time_step, Dtot, binding_radius, alpha, kact/(kact+kdiff));
+							double currnorm = 1.0;
 				
 							if( apair->state == STATE_REACTING ) 
 							{	// this pair was previously in the reacting zone.
 			
 								double p0_ratio = pirr_pfree_ratio_psF(apair->sep, apair->prev_sep, time_step, Dtot, binding_radius, alpha, apair->ps_prev, rtol);
+					
 								currnorm = apair->prev_norm * p0_ratio;
-								
 //								printf("RESCALING %lf %lf\n", apair->prev_norm, p0_ratio );
 							}
-	
-#ifdef DO_HISTOGRAM
-							int dbin = apair->sep * N_BINS_PHIST / Rmax;
+							
+	#ifdef DO_HISTOGRAM
+							int sf;
+							double su,sv;
+							sub_surface->nearPointOnBoxedSurface( aqueous_r+3*ap, &sf, &su, &sv, M, mlow, mhigh, distance+ap, -1, do_planar /* disables pbc z */ );
+							int dbin = distance[ap] * N_BINS_PHIST / Rmax;
 							if( dbin >= N_BINS_PHIST )
 								dbin = N_BINS_PHIST-1;
-							sum_prob_distance[dbin] += probvec1;
-							n_prob_distance[dbin] += 1; 
-#endif						
-						
+							sum_prob_distance[dbin] += currnorm * probvec1;
+	#endif						
 							double p = currnorm * probvec1;
 					
-
 							if( rand() / (double)RAND_MAX < p )
 							{
-//								printf("AJS AT TIME %le.\n", cur_t );
-//								exit(1); 
-
 		//						printf("Reacted! p: %le \n", p);
 								apair->state = STATE_IN_COMPLEX;
 			
 								// move the aqueous particle into ``complex'' position.
 			
-								aqueous_r[3*ap+0] = surface_p_r_m[3*sp+0] + surface_p_r_n[3*sp+0] * binding_radius * nrm_sign_factor;
-								aqueous_r[3*ap+1] = surface_p_r_m[3*sp+1] + surface_p_r_n[3*sp+1] * binding_radius * nrm_sign_factor;
-								aqueous_r[3*ap+2] = surface_p_r_m[3*sp+2] + surface_p_r_n[3*sp+2] * binding_radius * nrm_sign_factor;
+								aqueous_r[3*ap+0] = surface_p_r_m[3*sp+0] + surface_p_r_n[3*sp+0] * sp_ap_displacement * nrm_sign_factor;
+								aqueous_r[3*ap+1] = surface_p_r_m[3*sp+1] + surface_p_r_n[3*sp+1] * sp_ap_displacement * nrm_sign_factor;
+								aqueous_r[3*ap+2] = surface_p_r_m[3*sp+2] + surface_p_r_n[3*sp+2] * sp_ap_displacement * nrm_sign_factor;
 		
 								tot_on += 1;
 								surface_status[sp] = STATE_IN_COMPLEX + REACTED_BIT;
@@ -1131,8 +1057,8 @@ int main( int argc, const char **argv )
 						else if( apair->state == STATE_IN_COMPLEX )
 						{
 							double p = 1 - exp( -kr_off * time_step );
-							double rn = gsl_rng_uniform(rng_x);	
-							if( rn < p )
+						
+							if( (double)rand() / (double)RAND_MAX < p )
 							{
 								if( prev ) 
 									prev->next = apair->next;
@@ -1158,46 +1084,6 @@ int main( int argc, const char **argv )
 								surface_status[sp] = STATE_REACTING + REACTED_BIT;	
 								aqueous_status[ap] = STATE_REACTING + REACTED_BIT;	
 								tot_off += 1;
-								
-								int placement_done = 0;
-					
-								while( !placement_done )
-								{
-									placement_done = 1;
-									double random_dir[3] = { gsl_ran_gaussian(rng_x, 1.0 ), gsl_ran_gaussian(rng_x, 1.0 ), gsl_ran_gaussian(rng_x, 1.0 ) };
-									normalize(random_dir);
-									if( (random_dir[0] * surface_p_r_n[0] + random_dir[1] * surface_p_r_n[1] + random_dir[2] * surface_p_r_n[2]) * nrm_sign_factor < 0 )
-									{
-										random_dir[0] *= -1;
-										random_dir[1] *= -1;
-										random_dir[2] *= -1;
-									}
-									if( placement_done )
-									{
-										aqueous_r[3*ap+0] = surface_p_r_m[3*sp+0] + random_dir[0] * binding_radius;
-										aqueous_r[3*ap+1] = surface_p_r_m[3*sp+1] + random_dir[1] * binding_radius;
-										aqueous_r[3*ap+2] = surface_p_r_m[3*sp+2] + random_dir[2] * binding_radius;
-
-										int nnear = sub_surface->getNear( aqueous_r+3*ap, ap, r, binding_radius, 1., 1., 1., global_plist, global_rads);	
-
-										for( int x = 0; x < nnear && !placement_done; x++ )
-										{			
-											int p2 = global_plist[x];
-
-											if( p2 >= surface_np ) continue;
-
-											double dr[3] = { 
-												aqueous_r[3*ap+0] - surface_p_r_m[3*p2+0],
-												aqueous_r[3*ap+1] - surface_p_r_m[3*p2+1],
-												aqueous_r[3*ap+2] - surface_p_r_m[3*p2+2] };
-											double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
-				
-											if( r < binding_radius)
-												placement_done = 0;
-													
-										}
-									}
-								}	
 							}		
 						}
 
@@ -1206,6 +1092,18 @@ int main( int argc, const char **argv )
 					}
 				}
 	
+	#ifdef DO_HISTOGRAM
+				for( int p = 0; p < aqueous_np; p++ )
+				{
+					if( distance[p] < Rmax )
+					{
+						int dbin = distance[p] * N_BINS_PHIST / Rmax;
+						if( dbin >= N_BINS_PHIST )
+							dbin = N_BINS_PHIST-1;
+						n_prob_distance[dbin] += 1;	
+					}
+				}
+	#endif
 				for( int x = 0; x < nv; x++ )
 				{
 					double dr[3] = { r[3*x+0] - ro[3*x+0], 
@@ -1283,7 +1181,6 @@ int main( int argc, const char **argv )
 				memcpy( pfaces_cache, pfaces, sizeof(int) * surface_np );
 				memcpy( puv_cache, puv, sizeof(double) * 2 * surface_np );
 				memcpy( aqueous_r_cache, aqueous_r, sizeof(double) * 3 * aqueous_np );
-				memcpy( surface_p_r_m_cache, surface_p_r_m, sizeof(double) * 3 * surface_np );
 	
 				int done = 0;
 	
@@ -1307,29 +1204,7 @@ int main( int argc, const char **argv )
 						if( surface_status[p] & REACTED_BIT ) continue;
 						if( block.mean_field && !mean_field_activated[p] )
 							continue; 
-	
-#ifdef XY_DIFFUSION
-						double dx = gsl_ran_gaussian(rng_x,  sqrt(2 * block.diffc * time_step) );
-						double dy = gsl_ran_gaussian(rng_x,  sqrt(2 * block.diffc * time_step) );
-
-						surface_p_r_m[3*p+0] += dx;
-						surface_p_r_m[3*p+1] += dy;
-
-						if( surface_p_r_m[3*p+0] < -LA/2 ) {
-						surface_p_r_m[3*p+0] = -LA/2 + (-LA/2-surface_p_r_m[3*p+0]);
-						}
-						if( surface_p_r_m[3*p+1] < -LB/2 ) {
-						surface_p_r_m[3*p+1] = -LB/2 + (-LB/2-surface_p_r_m[3*p+1]);
-						}
-						if( surface_p_r_m[3*p+0] >  LA/2 ) {
-						surface_p_r_m[3*p+0] = LA/2 + (LA/2-surface_p_r_m[3*p+0]);
-						}
-						if( surface_p_r_m[3*p+1] >  LB/2 ) {
-						surface_p_r_m[3*p+1] = LB/2 + (LB/2-surface_p_r_m[3*p+1]);
-						}
-						sub_surface->updateParticle( surface_p_r_m+3*p, p, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
-#else
-	
+		
 						int f=pfaces[p];
 						double u = puv[2*p+0], v = puv[2*p+1];
 						double frc_duv[2] = { -pgrad[2*p+0], -pgrad[2*p+1]};
@@ -1344,7 +1219,7 @@ int main( int argc, const char **argv )
 						int of = f;
 						double fstep[3]={0,0,0};
 						double ouv[2] = {u,v};
-						sub_surface->localMoveReflect( &f, &u, &v, sigma, r, frc_duv, dt, fstep, 10); 	
+						sub_surface->localMove( &f, &u, &v, sigma, r, frc_duv, dt, fstep, 10); 	
 		
 		
 						pfaces[p] = f;
@@ -1354,17 +1229,16 @@ int main( int argc, const char **argv )
 						double old_p[3] = { surface_p_r_m[3*p+0], surface_p_r_m[3*p+1], surface_p_r_m[3*p+2] };
 		
 						updateParticleR( p, pfaces, puv, surface_p_r_m, r, sub_surface, surface_np ); 
-#endif
-
 		
+						double pdr[3] = { surface_p_r_m[3*p+0] - old_p[0], surface_p_r_m[3*p+1] - old_p[1], surface_p_r_m[3*p+2] - old_p[2] };
+						double dr_squared = pdr[0]*pdr[0]+pdr[1]*pdr[1]+pdr[2]*pdr[2];
 		
-#ifndef XY_DIFFUSION
 						if( f != of )
 						{
 							sub_surface->removeParticleFromFace( of, p, c0_p[p], particle_footprint );
 							sub_surface->addParticleToFace( pfaces[p], p, c0_p[p], particle_footprint );
 						}	
-#endif		
+		
 						// am I carrying an aqueous particle with me?		
 						
 						if( block.mean_field || (surface_status[p]&STATE_MASK) == STATE_IN_COMPLEX )
@@ -1387,9 +1261,9 @@ int main( int argc, const char **argv )
 								printf("MAJOR PROBLEM here.\n");
 								exit(1);
 							}	
-							aqueous_r[3*ap+0] = surface_p_r_m[3*p+0] + surface_p_r_n[3*p+0] * binding_radius * nrm_sign_factor;	
-							aqueous_r[3*ap+1] = surface_p_r_m[3*p+1] + surface_p_r_n[3*p+1] * binding_radius * nrm_sign_factor;	
-							aqueous_r[3*ap+2] = surface_p_r_m[3*p+2] + surface_p_r_n[3*p+2] * binding_radius * nrm_sign_factor;	
+							aqueous_r[3*ap+0] = surface_p_r_m[3*p+0] + surface_p_r_n[3*p+0] * sp_ap_displacement * nrm_sign_factor;	
+							aqueous_r[3*ap+1] = surface_p_r_m[3*p+1] + surface_p_r_n[3*p+1] * sp_ap_displacement * nrm_sign_factor;	
+							aqueous_r[3*ap+2] = surface_p_r_m[3*p+2] + surface_p_r_n[3*p+2] * sp_ap_displacement * nrm_sign_factor;	
 								
 							sub_surface->updateParticle( aqueous_r+3*ap, surface_np+ap, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
 						}
@@ -1418,30 +1292,11 @@ int main( int argc, const char **argv )
 							aqueous_r[3*p+1] += dy;
 							aqueous_r[3*p+2] += dz;
 							
-							if( do_planar && aqueous_r[3*p+0] >= Lx/2 )
-							{
-								if( ! do_diffc ) // z reflection.	
-									aqueous_r[3*p+0] = Lx/2 - (aqueous_r[3*p+0]-Lx/2);
-							}
-							
-							if( do_planar && aqueous_r[3*p+1] >= Ly/2 )
-							{
-								if( ! do_diffc ) // z reflection.	
-									aqueous_r[3*p+1] = Ly/2 - (aqueous_r[3*p+1]-Ly/2);
-							}
-							
 							if( do_planar && aqueous_r[3*p+2] >= Lz )
 							{
 								if( ! do_diffc ) // z reflection.	
 									aqueous_r[3*p+2] = Lz - (aqueous_r[3*p+2]-Lz);
 							}
-
-							if( do_planar )
-							{
-								if( aqueous_r[3*p+0] < -Lx/2 ) aqueous_r[3*p+0] = -Lx/2 + (-Lx/2-aqueous_r[3*p+0]);
-								if( aqueous_r[3*p+1] < -Ly/2 ) aqueous_r[3*p+1] = -Ly/2 + (-Ly/2-aqueous_r[3*p+1]);
-								if( aqueous_r[3*p+2] < 0) aqueous_r[3*p+2] = (-aqueous_r[3*p+2]);
-							}							
 	
 							double dmove[3] = { 
 								aqueous_r[3*p+0] - aqueous_r_last[3*p+0],
@@ -1521,44 +1376,11 @@ int main( int argc, const char **argv )
 							if( done )
 								sub_surface->updateParticle( aqueous_r+3*p, surface_np+p, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
 						}
-							
-						if( do_planar && aqueous_r[3*p+0] >= Lx/2 )
-						{
-							if( ! do_diffc ) // z reflection.	
-								aqueous_r[3*p+0] = Lx/2 + (Lx/2-aqueous_r[3*p+0]);
-						}
-						
-						if( do_planar && aqueous_r[3*p+1] >= Ly )
-						{
-							if( ! do_diffc ) // z reflection.	
-								aqueous_r[3*p+1] = Ly + (Ly/2-aqueous_r[3*p+1]);
-						}
-						
-						if( do_planar && aqueous_r[3*p+2] >= Lz )
-						{
-							if( ! do_diffc ) // z reflection.	
-								aqueous_r[3*p+2] = Lz + (Lz-aqueous_r[3*p+2]);
-						}
-
-						if( do_planar )
-						{
-	//						for( int tt = 0; tt < 3; tt++ )
-	//							if( aqueous_r[3*p+tt] < 0 ) aqueous_r[3*p+tt] = -aqueous_r[3*p+tt];
-						}							
-	
-						if( !do_planar )
-						{	
-							while( aqueous_r[3*p+0] < -LA/2 ) { aqueous_r[3*p+0] += LA; aqueous_r_last[3*p+0] += LA; }
-							while( aqueous_r[3*p+0] > LA/2 )  { aqueous_r[3*p+0] -= LA; aqueous_r_last[3*p+0] -= LA; }
-							while( aqueous_r[3*p+1] < -LB/2 ) { aqueous_r[3*p+1] += LB; aqueous_r_last[3*p+1] += LB; }
-							while( aqueous_r[3*p+1] > LB/2 )  { aqueous_r[3*p+1] -= LB; aqueous_r_last[3*p+1] -= LB; }
-						}	
-							if( do_planar )
-							{
-								if( aqueous_r[3*p+0] < -Lx/2 ) aqueous_r[3*p+0] = -Lx/2 + (-Lx/2-aqueous_r[3*p+0]);
-								if( aqueous_r[3*p+1] < -Ly/2 ) aqueous_r[3*p+1] = -Ly/2 + (-Ly/2-aqueous_r[3*p+1]);
-								if( aqueous_r[3*p+2] < 0) aqueous_r[3*p+2] = (-aqueous_r[3*p+2]);
-							}							
+		
+						while( aqueous_r[3*p+0] < -LA/2 ) { aqueous_r[3*p+0] += LA; aqueous_r_last[3*p+0] += LA; }
+						while( aqueous_r[3*p+0] > LA/2 )  { aqueous_r[3*p+0] -= LA; aqueous_r_last[3*p+0] -= LA; }
+						while( aqueous_r[3*p+1] < -LB/2 ) { aqueous_r[3*p+1] += LB; aqueous_r_last[3*p+1] += LB; }
+						while( aqueous_r[3*p+1] > LB/2 )  { aqueous_r[3*p+1] -= LB; aqueous_r_last[3*p+1] -= LB; }
 
 						if( do_planar && ! do_diffc )
 						{
@@ -1582,7 +1404,8 @@ int main( int argc, const char **argv )
 	
 					if( !block.mean_field )
 					{
-						int npairs_collide = get_pair_list( sub_surface, surface_p_r_m, aqueous_r, &pair_list, &npairsSpace, surface_np, aqueous_np, binding_radius  );
+						int npairs_collide = get_pair_list( sub_surface, surface_p_r_m, aqueous_r, &pair_list, &npairsSpace, surface_np, aqueous_np, binding_radius );
+						
 	
 
 						int ncol = 0;
@@ -1613,20 +1436,9 @@ int main( int argc, const char **argv )
 									sub_surface->removeParticleFromFace( pfaces[pair_list[2*x+0]], sp, c0_p[sp], particle_footprint );
 									sub_surface->addParticleToFace( pfaces_cache[pair_list[2*x+0]], sp, c0_p[sp], particle_footprint );
 								}	
-
-								surface_p_r_m[3*x+0] = surface_p_r_m_cache[3*x+0];
-								surface_p_r_m[3*x+1] = surface_p_r_m_cache[3*x+1];
-								surface_p_r_m[3*x+2] = surface_p_r_m_cache[3*x+2];
-
 								pfaces[pair_list[2*x+0]] = pfaces_cache[pair_list[2*x+0]];
 								puv[pair_list[2*x+0]*2+0] = puv_cache[pair_list[2*x+0]*2+0];
 								puv[pair_list[2*x+0]*2+1] = puv_cache[pair_list[2*x+0]*2+1];
-
-#ifdef XY_DIFFUSION
-								sub_surface->updateParticle( surface_p_r_m+3*x, x, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
-#else
-								updateParticleR( x, pfaces, puv, surface_p_r_m, r, sub_surface, surface_np ); 
-#endif
 								ncol++;
 								done = 0; 
 							}
@@ -1695,13 +1507,10 @@ int main( int argc, const char **argv )
 						surface_p_r_m[sp*3+1] - aqueous_r[3*ap+1],
 						surface_p_r_m[sp*3+2] - aqueous_r[3*ap+2] };
 		
-						if( ! do_planar )
-						{
-							while( dr[0] < -LA/2 ) dr[0] += LA;
-							while( dr[0] >  LA/2 ) dr[0] -= LA;
-							while( dr[1] < -LB/2 ) dr[1] += LB;
-							while( dr[1] >  LB/2 ) dr[1] -= LB;
-						}
+						while( dr[0] < -LA/2 ) dr[0] += LA;
+						while( dr[0] >  LA/2 ) dr[0] -= LA;
+						while( dr[1] < -LB/2 ) dr[1] += LB;
+						while( dr[1] >  LB/2 ) dr[1] -= LB;
 
 						if( ! do_planar )
 						{
@@ -1814,13 +1623,8 @@ int main( int argc, const char **argv )
 				printf("%d/%d surface particles are in complex.\n", npaired, surface_np );
 			}		
 	#ifdef DO_HISTOGRAM
-			fprintf( histo_file, "%le PR", cur_t );
 			for( int b = 0; b < N_BINS_PHIST; b++ )	
 				fprintf( histo_file, " %le", sum_prob_distance[b]/(1e-15+n_prob_distance[b]) );
-			fprintf(histo_file, "\n"); 
-			fprintf( histo_file, "%le NUM", cur_t );
-			for( int b = 0; b < N_BINS_PHIST; b++ )	
-				fprintf( histo_file, " %le", n_prob_distance[b] );
 			fprintf(histo_file, "\n"); 
 			fflush(histo_file);
 	#endif						
@@ -2003,27 +1807,6 @@ int main( int argc, const char **argv )
 		sprintf(fileName, "%s_multi_complex.txt", block.jobName );
 		FILE *multi_complex_file = fopen(fileName,"w");
 		for( int c = 0; c < ncind; c++ )
-			fprintf(multi_complex_file, "%le %le\n", c*t_per_complex, ncomplex[c] / (run+1) );
-		fflush( multi_complex_file);
-	}
-	
-	if( tFile ) 
-		fclose(tFile);
-	FILE *saveFile = fopen("file.save", "w");
-
-	for( int x = 0; x < sub_surface->nv; x++ )
-	{
-		fprintf(saveFile, "%.14le %.14le %.14le\n",
-			r[3*x+0], r[3*x+1], r[3*x+2] );
-	}
-	fprintf(saveFile, "%.14le %.14le %.14le\n", r[3*nv+0], r[3*nv+1], r[3*nv+2] );
-
-	for( int p = 0; p < surface_np; p++ )
-		fprintf(saveFile, "%d %lf %lf\n", pfaces[p], puv[2*p+0], puv[2*p+1] );
-	fclose(saveFile);
-
-}
-
 void updateParticleR( int p, int *pfaces, double *puv, double *p_r_m, double *r, surface *sub_surface, int np )
 {
 	int nv = sub_surface->nv;
@@ -2068,13 +1851,13 @@ int get_pair_list( surface *sub_surface, double *surface_r, double *aqueous_r, i
 				surface_r[p*3+1] - aqueous_r[3*p2x+1],
 				surface_r[p*3+2] - aqueous_r[3*p2x+2] };
 
+			while( dr[0] < -La/2 ) dr[0] += La;
+			while( dr[0] >  La/2 ) dr[0] -= La;
+			while( dr[1] < -Lb/2 ) dr[1] += Lb;
+			while( dr[1] >  Lb/2 ) dr[1] -= Lb;
 
 			if( ! do_planar_global )
 			{
-				while( dr[0] < -La/2 ) dr[0] += La;
-				while( dr[0] >  La/2 ) dr[0] -= La;
-				while( dr[1] < -Lb/2 ) dr[1] += Lb;
-				while( dr[1] >  Lb/2 ) dr[1] -= Lb;
 				while( dr[2] < -Lc/2 ) dr[2] += Lc;
 				while( dr[2] >  Lc/2 ) dr[2] -= Lc;
 			}
@@ -2110,12 +1893,13 @@ int get_pair_list( surface *sub_surface, double *surface_r, double *aqueous_r, i
 				surface_r[p*3+1] - aqueous_r[3*p2x+1],
 				surface_r[p*3+2] - aqueous_r[3*p2x+2] };
 
+			while( dr[0] < -La/2 ) dr[0] += La;
+			while( dr[0] >  La/2 ) dr[0] -= La;
+			while( dr[1] < -Lb/2 ) dr[1] += Lb;
+			while( dr[1] >  Lb/2 ) dr[1] -= Lb;
+
 			if( ! do_planar_global )
 			{
-				while( dr[0] < -La/2 ) dr[0] += La;
-				while( dr[0] >  La/2 ) dr[0] -= La;
-				while( dr[1] < -Lb/2 ) dr[1] += Lb;
-				while( dr[1] >  Lb/2 ) dr[1] -= Lb;
 				while( dr[2] < -Lc/2 ) dr[2] += Lc;
 				while( dr[2] >  Lc/2 ) dr[2] -= Lc;
 			}

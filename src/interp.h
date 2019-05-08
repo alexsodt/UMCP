@@ -349,6 +349,7 @@ struct surface
 	double dvolume( double *r, double *g, double scale = 1.0);
 	void generateVolumePlan(void);
 	void randomPointOnSurface( int *face, double *u, double *v );
+	void updateFaceInfoForRandom( void );
 	void evaluateRNRM( int f, double u, double v, double *rp, double *nrm, double *r );
 	double totalArea( void );
 	double get_target_z( double x, double y );
@@ -437,19 +438,23 @@ struct surface
 	int fetchCiu( int f, double u, double v, double **C_iu, double *rsurf );
 	
 	void localMove( int *f_in, double *u_in, double *v_in, double sigma, double *r, double *frc_duv=NULL, double dt=1, double *fstep =NULL, int max_corr_iter=0);
+	void localMoveReflect( int *f_in, double *u_in, double *v_in, double sigma, double *r, double *frc_duv=NULL, double dt=1, double *fstep =NULL, int max_corr_iter=0);
 	double trialMove( int *f_in, double *u_in, double *v_in, double duv[2], double lambda, double *r, double *base_position );
 
 	// COMPUTING S(q)
-	void ComputeSq( double *Sq, double *r, double * p_r_m, int np, double b_av, double b_p, double q_min, double q_max, int n_q, int Sq_res, int do_planar );
-	void binCurvature( double *cdist, double minc, double maxc, int nbins, double *r, int Sq_res );
-	double *Sq_cache; // this is the ``resting area'' of the pieces of the membrane.
-	void cacheSqG(int sq_res, double *r);
-	void EiQFace( int f, double *Sq, double *qvals, int nq, double *r, double b_val );
+	void sample_B_hist( double *rmesh, double *B_hist, int sample_type, int nsamples, double max_r, int nbins);
+	void processSANS( parameterBlock *block );	
+
+//	void ComputeSq( double *Sq, double *r, double * p_r_m, int np, double b_av, double b_p, double q_min, double q_max, int n_q, int Sq_res, int do_planar );
+//	void binCurvature( double *cdist, double minc, double maxc, int nbins, double *r, int Sq_res );
+//	double *Sq_cache; // this is the ``resting area'' of the pieces of the membrane.
+//	void cacheSqG(int sq_res, double *r);
+//	void EiQFace( int f, double *Sq, double *qvals, int nq, double *r, double b_val );
 //	void generateSubdivisionMatrices( double **M, int mlow, int mhigh);
 
 //	void nearPointOnBoxedSurface( double *pt, int *f, double *u, double *v, double **M, int mlow, int mhigh, double *distance, double L=-1 ); 
 	void nearPointOnBoxedSurface( double *pt, int *f, double *u, double *v, double **M, int mlow, int mhigh, double *distance, double initial_distance=-1, int disable_PBC_z=0); 
-	int linearCollisionPoint( double *pt1_in, double *pt2_in, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh );
+	int linearCollisionPoint( double *pt1_in, double *pt2_in, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, int disable_PBC_z=0 );
 	void assembleNearList( double *pt, int **f_list_io, double **puv_list_io, double **areas_io, int *npts, double **M, int mlow, int mhigh, double Rmax, int sub_limit, int disable_PBC_z=0 );
 	void buildFaceData( double **, int *, int *);
 	bool withinRadius( double *pt, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, double L, double radius, double *vertex_data, int *ptr_to_data, int *nump, int disable_PBC_z=0 );
