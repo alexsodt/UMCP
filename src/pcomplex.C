@@ -1541,8 +1541,8 @@ double pcomplex::T( surface *theSurface, double *rsurf )
 
 		// T = 0.5 * p * qdot
 #ifndef DISABLE_ON_MEMBRANE_T
-		T += 0.5 * (p[2*s+0]) * (qdot0[2*s+0]);
-		T += 0.5 * (p[2*s+1]) * (qdot0[2*s+1]);
+		T += 0.5 * (p[2*s+0]) * (qdot0[0]);
+		T += 0.5 * (p[2*s+1]) * (qdot0[1]);
 #endif
 	}
 
