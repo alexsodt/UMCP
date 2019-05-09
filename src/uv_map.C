@@ -480,6 +480,9 @@ double surface::g( int f, double u, double v, double *r )
 			return 1e-100;
 
 		double *theMap = theKernel->get_map( &fu, &fv );
+		
+		double u_u = u, u_v=0, v_u=0, v_v = v;
+		theKernel->get_map_transform( &u_u, &u_v, &v_u, &v_v );
 
 		double u = fu;
 		double v = fv;
@@ -573,20 +576,20 @@ double surface::g( int f, double u, double v, double *r )
 
 			for( int y = 0; y < 12; y++ )
 			{
-				lru[0] += (lr[0] + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_du[y];
-				lru[1] += (lr[1] + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_du[y];
-				lru[2] += (lr[2] + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_du[y];
+				lru[0] += (lr[0] + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * u_u;
+				lru[1] += (lr[1] + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * u_u;
+				lru[2] += (lr[2] + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * u_u;
 				
-				lrv[0] += (lr[0] + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_dv[y];
-				lrv[1] += (lr[1] + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_dv[y];
-				lrv[2] += (lr[2] + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_dv[y];
+				lrv[0] += (lr[0] + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * v_v;
+				lrv[1] += (lr[1] + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * v_v;
+				lrv[2] += (lr[2] + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * v_v;
 			}
 		}
 	
 		double nrm[3];	
 		cross( lru, lrv, nrm );
 
-		return pow( 4., domain) * normalize(nrm);
+		return normalize(nrm);
 	}
 	else
 	{

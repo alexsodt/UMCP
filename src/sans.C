@@ -1,4 +1,6 @@
 
+//#define DEBUG_PTS
+
 #include "interp.h"
 #include "sans.h"
 #include "spline.h"
@@ -9,8 +11,10 @@
 #include <string.h>
 void loadBetaZ( const char *fileName, int load_to_spline );
 
+static int N_Z_BINS = 100;
 static double MINZ = -75;
 static double MAXZ =  75;
+double Ap = 1.0; // square angstroms
 
 void surface::processSANS( parameterBlock *block )
 {
@@ -22,17 +26,36 @@ void surface::processSANS( parameterBlock *block )
 
 // a measurement of Sq is added into Sq_inst (it is not zero'd).
 
-void surface::sample_B_hist( double *rmesh, double *B_hist, 
+void surface::sample_B_hist( double *rmesh, double *B_hist, double *A2dz2_sampled,
 			int sample_type, 
 			int nsamples, double maxr, int nbins)
 {
+	static double av_b_sampled = 0;
+	static double av_b2_sampled = 0;
+	static double n_samples = 0;
 
+	double special_q = 6.494494e-03;
+	static double av_r[3] = {0,0,0};
+	static double av_c[3] = {0,0,0};
+	
+	double local_av_r[3] = {0,0,0};
+	double local_av_c[3] = {0,0,0};
+
+#ifdef DEBUG_PTS
+	FILE *dbgFile = fopen("debug.xyz","w");
+	double max_area = 100000;
+#endif
 	int samples_per_proc = ceil( nsamples/ (double)par_info.nprocs );
 
 #ifdef PARALLEL
 	double *local_sampler = (double *)malloc( sizeof(double) * nbins );
 	memset( local_sampler, 0, sizeof(double) * nbins );
 #endif
+
+	// for clarity in accounting for actual volume contribution we use a real value of dz/Ap:
+	double dz = (MAXZ-MINZ)/N_Z_BINS;
+
+	double local_A2dz2_sampled = 0;
 
 	if( sample_type == SANS_SAMPLE_NRM )
 	{	
@@ -99,9 +122,44 @@ void surface::sample_B_hist( double *rmesh, double *B_hist,
 
 				double b1 = evaluateSpline( z1, SANS_SPLINE );
 				double b2 = evaluateSpline( z2, SANS_SPLINE );
-				
-				double val = b1 * b2 * w1 * w2;
 
+				av_b_sampled += (b1+b2)/2;
+				av_b2_sampled += b1*b2;
+				n_samples += 1;
+
+				// number of volume ``units'' we put into histogram;
+				double vol_squared_weight = (w1) * (w2) * dz * dz / (Ap*dz) / (Ap*dz);				
+				double val = b1 * b2 * vol_squared_weight;
+				(local_A2dz2_sampled) += w1 * w2;
+	
+				av_r[0] += b1 * cos( p1[0] * special_q);
+				av_r[1] += b1 * cos( p1[1] * special_q);
+				av_r[2] += b1 * cos( p1[2] * special_q);
+				
+				av_c[0] += b1 * sin( p1[0] * special_q);
+				av_c[1] += b1 * sin( p1[1] * special_q);
+				av_c[2] += b1 * sin( p1[2] * special_q);
+				
+				av_r[0] += b2 * cos( p1[0] * special_q);
+				av_r[1] += b2 * cos( p1[1] * special_q);
+				av_r[2] += b2 * cos( p1[2] * special_q);
+				
+				av_c[0] += b2 * sin( p1[0] * special_q);
+				av_c[1] += b2 * sin( p1[1] * special_q);
+				av_c[2] += b2 * sin( p1[2] * special_q);
+
+
+#ifdef DEBUG_PTS	
+				if( nz == 0 )
+				{
+					double rn = rand()/(double)RAND_MAX;
+
+					if( rn < w1 / max_area )
+						fprintf(dbgFile, "C %lf %lf %lf %d %lf %lf %lf\n", p1[0], p1[1], p1[2], f1, u1, v1, w1 );
+					if( rn < w2 / max_area )
+						fprintf(dbgFile, "C %lf %lf %lf %d %lf %lf %lf\n", p2[0], p2[1], p2[2], f2, u2, v2, w2 );
+				}
+#endif
 				if( rbin < nbins )
 #ifdef PARALLEL					
 					local_sampler[rbin] += val;
@@ -117,13 +175,37 @@ void surface::sample_B_hist( double *rmesh, double *B_hist,
 		
 	}
 
+#ifdef DEBUG_PTS
+	fclose(dbgFile);
+	exit(1);
+#endif
+
 #ifdef PARALLEL
+	ParallelSum( local_av_r, 3 );
+	ParallelSum( local_av_c, 3 );
+
+	av_r[0] += local_av_r[0];
+	av_r[1] += local_av_r[1];
+	av_r[2] += local_av_r[2];
+	
+	av_c[0] += local_av_c[0];
+	av_c[1] += local_av_c[1];
+	av_c[2] += local_av_c[2];
+
+	printf("Specialq: %le %le %le\n", 
+			av_r[0]*av_r[0]+av_c[0]*av_c[0],
+			av_r[1]*av_r[1]+av_c[1]*av_c[1],
+			av_r[2]*av_r[2]+av_c[2]*av_c[2] );
+
+	ParallelSum( &local_A2dz2_sampled, 1 );
 	ParallelSum( local_sampler, nbins );
 	for( int b = 0; b < nbins; b++ )
 		B_hist[b] += local_sampler[b];
 	free(local_sampler);
 #endif
 
+	*A2dz2_sampled += local_A2dz2_sampled;
+ 
 }
 
 
@@ -144,7 +226,6 @@ void loadBetaZ( const char *fileName, int load_to_spline )
 	
 	getLine( bzFile, buffer );
 
-	int N_Z_BINS;
 	double Lx, Ly, Lz;
 
 	
@@ -207,7 +288,7 @@ void loadBetaZ( const char *fileName, int load_to_spline )
 	
 }
 
-void writeSq( char *fileName, double *B_hist, double sans_max_r, int nsans_bins, double qmin, double qmax, int nq )
+void writeSq( char *fileName, double *B_hist, double A2dz2_sampled, double sans_max_r, int nsans_bins, double qmin, double qmax, int nq )
 {
 #ifdef PARALLEL
 	if( par_info.my_id != BASE_TASK ) return;
@@ -224,6 +305,31 @@ void writeSq( char *fileName, double *B_hist, double sans_max_r, int nsans_bins,
 	for( int ir = 0; ir < nsans_bins; ir++ )
 		fprintf(theFile, "%le %le\n", (ir+0.5)*dr, B_hist[ir] );
 
+
+
+	// update histogram B0.
+
+	double B0 = 0;
+
+/*		this was misguided. I thought there was something I had to do to get it to be positive definite.
+ *	
+ *		double dz = (MAXZ-MINZ)/N_Z_BINS;
+
+	double approx_pts_sampled = sqrt( A2dz2_sampled);
+
+	for( int iz = 0; iz < N_Z_BINS; iz++ )
+	{
+		double z = MINZ + (iz+0.5)*(MAXZ-MINZ)/N_Z_BINS;
+
+		double b = evaluateSpline( z, SANS_SPLINE );
+
+		double vol_pt = Ap * dz;
+
+		// integral now depends on the number of bins.
+		B0 += b*b * (vol_pt) * (vol_pt) * dz * approx_pts_sampled;
+	}
+*/
+
 	double eps = 1e-3;
 	for( int iq = -1; iq < nq; iq++ )
 	{
@@ -232,16 +338,17 @@ void writeSq( char *fileName, double *B_hist, double sans_max_r, int nsans_bins,
 		if( nq > 1 )
 			q = qmin + iq * (qmax-qmin)/(nq-1);
 
-		double val = 0;
+		double val = B0;
 
 		if( iq == -1 )
 		{
 			q = 0;
 			for( int ir = 0; ir < nsans_bins; ir++ )
 			{
+
 				double r = (ir+0.5)*dr;
 	
-				val += dr * B_hist[ir];
+				val += B_hist[ir];
 			}		
 		}
 		else
@@ -250,7 +357,7 @@ void writeSq( char *fileName, double *B_hist, double sans_max_r, int nsans_bins,
 			{
 				double r = (ir+0.5)*dr;
 	
-				val += dr * B_hist[ir] * sin(q*r)/(q*r);
+				val += B_hist[ir] * sin(q*r)/(q*r);
 			}		
 		}
 	

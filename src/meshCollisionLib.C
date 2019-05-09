@@ -1926,7 +1926,7 @@ void surface::nearPointOnBoxedSurface( double *pt_in, int *col_f, double *col_u,
 }
 
 void surface::assembleNearList( double *pt_in, 
-					int **f_list_io, double **puv_list_io, double **areas_io, int *npts, double **M, int mlow, int mhigh, double Rmax, int sub_limit, int disable_PBC_z )
+					int **f_list_io, double **puv_list_io, double **areas_io, int *npts, double **M, int mlow, int mhigh, double Rmax, int sub_limit, int disable_PBC )
 {
 	double pt[3] = { pt_in[0], pt_in[1], pt_in[2] };
 	double Lx = PBC_vec[0][0];
@@ -1947,12 +1947,12 @@ void surface::assembleNearList( double *pt_in,
 	int nbc = 0;
 	int nbtot = xbox*ybox*zbox;
 
-	while( pt[0] < -Lx/2 ) pt[0] += Lx;
-	while( pt[0] >= Lx/2 ) pt[0] -= Lx;
-	while( pt[1] < -Ly/2 ) pt[1] += Ly;
-	while( pt[1] >= Ly/2 ) pt[1] -= Ly;
-	if( ! disable_PBC_z )
+	if( ! disable_PBC )
 	{
+		while( pt[0] < -Lx/2 ) pt[0] += Lx;
+		while( pt[0] >= Lx/2 ) pt[0] -= Lx;
+		while( pt[1] < -Ly/2 ) pt[1] += Ly;
+		while( pt[1] >= Ly/2 ) pt[1] -= Ly;
 		while( pt[2] < -Lz/2 ) pt[2] += Lz;
 		while( pt[2] >= Lz/2 ) pt[2] -= Lz;
 	}

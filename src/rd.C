@@ -15,7 +15,9 @@
 #include "fpr_subroutines/fpr.h"
 #include "fpr_subroutines/Faddeeva.hh"
 
-#define XY_DIFFUSION
+double r_fudge = 5.0;
+
+//#define XY_DIFFUSION
 
 //#define DEBUG_DIFFC
 
@@ -98,6 +100,19 @@ int main( int argc, const char **argv )
 	kr_on = block.k_on * unit_conv;
 	// off rates are in per-second.
 	kr_off = block.k_off;
+	double Dtot = ( (2.0/3.0) * block.diffc + block.aqueous_diffc);
+	binding_radius = sp_ap_displacement;
+
+	if( block.mean_field )
+	{
+		double KEQ = kr_on / kr_off / 2;
+		double kr_phenom = 0.5 / ( 1 / kr_on + 1.0/(4*M_PI * binding_radius * Dtot ) );
+		double mf_off = kr_phenom / KEQ;
+
+
+		printf("For mean-field, setting the off-rate from %le to %le per second.\n", kr_off, mf_off );
+		kr_off = mf_off;
+	}
 
 	printf("On-rate: %le Off-rate: %le\n", kr_on, kr_off );
 
@@ -343,7 +358,6 @@ int main( int argc, const char **argv )
 	if( particle_radius > min_box )
 		min_box = particle_radius;
 	
-	binding_radius = sp_ap_displacement;
 	double Rmax = binding_radius + 3 * sqrt( 6 * block.aqueous_diffc * time_step); 
 	if( Rmax < 15 )
 		Rmax = 15;
@@ -812,7 +826,6 @@ int main( int argc, const char **argv )
 				for( int ap = 0; ap < aqueous_np; ap++ )
 					aqueous_status[ap] -= (aqueous_status[ap] & REACTED_BIT);
 
-				double Dtot = ( (2.0/3.0) * block.diffc + block.aqueous_diffc);
 				double kdiff = 4 * M_PI * Dtot * binding_radius;
 				double kact = kr_on;
 				double fact = 1.0 + kact / kdiff;
@@ -1451,16 +1464,16 @@ int main( int argc, const char **argv )
 
 							// did it move farther than the distance it was from the membrane? if so we may need to check the collision.
 	
-							if( r_move > distance[p] )
+							if( 1 ) //r_move > distance[p] - r_fudge )
 							{
 								int f;
 								double u,v;
 								double dist;
 			
 
-								double rad = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar /* disables pbc z */ );
+								double rad = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  2*r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar /* disables pbc z */ );
 
-								if( rad < 0 )
+								if( rad < 0 ) // but may not be a problem??
 								{
 									int col_f;
 									double col_u, col_v;
@@ -1491,19 +1504,38 @@ int main( int argc, const char **argv )
 										aqueous_r[3*p+2] -= 2 * pr * nrm[2];
 
 	
-										if( aqueous_r[3*p+2] < 0 )
-										{
-											printf("ERROR.\n");
-											exit(1);	
-										}
 									}
 									else
 									{
-										int collide = theSurface->linearCollisionPoint( startp, aqueous_r+3*p, &col_f, &col_u, &col_v, M, mlow, mhigh, do_planar /* disable PBC z */ );
+										int collide = sub_surface->linearCollisionPoint( startp, aqueous_r+3*p, &col_f, &col_u, &col_v, M, mlow, mhigh, do_planar /* disable PBC z */ );
 						
 										if( !collide )
 										{
-											printf("ERROR.\n");
+											int sf;
+											double su,sv;
+											sub_surface->nearPointOnBoxedSurface(startp, &sf,&su,&sv, M, mlow, mhigh, &dist, -1, 0 ); 
+											double rpt[3],rnrm[3];
+											sub_surface->evaluateRNRM( sf, su, sv, rpt, rnrm, r);
+											double dr1[3] = { 	
+													rpt[0] - startp[0],
+													rpt[1] - startp[1],
+													rpt[2] - startp[2] };	
+											double r1 = sqrt(dr1[0]*dr1[0]+dr1[1]*dr1[1]+dr1[2]*dr1[2]);
+											int af;
+											double au,av;
+											sub_surface->nearPointOnBoxedSurface(aqueous_r+3*p, &af,&au,&av, M, mlow, mhigh, &dist, -1, 0 );
+											sub_surface->evaluateRNRM( af, au, av, rpt, rnrm, r);
+											double dr2[3] = { 	
+													rpt[0] - aqueous_r[3*p+0],
+													rpt[1] - aqueous_r[3*p+1],
+													rpt[2] - aqueous_r[3*p+2] };	
+											double r2 = sqrt(dr2[0]*dr2[0]+dr2[1]*dr2[1]+dr2[2]*dr2[2]);
+											 
+											int f;
+											double u,v;
+											double rad1 = sub_surface->returnRadius( startp, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar /* disables pbc z */ );
+											double rad2 = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar /* disables pbc z */ );
+											printf("ERROR. r1: %.14le r2: %.14le\n", r1, r2 );
 											exit(1);
 										}
 									}

@@ -442,7 +442,7 @@ struct surface
 	double trialMove( int *f_in, double *u_in, double *v_in, double duv[2], double lambda, double *r, double *base_position );
 
 	// COMPUTING S(q)
-	void sample_B_hist( double *rmesh, double *B_hist, int sample_type, int nsamples, double max_r, int nbins);
+	void sample_B_hist( double *rmesh, double *B_hist, double *A2dz2_sampled, int sample_type, int nsamples, double max_r, int nbins);
 	void processSANS( parameterBlock *block );	
 
 //	void ComputeSq( double *Sq, double *r, double * p_r_m, int np, double b_av, double b_p, double q_min, double q_max, int n_q, int Sq_res, int do_planar );
