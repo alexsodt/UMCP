@@ -2847,3 +2847,22 @@ void surface::approxSparseEffectiveMass( force_set * theForceSet, int *use_map, 
 
 }
 
+
+// this is the mass matrix itself, not its inverse.
+void surface::getSparseMass( force_set * theForceSet, SparseMatrix **theMatrix )
+{
+	(*theMatrix) = new SparseMatrix;
+	(*theMatrix)->init( 3*nv ); 
+
+	for( int x = 0; x < theForceSet->npts; x++ )
+	{
+		for( int c1 = 0; c1 < theForceSet->frc_ncoef[x]; c1++ )
+		for( int c2 = 0; c2 < theForceSet->frc_ncoef[x]; c2++ )
+		{
+			(*theMatrix)->coupleParameters( theForceSet->frc_coef_list[x*maxv+c1], theForceSet->frc_coef_list[x*maxv+c2], theForceSet->frc_coef[x*maxv+c1] * theForceSet->frc_coef[x*maxv+c2] );
+		}
+	}	
+
+	(*theMatrix)->setNeedSource();
+	(*theMatrix)->compress();
+}
