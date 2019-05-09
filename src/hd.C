@@ -24,10 +24,12 @@
 #define MM_METHOD_1
 #define BOXED
 
+#define OLD_LANGEVIN
+
 //#define FIX_MEMBRANE
 //#define MONTE_CARLO_HACK
 
-#define SAVE_RESTARTS
+//#define SAVE_RESTARTS
 #define NUM_SAVE_BUFFERS 50
 //#define DEBUG_MOMENTUM_CHANGE
 #define NO_DIFF_R
