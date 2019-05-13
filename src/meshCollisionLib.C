@@ -1231,6 +1231,9 @@ bool surface::withinBoxedSurface(double* pt, int *f, double *u, double *v, doubl
                 evaluateRNRM( *f, *u, *v, rp, nrm, r_surface );
 
                 double pt_to_surface[3] = { pt[0] - rp[0], pt[1] - rp[1], pt[2] - rp[2] };
+
+		wrapPBC( pt_to_surface, r_surface + 3 * nv  );
+
                 //double rl = normalize(pt_to_surface);
                 free(r_surface);
                 //find dot product of normal and vector to point

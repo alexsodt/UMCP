@@ -132,21 +132,21 @@ void surface::sample_B_hist( double *rmesh, double *B_hist, double *A2dz2_sample
 				double val = b1 * b2 * vol_squared_weight;
 				(local_A2dz2_sampled) += w1 * w2;
 	
-				av_r[0] += b1 * cos( p1[0] * special_q);
-				av_r[1] += b1 * cos( p1[1] * special_q);
-				av_r[2] += b1 * cos( p1[2] * special_q);
+				av_r[0] += b1 * cos( p1[0] * special_q) * w1;
+				av_r[1] += b1 * cos( p1[1] * special_q) * w1;
+				av_r[2] += b1 * cos( p1[2] * special_q) * w1;
 				
-				av_c[0] += b1 * sin( p1[0] * special_q);
-				av_c[1] += b1 * sin( p1[1] * special_q);
-				av_c[2] += b1 * sin( p1[2] * special_q);
+				av_c[0] += b1 * sin( p1[0] * special_q) * w1;
+				av_c[1] += b1 * sin( p1[1] * special_q) * w1;
+				av_c[2] += b1 * sin( p1[2] * special_q) * w1;
 				
-				av_r[0] += b2 * cos( p1[0] * special_q);
-				av_r[1] += b2 * cos( p1[1] * special_q);
-				av_r[2] += b2 * cos( p1[2] * special_q);
+				av_r[0] += b2 * cos( p2[0] * special_q) * w2;
+				av_r[1] += b2 * cos( p2[1] * special_q) * w2;
+				av_r[2] += b2 * cos( p2[2] * special_q) * w2;
 				
-				av_c[0] += b2 * sin( p1[0] * special_q);
-				av_c[1] += b2 * sin( p1[1] * special_q);
-				av_c[2] += b2 * sin( p1[2] * special_q);
+				av_c[0] += b2 * sin( p2[0] * special_q) * w2;
+				av_c[1] += b2 * sin( p2[1] * special_q) * w2;
+				av_c[2] += b2 * sin( p2[2] * special_q) * w2;
 
 
 #ifdef DEBUG_PTS	

@@ -60,7 +60,7 @@ extern double kg;
 extern double KA;
 extern double KA4;
 double defaultR = 250;
-void updateParticleR( int p, int *pfaces, double *puv, double *p_r_m, double *r, surface *sub_surface, int np );
+void updateParticleR( int p, int *pfaces, double *puv, double *p_r_m, double *p_r_n, double *r, surface *sub_surface, int np );
 
 double particle_radius = 0;
 double b;
@@ -664,7 +664,7 @@ int main( int argc, const char **argv )
 
 #ifndef XY_DIFFUSION	
 		for( int p = 0; p < surface_np; p++ )
-			updateParticleR( p, pfaces, puv, surface_p_r_m, r, sub_surface, surface_np ); 
+			updateParticleR( p, pfaces, puv, surface_p_r_m, surface_p_r_n, r, sub_surface, surface_np ); 
 #endif	
 		for (int i = 0; i < aqueous_np; i++) {
 			double radius;
@@ -845,6 +845,10 @@ int main( int argc, const char **argv )
 						
 							if( (double)rand() / (double)RAND_MAX < p )
 							{
+								aqueous_r_last[3*ap+0] = aqueous_r[3*ap+0];
+								aqueous_r_last[3*ap+1] = aqueous_r[3*ap+1];
+								aqueous_r_last[3*ap+2] = aqueous_r[3*ap+2];
+								distance[ap] = binding_radius;
 								aqueous_status[ap] = STATE_REACTING + REACTED_BIT;	
 								mean_field_activated[ap] = 0;
 								tot_off += 1;
@@ -924,7 +928,10 @@ int main( int argc, const char **argv )
 							int sf;
 							double su,sv;
 							sub_surface->nearPointOnBoxedSurface( aqueous_r+3*ap, &sf, &su, &sv, M, mlow, mhigh, distance+ap, -1, do_planar /* disables pbc z */ );
-	
+							aqueous_r_last[3*ap+0] = aqueous_r[3*ap+0];	
+							aqueous_r_last[3*ap+1] = aqueous_r[3*ap+1];	
+							aqueous_r_last[3*ap+2] = aqueous_r[3*ap+2];	
+
 							double c_tot = sub_surface->c(sf, su, sv, r );
 	
 							// updated distance may be greater.
@@ -976,7 +983,6 @@ int main( int argc, const char **argv )
 		
 #endif
 	
-	//						printf("testing: %le distance: %le\n", probvec1, distance[ap] );
 	
 	
 							//double rn = rand() / (double)RAND_MAX;
@@ -1036,9 +1042,9 @@ int main( int argc, const char **argv )
 	
 								sub_surface->evaluateRNRM( sf, su, sv, surface_p_r_m+3*ap, surface_p_r_n+3*ap, r );
 	
-								aqueous_r[3*ap+0] = surface_p_r_m[3*ap+0] + surface_p_r_n[3*ap+0] * binding_radius; 
-								aqueous_r[3*ap+1] = surface_p_r_m[3*ap+1] + surface_p_r_n[3*ap+1] * binding_radius;
-								aqueous_r[3*ap+2] = surface_p_r_m[3*ap+2] + surface_p_r_n[3*ap+2] * binding_radius; 
+								aqueous_r[3*ap+0] = surface_p_r_m[3*ap+0] + surface_p_r_n[3*ap+0] * binding_radius * nrm_sign_factor; 
+								aqueous_r[3*ap+1] = surface_p_r_m[3*ap+1] + surface_p_r_n[3*ap+1] * binding_radius * nrm_sign_factor;
+								aqueous_r[3*ap+2] = surface_p_r_m[3*ap+2] + surface_p_r_n[3*ap+2] * binding_radius * nrm_sign_factor; 
 
 								mean_field_activated[ap] = 1;
 								aqueous_status[ap] = STATE_IN_COMPLEX + REACTED_BIT;
@@ -1089,7 +1095,6 @@ int main( int argc, const char **argv )
 
 							double probvec1 = passocF(apair->sep, time_step, Dtot, binding_radius, alpha, kact/(kact+kdiff));
 							double currnorm = 1.0;
-//							printf("grep %le %le\n", apair->sep, probvec1 );
 							int sp = apair->surface_id;
 							int ap = apair->aqueous_id;
 				
@@ -1099,7 +1104,6 @@ int main( int argc, const char **argv )
 								double p0_ratio = pirr_pfree_ratio_psF(apair->sep, apair->prev_sep, time_step, Dtot, binding_radius, alpha, apair->ps_prev, rtol);
 								currnorm = apair->prev_norm * p0_ratio;
 								
-//								printf("RESCALING %lf %lf\n", apair->prev_norm, p0_ratio );
 							}
 	
 #ifdef DO_HISTOGRAM
@@ -1115,14 +1119,12 @@ int main( int argc, const char **argv )
 
 							if( rand() / (double)RAND_MAX < p )
 							{
-//								printf("AJS AT TIME %le.\n", cur_t );
-//								exit(1); 
 
-		//						printf("Reacted! p: %le \n", p);
 								apair->state = STATE_IN_COMPLEX;
 			
 								// move the aqueous particle into ``complex'' position.
 			
+
 								aqueous_r[3*ap+0] = surface_p_r_m[3*sp+0] + surface_p_r_n[3*sp+0] * binding_radius * nrm_sign_factor;
 								aqueous_r[3*ap+1] = surface_p_r_m[3*sp+1] + surface_p_r_n[3*sp+1] * binding_radius * nrm_sign_factor;
 								aqueous_r[3*ap+2] = surface_p_r_m[3*sp+2] + surface_p_r_n[3*sp+2] * binding_radius * nrm_sign_factor;
@@ -1167,7 +1169,6 @@ int main( int argc, const char **argv )
 								apair->prev_sep = binding_radius;
 
 */
-		//						printf("Dissociated! p: %le \n", p );
 								surface_status[sp] = STATE_REACTING + REACTED_BIT;	
 								aqueous_status[ap] = STATE_REACTING + REACTED_BIT;	
 								tot_off += 1;
@@ -1177,6 +1178,7 @@ int main( int argc, const char **argv )
 								while( !placement_done )
 								{
 									placement_done = 1;
+#ifdef RANDOM_DISPLACEMENT
 									double random_dir[3] = { gsl_ran_gaussian(rng_x, 1.0 ), gsl_ran_gaussian(rng_x, 1.0 ), gsl_ran_gaussian(rng_x, 1.0 ) };
 									normalize(random_dir);
 									if( (random_dir[0] * surface_p_r_n[0] + random_dir[1] * surface_p_r_n[1] + random_dir[2] * surface_p_r_n[2]) * nrm_sign_factor < 0 )
@@ -1185,11 +1187,19 @@ int main( int argc, const char **argv )
 										random_dir[1] *= -1;
 										random_dir[2] *= -1;
 									}
+#endif
 									if( placement_done )
 									{
-										aqueous_r[3*ap+0] = surface_p_r_m[3*sp+0] + random_dir[0] * binding_radius;
-										aqueous_r[3*ap+1] = surface_p_r_m[3*sp+1] + random_dir[1] * binding_radius;
-										aqueous_r[3*ap+2] = surface_p_r_m[3*sp+2] + random_dir[2] * binding_radius;
+#ifdef RANDOM_DISPLACEMENT
+										aqueous_r_last[3*ap+0] = aqueous_r[3*ap+0] = surface_p_r_m[3*sp+0] + random_dir[0] * binding_radius;
+										aqueous_r_last[3*ap+1] = aqueous_r[3*ap+1] = surface_p_r_m[3*sp+1] + random_dir[1] * binding_radius;
+										aqueous_r_last[3*ap+2] = aqueous_r[3*ap+2] = surface_p_r_m[3*sp+2] + random_dir[2] * binding_radius;
+#else
+										aqueous_r_last[3*ap+0] = aqueous_r[3*ap+0] = surface_p_r_m[3*sp+0] + surface_p_r_n[3*sp+0] * binding_radius * nrm_sign_factor;
+										aqueous_r_last[3*ap+1] = aqueous_r[3*ap+1] = surface_p_r_m[3*sp+1] + surface_p_r_n[3*sp+1] * binding_radius * nrm_sign_factor;
+										aqueous_r_last[3*ap+2] = aqueous_r[3*ap+2] = surface_p_r_m[3*sp+2] + surface_p_r_n[3*sp+2] * binding_radius * nrm_sign_factor;
+#endif
+										distance[ap] = binding_radius;
 
 										int nnear = sub_surface->getNear( aqueous_r+3*ap, ap, r, binding_radius, 1., 1., 1., global_plist, global_rads);	
 
@@ -1366,7 +1376,7 @@ int main( int argc, const char **argv )
 						
 						double old_p[3] = { surface_p_r_m[3*p+0], surface_p_r_m[3*p+1], surface_p_r_m[3*p+2] };
 		
-						updateParticleR( p, pfaces, puv, surface_p_r_m, r, sub_surface, surface_np ); 
+						updateParticleR( p, pfaces, puv, surface_p_r_m, surface_p_r_n, r, sub_surface, surface_np ); 
 #endif
 
 		
@@ -1417,7 +1427,8 @@ int main( int argc, const char **argv )
 						if( aqueous_status[p] & REACTED_BIT || aqueous_status[p] == STATE_IN_COMPLEX ) { continue; }
 		
 						int done = 0;
-		
+						double r_move=0;
+
 						while( !done )
 						{
 							done = 1;
@@ -1460,18 +1471,20 @@ int main( int argc, const char **argv )
 								aqueous_r[3*p+0] - aqueous_r_last[3*p+0],
 								aqueous_r[3*p+1] - aqueous_r_last[3*p+1],
 								aqueous_r[3*p+2] - aqueous_r_last[3*p+2] };
-							double r_move = sqrt(dmove[0]*dmove[0]+dmove[1]*dmove[1]+dmove[2]*dmove[2]);
+							r_move = sqrt(dmove[0]*dmove[0]+dmove[1]*dmove[1]+dmove[2]*dmove[2]);
 
 							// did it move farther than the distance it was from the membrane? if so we may need to check the collision.
+
 	
-							if( 1 ) //r_move > distance[p] - r_fudge )
+							if( r_move > distance[p] - r_fudge )
 							{
 								int f;
 								double u,v;
 								double dist;
 			
 
-								double rad = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  2*r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar /* disables pbc z */ );
+
+								double rad = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar /* disables pbc z */ );
 
 								if( rad < 0 ) // but may not be a problem??
 								{
@@ -1479,7 +1492,7 @@ int main( int argc, const char **argv )
 									double col_u, col_v;
 									double startp[3] = { aqueous_r[3*p+0] - dx, aqueous_r[3*p+1] - dy, aqueous_r[3*p+2] - dz };
 									int collide = theSurface->linearCollisionPoint( startp, aqueous_r+3*p, &col_f, &col_u, &col_v, M, mlow, mhigh, do_planar /* disable PBC z */  );
-									if( collide )
+									while( collide )
 									{	
 										double rcol[3], nrm[3];
 				
@@ -1499,15 +1512,23 @@ int main( int argc, const char **argv )
 	
 										// attempt a reflection.
 									//	printf("Outside, redoing.\n");
+										startp[0] = rcol[0] + 1e-1 * nrm_sign_factor * nrm[0];
+										startp[1] = rcol[1] + 1e-1 * nrm_sign_factor * nrm[1];
+										startp[2] = rcol[2] + 1e-1 * nrm_sign_factor * nrm[2];
+
 										aqueous_r[3*p+0] -= 2 * pr * nrm[0];
 										aqueous_r[3*p+1] -= 2 * pr * nrm[1];
 										aqueous_r[3*p+2] -= 2 * pr * nrm[2];
 
-	
+										collide = theSurface->linearCollisionPoint( startp, aqueous_r+3*p, &col_f, &col_u, &col_v, M, mlow, mhigh, do_planar /* disable PBC z */  );
+
+										if( collide )
+											printf("MULTIPLE COLLISION.\n");
 									}
+/*
 									else
 									{
-										int collide = sub_surface->linearCollisionPoint( startp, aqueous_r+3*p, &col_f, &col_u, &col_v, M, mlow, mhigh, do_planar /* disable PBC z */ );
+										int collide = sub_surface->linearCollisionPoint( startp, aqueous_r+3*p, &col_f, &col_u, &col_v, M, mlow, mhigh, do_planar );
 						
 										if( !collide )
 										{
@@ -1517,29 +1538,35 @@ int main( int argc, const char **argv )
 											double rpt[3],rnrm[3];
 											sub_surface->evaluateRNRM( sf, su, sv, rpt, rnrm, r);
 											double dr1[3] = { 	
-													rpt[0] - startp[0],
-													rpt[1] - startp[1],
-													rpt[2] - startp[2] };	
+													startp[0]-rpt[0],
+													startp[1]-rpt[1],
+													startp[2]-rpt[2] };	
 											double r1 = sqrt(dr1[0]*dr1[0]+dr1[1]*dr1[1]+dr1[2]*dr1[2]);
+											double drp1 = (dr1[0]*rnrm[0] + dr1[1]*rnrm[1] + dr1[2]*rnrm[2])/r1;
 											int af;
 											double au,av;
 											sub_surface->nearPointOnBoxedSurface(aqueous_r+3*p, &af,&au,&av, M, mlow, mhigh, &dist, -1, 0 );
 											sub_surface->evaluateRNRM( af, au, av, rpt, rnrm, r);
 											double dr2[3] = { 	
-													rpt[0] - aqueous_r[3*p+0],
-													rpt[1] - aqueous_r[3*p+1],
-													rpt[2] - aqueous_r[3*p+2] };	
+													aqueous_r[3*p+0]-rpt[0],
+													aqueous_r[3*p+1]-rpt[1],
+													aqueous_r[3*p+2]-rpt[2] };	
 											double r2 = sqrt(dr2[0]*dr2[0]+dr2[1]*dr2[1]+dr2[2]*dr2[2]);
+											double drp2 = (dr2[0]*rnrm[0] + dr2[1]*rnrm[1] + dr2[2]*rnrm[2])/r2;
 											 
 											int f;
 											double u,v;
-											double rad1 = sub_surface->returnRadius( startp, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar /* disables pbc z */ );
-											double rad2 = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar /* disables pbc z */ );
-											printf("ERROR. r1: %.14le r2: %.14le\n", r1, r2 );
+											double rad1 = sub_surface->returnRadius( startp, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar  );
+											double rad2 = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar );
+
+											double rad_check = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  2*r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar  );
+											printf("ERROR. ap: %d r1: %.14le dr.p: %le r2: %.14le dr.p %.14le\n", p, r1, drp1, r2, drp2 );
 											exit(1);
 										}
 									}
+			*/
 								}
+						
 								else
 								{
 							//		printf("rad: %lf pt: %le %le %le\n", rad, aqueous_r[3*p+0], aqueous_r[3*p+1], aqueous_r[3*p+2] );
@@ -1607,6 +1634,35 @@ int main( int argc, const char **argv )
 						}
 
 						okay_aqueous_flag[p] = 1;
+
+						{
+							int af;
+							double au,av;
+							double dist;
+							sub_surface->nearPointOnBoxedSurface(aqueous_r+3*p, &af,&au,&av, M, mlow, mhigh, &dist, -1, 0 );
+							double rpt[3], rnrm[3];
+							sub_surface->evaluateRNRM( af, au, av, rpt, rnrm, r);
+							double dr2[3] = { 	
+									aqueous_r[3*p+0]-rpt[0],
+									aqueous_r[3*p+1]-rpt[1],
+									aqueous_r[3*p+2]-rpt[2] };	
+							double r2 = sqrt(dr2[0]*dr2[0]+dr2[1]*dr2[1]+dr2[2]*dr2[2]);
+							double drp2 = (dr2[0]*rnrm[0] + dr2[1]*rnrm[1] + dr2[2]*rnrm[2])/r2;
+
+
+							if( drp2 > 0 )
+							{	// particle is now outside, did we miss it?
+								int f;
+								double u,v;
+								double dist;
+			
+
+								double rad = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  2*r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar /* disables pbc z */ );
+
+								printf("MAJOR ERROR p %d o %d t %d.\n", p, o, t);
+								exit(1);
+							}
+						}
 					}
 	
 					// check for collisions.
@@ -1657,7 +1713,7 @@ int main( int argc, const char **argv )
 #ifdef XY_DIFFUSION
 								sub_surface->updateParticle( surface_p_r_m+3*x, x, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
 #else
-								updateParticleR( x, pfaces, puv, surface_p_r_m, r, sub_surface, surface_np ); 
+								updateParticleR( x, pfaces, puv, surface_p_r_m, surface_p_r_n, r, sub_surface, surface_np ); 
 #endif
 								ncol++;
 								done = 0; 
@@ -2056,7 +2112,7 @@ int main( int argc, const char **argv )
 
 }
 
-void updateParticleR( int p, int *pfaces, double *puv, double *p_r_m, double *r, surface *sub_surface, int np )
+void updateParticleR( int p, int *pfaces, double *puv, double *p_r_m, double *p_r_n, double *r, surface *sub_surface, int np )
 {
 	int nv = sub_surface->nv;
 
@@ -2067,6 +2123,10 @@ void updateParticleR( int p, int *pfaces, double *puv, double *p_r_m, double *r,
 	p_r_m[3*p+0] = rp[0];			
 	p_r_m[3*p+1] = rp[1];			
 	p_r_m[3*p+2] = rp[2];		
+	
+	p_r_n[3*p+0] = nrm[0];			
+	p_r_n[3*p+1] = nrm[1];			
+	p_r_n[3*p+2] = nrm[2];		
 	
 	sub_surface->updateParticle( p_r_m+3*p, p, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
 	

@@ -1407,7 +1407,7 @@ int temp_main( int argc, char **argv )
 			if( block.s_q && global_cntr % block.s_q_period == 0 && o >= nequil)
 			{
 				// Update SANS B-histogram.
-				sub_surface->sample_B_hist( r, B_hist, &A2dz2_sampled, SANS_SAMPLE_NRM, 10000, sans_max_r, nsans_bins );  
+				sub_surface->sample_B_hist( r, B_hist, &A2dz2_sampled, SANS_SAMPLE_NRM, 1000, sans_max_r, nsans_bins );  
 			}
 
 		}
