@@ -1635,6 +1635,8 @@ int main( int argc, const char **argv )
 
 						okay_aqueous_flag[p] = 1;
 
+#ifdef DEBUG_PARTICLE_ESCAPE
+						if( 0 )
 						{
 							int af;
 							double au,av;
@@ -1663,6 +1665,7 @@ int main( int argc, const char **argv )
 								exit(1);
 							}
 						}
+#endif
 					}
 	
 					// check for collisions.
