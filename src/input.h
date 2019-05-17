@@ -100,6 +100,7 @@ class parameterBlock
 	double leaflet_fraction;
 	double concentration;
 	int    mean_field;
+	int correlated;
 
 	double k_off;
 	double k_on;
@@ -118,7 +119,8 @@ class parameterBlock
 	double binw;
 	double max_time; // the max time before it resets computation of the correlation function.
 	int s_q_period;
-	
+	int shape_correction;
+
 	int ncorr;     // should we compute the auto-correlation function of the membrane normal?
 
 	double hours;

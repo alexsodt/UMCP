@@ -5749,7 +5749,7 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 		d_g_d_RuRu = RvRv/(2.*Sqrt(-Power(RuRv,2) + RuRu*RvRv));  
 		d_g_d_RuRv = -(RuRv/Sqrt(-Power(RuRv,2) + RuRu*RvRv));  
 		d_g_d_RvRv = RuRu/(2.*Sqrt(-Power(RuRv,2) + RuRu*RvRv));  
-
+	
 		d_RuRu_d_rux = 2*Ru[0];
 		d_RuRu_d_ruy = 2*Ru[1];
 		d_RuRu_d_ruz = 2*Ru[2];
@@ -5765,6 +5765,19 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 		d_RvRv_d_rvx = 2*Rv[0];
 		d_RvRv_d_rvy = 2*Rv[1];
 		d_RvRv_d_rvz = 2*Rv[2];
+		
+		d_g_d_rvx += d_g_d_RvRv * d_RvRv_d_rvx;
+		d_g_d_rvy += d_g_d_RvRv * d_RvRv_d_rvy;
+		d_g_d_rvz += d_g_d_RvRv * d_RvRv_d_rvz;
+		d_g_d_rux += d_g_d_RuRv * d_RuRv_d_rux;
+		d_g_d_ruy += d_g_d_RuRv * d_RuRv_d_ruy;
+		d_g_d_ruz += d_g_d_RuRv * d_RuRv_d_ruz;
+		d_g_d_rvx += d_g_d_RuRv * d_RuRv_d_rvx;
+		d_g_d_rvy += d_g_d_RuRv * d_RuRv_d_rvy;
+		d_g_d_rvz += d_g_d_RuRv * d_RuRv_d_rvz;
+		d_g_d_rux += d_g_d_RuRu * d_RuRu_d_rux;
+		d_g_d_ruy += d_g_d_RuRu * d_RuRu_d_ruy;
+		d_g_d_ruz += d_g_d_RuRu * d_RuRu_d_ruz;
 
 		// that's it.
 
@@ -6103,6 +6116,7 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 		d_g_d_RuRu = RvRv/(2.*Sqrt(-Power(RuRv,2) + RuRu*RvRv));  
 		d_g_d_RuRv = -(RuRv/Sqrt(-Power(RuRv,2) + RuRu*RvRv));  
 		d_g_d_RvRv = RuRu/(2.*Sqrt(-Power(RuRv,2) + RuRu*RvRv));  
+		
 
 		d_RuRu_d_rux = 2*Ru[0];
 		d_RuRu_d_ruy = 2*Ru[1];
@@ -6119,6 +6133,19 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 		d_RvRv_d_rvx = 2*Rv[0];
 		d_RvRv_d_rvy = 2*Rv[1];
 		d_RvRv_d_rvz = 2*Rv[2];
+		
+		d_g_d_rvx += d_g_d_RvRv * d_RvRv_d_rvx;
+		d_g_d_rvy += d_g_d_RvRv * d_RvRv_d_rvy;
+		d_g_d_rvz += d_g_d_RvRv * d_RvRv_d_rvz;
+		d_g_d_rux += d_g_d_RuRv * d_RuRv_d_rux;
+		d_g_d_ruy += d_g_d_RuRv * d_RuRv_d_ruy;
+		d_g_d_ruz += d_g_d_RuRv * d_RuRv_d_ruz;
+		d_g_d_rvx += d_g_d_RuRv * d_RuRv_d_rvx;
+		d_g_d_rvy += d_g_d_RuRv * d_RuRv_d_rvy;
+		d_g_d_rvz += d_g_d_RuRv * d_RuRv_d_rvz;
+		d_g_d_rux += d_g_d_RuRu * d_RuRu_d_rux;
+		d_g_d_ruy += d_g_d_RuRu * d_RuRu_d_ruy;
+		d_g_d_ruz += d_g_d_RuRu * d_RuRu_d_ruz;
 
 		// that's it.
 

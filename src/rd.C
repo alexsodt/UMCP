@@ -103,17 +103,19 @@ int main( int argc, const char **argv )
 	double Dtot = ( (2.0/3.0) * block.diffc + block.aqueous_diffc);
 	binding_radius = sp_ap_displacement;
 
-	if( block.mean_field )
+	if( block.mean_field && !block.correlated )
 	{
 		double KEQ = kr_on / kr_off / 2;
 		double kr_phenom = 0.5 / ( 1 / kr_on + 1.0/(4*M_PI * binding_radius * Dtot ) );
 		double mf_off = kr_phenom / KEQ;
 
 
-		printf("For mean-field, setting the off-rate from %le to %le per second.\n", kr_off, mf_off );
+		printf("For (completely uncorrelated) mean-field, setting the off-rate from %le to %le per second.\n", kr_off, mf_off );
 		kr_off = mf_off;
 	}
-
+	else if( block.mean_field && block.correlated )
+		printf("Partially correlating mean-field in time following dissociation.\n");
+	
 	printf("On-rate: %le Off-rate: %le\n", kr_on, kr_off );
 
 	srand(block.random_seed);
@@ -374,6 +376,8 @@ int main( int argc, const char **argv )
 	double *aqueous_r = surface_p_r_m + 3 * surface_np;
 	double *aqueous_r_last = (double *)malloc( sizeof(double) * 3 * aqueous_np );
 	double *distance = (double *)malloc( sizeof(double) * aqueous_np );
+	int *correlated = (int *)malloc( sizeof(int) * aqueous_np );
+	memset( correlated, 0, sizeof(int) * aqueous_np );
 
 	int *surface_status = (int *)malloc( sizeof(int) * surface_np );
 	int *aqueous_status = (int *)malloc( sizeof(int) * aqueous_np );
@@ -851,6 +855,7 @@ int main( int argc, const char **argv )
 								distance[ap] = binding_radius;
 								aqueous_status[ap] = STATE_REACTING + REACTED_BIT;	
 								mean_field_activated[ap] = 0;
+								correlated[ap] = 1;
 								tot_off += 1;
 							}		
 						}
@@ -919,8 +924,6 @@ int main( int argc, const char **argv )
 #endif						
 
 							}
-						
-
 #endif
 
 							// evaluate the real distance to the membrane.
@@ -988,6 +991,16 @@ int main( int argc, const char **argv )
 							//double rn = rand() / (double)RAND_MAX;
 							double rn = gsl_rng_uniform(rng_x);	
 
+							if( block.correlated && correlated[ap] )
+							{
+								// reduce particle density by a single particle.
+#ifdef NUMERICAL_INTEGRATION
+								running_prob *= (surface_np-1)/(surface_np);
+#else
+								probvec1 *= (surface_np-1)/(surface_np);
+#endif
+							}
+
 
 #ifdef NUMERICAL_INTEGRATION
 							if( rn < running_prob )
@@ -1048,8 +1061,44 @@ int main( int argc, const char **argv )
 
 								mean_field_activated[ap] = 1;
 								aqueous_status[ap] = STATE_IN_COMPLEX + REACTED_BIT;
-	
+								correlated[ap] = 0;
 								tot_on += 1;
+							}
+							else if( correlated[ap] )
+							{	
+								// test interaction with its ghost
+							
+								double dsep[3] = { 
+									aqueous_r[3*ap+0] - surface_p_r_m[3*ap+0],
+									aqueous_r[3*ap+1] - surface_p_r_m[3*ap+1],
+									aqueous_r[3*ap+2] - surface_p_r_m[3*ap+2] };
+								double sep = normalize(dsep);	
+		
+								if( sep < Rmax )
+								{
+									double probvec1 = passocF(sep, time_step, Dtot, binding_radius, alpha, kact/(kact+kdiff));
+									double rn = gsl_rng_uniform(rng_x);	
+
+									if( rn < probvec1 )
+									{
+										aqueous_r[3*ap+0] = surface_p_r_m[3*ap+0] + surface_p_r_n[3*ap+0] * binding_radius * nrm_sign_factor; 
+										aqueous_r[3*ap+1] = surface_p_r_m[3*ap+1] + surface_p_r_n[3*ap+1] * binding_radius * nrm_sign_factor;
+										aqueous_r[3*ap+2] = surface_p_r_m[3*ap+2] + surface_p_r_n[3*ap+2] * binding_radius * nrm_sign_factor; 
+
+										mean_field_activated[ap] = 1;
+										aqueous_status[ap] = STATE_IN_COMPLEX + REACTED_BIT;
+										correlated[ap] = 0;
+										printf("SUCCESSFUL CORRELATED REACTION.\n");
+										tot_on += 1;
+									}
+									else
+										aqueous_status[ap] = STATE_REACTING;
+								}
+								else
+								{
+									correlated[ap] = 0;
+									aqueous_status[ap] = STATE_REACTING;
+								}
 							}
 							else
 								aqueous_status[ap] = STATE_REACTING;
@@ -1492,6 +1541,8 @@ int main( int argc, const char **argv )
 									double col_u, col_v;
 									double startp[3] = { aqueous_r[3*p+0] - dx, aqueous_r[3*p+1] - dy, aqueous_r[3*p+2] - dz };
 									int collide = theSurface->linearCollisionPoint( startp, aqueous_r+3*p, &col_f, &col_u, &col_v, M, mlow, mhigh, do_planar /* disable PBC z */  );
+									int nMulCol = 0;
+
 									while( collide )
 									{	
 										double rcol[3], nrm[3];
@@ -1516,14 +1567,38 @@ int main( int argc, const char **argv )
 										startp[1] = rcol[1] + 1e-1 * nrm_sign_factor * nrm[1];
 										startp[2] = rcol[2] + 1e-1 * nrm_sign_factor * nrm[2];
 
-										aqueous_r[3*p+0] -= 2 * pr * nrm[0];
-										aqueous_r[3*p+1] -= 2 * pr * nrm[1];
-										aqueous_r[3*p+2] -= 2 * pr * nrm[2];
+										if( nMulCol >= 2 )
+										{
+											collide = 0;
 
-										collide = theSurface->linearCollisionPoint( startp, aqueous_r+3*p, &col_f, &col_u, &col_v, M, mlow, mhigh, do_planar /* disable PBC z */  );
+											// error condition, try to recover.
 
-										if( collide )
-											printf("MULTIPLE COLLISION.\n");
+											aqueous_r[3*p+0] = rcol[0] + binding_radius * nrm_sign_factor * nrm[0];
+											aqueous_r[3*p+1] = rcol[1] + binding_radius * nrm_sign_factor * nrm[1];
+											aqueous_r[3*p+2] = rcol[2] + binding_radius * nrm_sign_factor * nrm[2];
+										
+											distance[p] = binding_radius;
+										}
+										else
+										{
+											aqueous_r[3*p+0] -= 2 * pr * nrm[0];
+											aqueous_r[3*p+1] -= 2 * pr * nrm[1];
+											aqueous_r[3*p+2] -= 2 * pr * nrm[2];
+											
+											distance[p] = fabs(pr);
+	
+											int pcol_f = col_f;
+											double p_col_u = col_u;
+											double p_col_v = col_v;
+											collide = theSurface->linearCollisionPoint( startp, aqueous_r+3*p, &col_f, &col_u, &col_v, M, mlow, mhigh, do_planar /* disable PBC z */  );
+	
+											if( collide )
+											{
+												nMulCol++;	
+//											printf("MULTIPLE COLLISION from %le %le %le to %le %le %le.\n", startp[0], startp[1], startp[2], aqueous_r[3*p+0], aqueous_r[3*p+1], aqueous_r[3*p+2] );
+//											printf("Collision pt is f %d %.14le %.14le (prev %d %.14le %.14le)\n", col_f, col_u, col_v, pcol_f, p_col_u, p_col_v ); 
+											}
+										}
 									}
 /*
 									else
@@ -1670,7 +1745,32 @@ int main( int argc, const char **argv )
 	
 					// check for collisions.
 					//
-	
+
+					if( block.mean_field && block.correlated )
+					{
+						for( int ap = 0; ap < aqueous_np; ap++ )
+						{
+							if( aqueous_status[ap] & REACTED_BIT ) continue; 
+							if( correlated[ap] && ! mean_field_activated[ap] )
+							{
+								double dsep[3] = { 
+									aqueous_r[3*ap+0] - surface_p_r_m[3*ap+0],
+									aqueous_r[3*ap+1] - surface_p_r_m[3*ap+1],
+									aqueous_r[3*ap+2] - surface_p_r_m[3*ap+2] };
+								double sep = normalize(dsep);
+
+								if( sep < binding_radius )
+								{	
+									done = 0;
+									okay_aqueous_flag[ap] = 0;
+									aqueous_r[ap*3+0] = aqueous_r_cache[ap*3+0];
+									aqueous_r[ap*3+1] = aqueous_r_cache[ap*3+1];
+									aqueous_r[ap*3+2] = aqueous_r_cache[ap*3+2];
+								}	
+							}
+						}
+					}
+
 					if( !block.mean_field )
 					{
 						int npairs_collide = get_pair_list( sub_surface, surface_p_r_m, aqueous_r, &pair_list, &npairsSpace, surface_np, aqueous_np, binding_radius  );

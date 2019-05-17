@@ -779,8 +779,6 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 	
 	ParallelSum( &n_att, 1 );
 
-	if( icycle % 100 == 0 )
-		printf("natt: %lf\n", n_att );
 	icycle++;
 
 	free(nearlist);

@@ -24,7 +24,8 @@
 #define MM_METHOD_1
 #define BOXED
 
-#define OLD_LANGEVIN
+
+//#define OLD_LANGEVIN
 
 //#define FIX_MEMBRANE
 //#define MONTE_CARLO_HACK
@@ -600,12 +601,12 @@ int temp_main( int argc, char **argv )
 
 	if( do_ld )
 	{
-		double prod =  gamma_langevin * time_step * AKMA_TIME;
-	
+#ifndef OLD_LANGEVIN
+		double prod =  gamma_langevin * time_step * AKMA_TIME;	
 		printf("gamma_langevin * time_step = %lf\n", gamma_langevin * time_step * AKMA_TIME );
-
 		if( prod > 1 )	
 			printf("WARNING: Langevin gamma * time_step greater than one: %lf\n", prod );
+#endif
 	}
 	// report average temperature
 	double sum_average_temp = 0;
@@ -1384,7 +1385,7 @@ int temp_main( int argc, char **argv )
 			
 			if( t == 0 )
 			{
-				printf("t: %le ns o: %d T: %.8le V: %.8le T+V: %.14le TEMP: %le MEM_TEMP: %le AV_TEMP %le VR: %.3le VMEM: %le VP: %le", (cur_t * 1e9), o, T, V,T+V, TEMP, mem_T, sum_average_temp / n_temp,VR, VMEM, VP );
+				printf("t: %le ns o: %d T: %.8le V: %.8le T+V: %.14le TEMP: %le MEM_TEMP: %le AV_TEMP %le VR: %.3le VMEM: %le VP: %le", (cur_t * 1e9), o, T, V, T+V, TEMP, mem_T, sum_average_temp / n_temp,VR, VMEM, VP );
 				if( step_rate > 0 )
 					printf(" steps/s: %le", step_rate );
 				printf("\n");
@@ -1407,7 +1408,7 @@ int temp_main( int argc, char **argv )
 			if( block.s_q && global_cntr % block.s_q_period == 0 && o >= nequil)
 			{
 				// Update SANS B-histogram.
-				sub_surface->sample_B_hist( r, B_hist, &A2dz2_sampled, SANS_SAMPLE_NRM, 1000, sans_max_r, nsans_bins );  
+				sub_surface->sample_B_hist( r, B_hist, &A2dz2_sampled, SANS_SAMPLE_NRM, 50000, sans_max_r, nsans_bins, block.shape_correction );  
 			}
 
 		}

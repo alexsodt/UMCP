@@ -2848,21 +2848,134 @@ void surface::approxSparseEffectiveMass( force_set * theForceSet, int *use_map, 
 }
 
 
-// this is the mass matrix itself, not its inverse.
+// this is the square-root mass matrix, not its inverse.
+//
 void surface::getSparseMass( force_set * theForceSet, SparseMatrix **theMatrix )
 {
-	(*theMatrix) = new SparseMatrix;
-	(*theMatrix)->init( 3*nv ); 
+	SparseMatrix *mass_matrix = new SparseMatrix;
+	mass_matrix->init( nv ); 
 
 	for( int x = 0; x < theForceSet->npts; x++ )
 	{
 		for( int c1 = 0; c1 < theForceSet->frc_ncoef[x]; c1++ )
 		for( int c2 = 0; c2 < theForceSet->frc_ncoef[x]; c2++ )
 		{
-			(*theMatrix)->coupleParameters( theForceSet->frc_coef_list[x*maxv+c1], theForceSet->frc_coef_list[x*maxv+c2], theForceSet->frc_coef[x*maxv+c1] * theForceSet->frc_coef[x*maxv+c2] );
+			(mass_matrix)->coupleParameters( theForceSet->frc_coef_list[x*maxv+c1], theForceSet->frc_coef_list[x*maxv+c2], theForceSet->frc_coef[x*maxv+c1] * theForceSet->frc_coef[x*maxv+c2] * theForceSet->mass[x] );
 		}
 	}	
 
+	*theMatrix = new SparseMatrix;
+	(*theMatrix)->init( nv );
+
+	mass_matrix->SquareRoot( theMatrix );
+
+
+//#define TEST
+#ifdef TEST
+
+
+//#define SIMPLE_TEST
+#ifdef SIMPLE_TEST
+	SparseMatrix *test = new SparseMatrix;
+	test->init(4);
+	test->coupleParameters(0,0,30.0);
+	test->coupleParameters(0,1,0.1);
+	test->coupleParameters(0,2,0.2);
+	test->coupleParameters(0,3,0.05);
+	test->coupleParameters(1,0,0.1);
+	test->coupleParameters(1,1,1.1);
+	test->coupleParameters(1,2,0.1);
+	test->coupleParameters(1,3,0.0);
+	test->coupleParameters(2,0,0.2);
+	test->coupleParameters(2,1,0.1);
+	test->coupleParameters(2,2,1.2);
+	test->coupleParameters(2,3,0.4);
+	test->coupleParameters(3,0,0.05);
+	test->coupleParameters(3,1,0.0);
+	test->coupleParameters(3,2,0.4);
+	test->coupleParameters(3,3,1.0);
+
+	SparseMatrix *output = new SparseMatrix;
+	output->init(4);
+	test->SquareRoot(&output); 
+	
+	double outp[16];
+	memset(outp,0,sizeof(double)*16);
+	for( int t = 0; t < 4; t++ )
+	{
+		for( int b = 0; b < (output->nnz[t]); b++ )
+			outp[t*4+output->nzl[t][b]] = output->nzv[t][b];
+	} 
+
+	for( int x = 0; x < 4; x++ ){
+	for( int y = 0; y < 4; y++ )
+	{
+		printf(" %le", outp[x*4+y] ); 
+	} printf("\n");
+	}
+	exit(1);
+#endif
+	// printout
+	double *Aout = (double *)malloc( sizeof(double) * nv * nv );
+	memset( Aout, 0, sizeof(double)*nv*nv);
+
+
+	for( int t = 0; t < nv; t++ )
+	{
+		for( int b = 0; b < (mass_matrix->nnz[t]); b++ )
+			Aout[t*nv+mass_matrix->nzl[t][b]] = mass_matrix->nzv[t][b];
+	} 
+	printf("A = {");
+	for( int t = 0; t < nv; t++ )
+	{
+		printf("{");
+		for( int t2 = 0; t2 < nv; t2++ )
+		{
+			printf(" %lf", Aout[t*nv+t2] );
+			if( t2 == nv -1 && t == nv-1)
+				printf("}\n");
+			else if ( t2 == nv -1 )
+				printf("},\n");
+			else
+				printf(",");
+		}
+	}
+	printf("};");
+	
+	SparseMatrix *temp = *theMatrix; 
+
+	memset( Aout, 0, sizeof(double)*nv*nv);
+	for( int t = 0; t < nv; t++ )
+	{
+		for( int b = 0; b < (temp->nnz[t]); b++ )
+			Aout[t*nv+temp->nzl[t][b]] = temp->nzv[t][b];
+	} 
+	printf("\n");
+	printf("B = {");
+	for( int t = 0; t < nv; t++ )
+	{
+		printf("{");
+		for( int t2 = 0; t2 < nv; t2++ )
+		{
+			printf(" %lf", Aout[t*nv+t2] );
+			if( t2 == nv -1 && t == nv-1)
+				printf("}\n");
+			else if ( t2 == nv -1 )
+				printf("},\n");
+			else
+				printf(",");
+		}
+	}
+	printf("};");
+	exit(1);
+#endif
+	
+
 	(*theMatrix)->setNeedSource();
 	(*theMatrix)->compress();
+
+	mass_matrix->freeMem();
+	delete mass_matrix;
 }
+
+

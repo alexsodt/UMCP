@@ -136,6 +136,7 @@ void setDefaults( parameterBlock *block )
 	block->crowder_mass	= 2e5;
 
 	block->mean_field  = 0;
+	block->correlated  = 0;
 	block->k_off = 1e4;
 	block->k_on  = 1e11; 
 	block->bin = 0;
@@ -154,6 +155,7 @@ void setDefaults( parameterBlock *block )
 	block->non_interacting = 1;
 	block->max_time = 1; // one second.
 	block->s_q_period = 1000; // 1000 steps per S_q	
+	block->shape_correction = 0;
 
 	// request a timestep analysis
 	block->timestep_analysis = 0;
@@ -733,6 +735,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}
 		}
+		else if( !strcasecmp( word1, "shape_correction" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->shape_correction = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->shape_correction = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}
+		}
 		else if( !strcasecmp( word1, "max_time" ) )
 			block->max_time = atof( word2 );
 		else if( !strcasecmp( word1, "ncorr" ) )
@@ -921,6 +935,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				block->mean_field = 1;
 			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
 				block->mean_field = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
+		else if( !strcasecmp( word1, "correlated" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->correlated = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->correlated = 0;
 			else
 			{
 				printf("Could not interpret input line '%s'.\n", tbuf );

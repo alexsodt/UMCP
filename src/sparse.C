@@ -8,6 +8,14 @@
 #include "sparse.h"
 #include "lapack_we_use.h"
 
+double sp_fac( int n )
+{
+	double x = 1;
+
+	for( int t = 1; t <= n; t++ )
+		x *= t;
+	return x;
+}
 
 void SparseMatrix::mvec( double *x, double *b )
 {
@@ -99,11 +107,9 @@ void SparseMatrix::cgsolve( double *b, double *soln )
 		x0[x] = b_use[x];// / nzv[x][diage[x]];
 //		x0[x] = (double)rand() / (double)RAND_MAX;
 
-		printf("%lf ", x0[x] );
 		preconditioner[x] = nzv[x][diage[x]];
 	}
 
-	printf("\n");
 
 	int done = 0;
 
@@ -401,7 +407,7 @@ void SparseMatrix::setNeedSource( void )
 	
 }
 
-void SparseMatrix::coupleParameters( int p1, int p2, double val )
+void SparseMatrix::coupleParameters( int p1, int p2, double val, double tol )
 {
 	int got_it = 0;
 
@@ -409,13 +415,16 @@ void SparseMatrix::coupleParameters( int p1, int p2, double val )
 	{
 		if( nzl[p1][x] == p2 )
 		{
+			if( p1 == p2 )
+				diagonal_element[p1] += val;
+
 			nzv[p1][x] += val;
 			got_it = 1;
 			break;
 		}
 	}	
 
-	if( !got_it )
+	if( !got_it && fabs(val) > tol )
 	{
 		if( nzl_space[p1] == nnz[p1] )
 		{
@@ -468,6 +477,38 @@ void SparseMatrix::coupleParameters( int p1, int p2, double val )
 #endif
 }
 
+void SparseMatrix::loadUnit( void )
+{
+	for( int t = 0; t < n; t++ )
+	{
+		nnz[t] = 1;
+		nzl[t][0] = t;
+		nzv[t][0] = 1;
+
+		diagonal_element[t] = 1;
+	}
+}
+
+void SparseMatrix::scale (double fac)
+{
+	for( int t = 0; t < n; t++ )
+	{
+		diagonal_element[t] *= fac;
+		
+		for( int x = 0; x < nnz[t]; x++ )
+			nzv[t][x] *= fac;
+	}
+}
+
+void SparseMatrix::clear( void )
+{
+	for( int t = 0; t < n; t++ )
+	{
+		nnz[t] = 0;
+		diagonal_element[t] = 0;
+	}
+}
+
 void SparseMatrix::init( int new_n )
 {
 	n = new_n;
@@ -515,6 +556,8 @@ void SparseMatrix::freeMem( void )
 	free(diage);
 	free(nzv);
 	free(scratch);
+	
+	free(diagonal_element);
 }
 
 void GramSchmidt( double *vecs, int start, int stop, int n )
@@ -931,3 +974,294 @@ void SparseMult( double *vec_out, double *vec_in, SparseMatrix *Mat )
 	free(vout);
 }
 
+void MMUL( SparseMatrix *in1, SparseMatrix *in2, SparseMatrix *out, double tol )
+{
+	for( int tA = 0; tA < in1->n; tA++ )
+	{
+		for( int ppA = 0; ppA < in1->nnz[tA]; ppA++ )
+		{
+			int tA2 = in1->nzl[tA][ppA];
+
+			for( int ppB = 0; ppB < in2->nnz[tA2]; ppB++ )
+			{
+				int tB = in2->nzl[tA2][ppB];
+			
+				double val =  in1->nzv[tA][ppA] * in2->nzv[tA2][ppB];
+
+				out->coupleParameters( tA, tB, val, tol );
+			}
+		}
+	}
+}
+
+#if 0
+void SparseMatrix::SquareRoot( SparseMatrix **root_output )
+{
+	double *preconditioner = (double *)malloc( sizeof(double) * n );
+
+	double RMS = 0;
+
+	for( int x = 0; x < n; x++ )
+		RMS += diagonal_element[x]*diagonal_element[x];
+
+	RMS /= n;
+	RMS = sqrt(RMS);
+
+	for( int x = 0; x < n; x++ )
+		preconditioner[x] = 1.0 / sqrt( RMS );	
+
+	// precondition the matrix.
+	for( int t = 0; t < n; t++ )
+		diagonal_element[t] *= preconditioner[t] * preconditioner[t];
+
+	for( int t = 0; t < n; t++ )
+	{
+		for( int pp = 0; pp < nnz[t]; pp++ )
+		{
+			int b = nzl[t][pp];
+
+			nzv[t][pp] *= preconditioner[t] * preconditioner[b];
+
+			if( t == b )
+				nzv[t][pp] -= 1;
+		}
+	}
+
+	SparseMatrix *temp = (SparseMatrix *)malloc( sizeof(SparseMatrix ) );
+	temp->init(n);
+	
+	SparseMatrix *temp2 = (SparseMatrix *)malloc( sizeof(SparseMatrix ) );
+	temp2->init(n);
+
+	SparseMatrix *result = (SparseMatrix *)malloc( sizeof(SparseMatrix) );
+	result->init( n );
+
+	/* ZEROth order: unit matrix */
+
+	for( int t = 0; t < n; t++ )
+		result->coupleParameters( t, t, 1.0 / preconditioner[t] );
+
+	int order_limit = 2;
+
+	SparseMatrix *output = NULL;
+	SparseMatrix *cur = this;
+	int o_switch = 0;
+
+	for( int o = 1; o <= order_limit; o++ )
+	{
+		if( o > 1 )
+		{
+			cur->clear();
+			MMUL( output, this, cur );
+		}
+		double factor = sp_fac(2*o) / ( (1 - 2. * o) * pow(sp_fac(o),2)*pow(4,o));
+
+		if( o % 2 == 1 )
+			factor *= -1;
+
+
+		for( int t = 0; t < cur->n; t++ )
+		{
+			for( int pp = 0; pp < cur->nnz[t]; pp++ )
+			{
+				int t2 = cur->nzl[t][pp];
+	
+				// un-precondition.
+				double pc = 1.0 / sqrt(preconditioner[t]) / sqrt( preconditioner[t2] );
+				
+				result->coupleParameters( t, t2, cur->nzv[t][pp] * pc * factor );
+			}
+		}
+
+		o_switch = !o_switch;
+
+		if( o == 1 )
+		{
+			output = this;
+			cur = temp;
+		}
+		else if( o_switch )
+		{ // o == 3
+			output = temp2;
+			cur = temp;
+		}
+		else
+		{ // o == 2, 4
+			output = temp;
+			cur = temp2;
+		}
+	}
+/*
+	// SECOND order 
+	
+	MMUL( this, this, temp );
+
+*/
+	// replace matrix.
+	
+	for( int t = 0; t < n; t++ )
+		diagonal_element[t] /= preconditioner[t] * preconditioner[t];
+
+	for( int t = 0; t < n; t++ )
+	{
+		for( int pp = 0; pp < nnz[t]; pp++ )
+		{
+			int b = nzl[t][pp];
+
+			if( t == b )
+				nzv[t][pp] += 1;
+
+			nzv[t][pp] /= preconditioner[t] * preconditioner[b];
+		}
+	}
+
+
+	*root_output = result;
+
+	temp->freeMem();
+	temp2->freeMem();
+
+	delete temp;
+	delete temp2;
+
+	free(preconditioner);
+}
+#endif
+
+void SparseMatrix::SquareRoot( SparseMatrix **root_output )
+{
+	double *preconditioner = (double *)malloc( sizeof(double) * n );
+
+	double maxv = 0;
+
+	for( int x = 0; x < n; x++ )
+	{
+		if( diagonal_element[x] > maxv )
+			maxv = diagonal_element[x];
+	}
+
+	for( int x = 0; x < n; x++ )
+		preconditioner[x] = 1.0 / maxv;	
+
+	// precondition the matrix.
+	for( int t = 0; t < n; t++ )
+		diagonal_element[t] *= preconditioner[t];
+
+	for( int t = 0; t < n; t++ )
+	{
+		for( int pp = 0; pp < nnz[t]; pp++ )
+		{
+			int b = nzl[t][pp];
+
+			nzv[t][pp] *= preconditioner[t];
+		}
+	}
+	
+
+
+	SparseMatrix *Yk = (SparseMatrix *)malloc( sizeof(SparseMatrix ) );
+	Yk->init(n);
+	SparseMatrix *Ykp1 = (SparseMatrix *)malloc( sizeof(SparseMatrix ) );
+	Ykp1->init(n);
+	SparseMatrix *Zk = (SparseMatrix *)malloc( sizeof(SparseMatrix ) );
+	Zk->init(n);
+	SparseMatrix *Zkp1 = (SparseMatrix *)malloc( sizeof(SparseMatrix ) );
+	Zkp1->init(n);
+	
+	SparseMatrix *temp = (SparseMatrix *)malloc( sizeof(SparseMatrix ) );
+	temp->init(n);
+
+	Zk->loadUnit();
+	MMUL( this, Zk, Yk );
+	
+	int done = 0;
+	int iters = 0;
+
+	double tol = 1e-5;
+
+	while( !done )
+	{
+		Ykp1->clear();
+		Zkp1->clear();
+		temp->clear();
+
+		MMUL( Zk, Yk, temp, tol );
+
+		// compute 3I - Zk Yk
+		
+		for( int t = 0; t < temp->n; t++ )
+		{
+			temp->diagonal_element[t] = 3 - temp->diagonal_element[t];
+			for( int x = 0; x < temp->nnz[t]; x++ )
+			{
+				int t2 = temp->nzl[t][x];
+
+				if( t2 == t )
+					temp->nzv[t][x] = 3 - temp->nzv[t][x];
+				else
+					temp->nzv[t][x] *= -1;
+			}
+		}
+
+		MMUL( Yk, temp, Ykp1, tol );
+		MMUL( temp, Zk, Zkp1, tol );
+
+		Ykp1->scale(0.5);		
+		Zkp1->scale(0.5);
+		// swap
+
+		SparseMatrix *ty = Yk;
+		SparseMatrix *tz = Zk;
+
+		Zk = Zkp1;
+		Yk = Ykp1;
+
+		Ykp1 = ty;
+		Zkp1 = tz;
+
+		iters++;
+
+		if( iters > 5 )
+			done = 1;
+	}
+
+	*root_output = Yk;
+
+	temp->freeMem();
+	Ykp1->freeMem();
+	Zk->freeMem();
+	Zkp1->freeMem();
+
+	delete temp;
+	delete Ykp1;
+	delete Zk;
+	delete Zkp1;
+
+	// unprecondition the matrix.
+	for( int t = 0; t < n; t++ )
+	{
+		Yk->diagonal_element[t] /= sqrt(preconditioner[t]);
+		diagonal_element[t] /= preconditioner[t];
+	}
+	for( int t = 0; t < n; t++ )
+	{
+		for( int pp = 0; pp < nnz[t]; pp++ )
+		{
+			int b = nzl[t][pp];
+
+			nzv[t][pp] /= preconditioner[t];
+		}
+	}
+	
+	for( int t = 0; t < Yk->n; t++ )
+	{
+		for( int pp = 0; pp < Yk->nnz[t]; pp++ )
+		{
+			int b = Yk->nzl[t][pp];
+
+			Yk->nzv[t][pp] /= sqrt(preconditioner[t]);
+		}
+	}
+
+	free(preconditioner);
+}

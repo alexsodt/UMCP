@@ -28,7 +28,7 @@ void surface::processSANS( parameterBlock *block )
 
 void surface::sample_B_hist( double *rmesh, double *B_hist, double *A2dz2_sampled,
 			int sample_type, 
-			int nsamples, double maxr, int nbins)
+			int nsamples, double maxr, int nbins, int shape_correction )
 {
 	static double av_b_sampled = 0;
 	static double av_b2_sampled = 0;
@@ -51,6 +51,9 @@ void surface::sample_B_hist( double *rmesh, double *B_hist, double *A2dz2_sample
 	double *local_sampler = (double *)malloc( sizeof(double) * nbins );
 	memset( local_sampler, 0, sizeof(double) * nbins );
 #endif
+	
+
+	double PP = 12.0; // approximately.
 
 	// for clarity in accounting for actual volume contribution we use a real value of dz/Ap:
 	double dz = (MAXZ-MINZ)/N_Z_BINS;
@@ -100,12 +103,35 @@ void surface::sample_B_hist( double *rmesh, double *B_hist, double *A2dz2_sample
 
 			double w1 = g(f1,u1,v1,rmesh);
 			double w2 = g(f2,u2,v2,rmesh);
-			
+			double c1  = 0;
+			double c2  = 0;
+
+			if( shape_correction )
+			{
+				c1 = c(f1,u1,v1,rmesh);
+                        	c2 = c(f2,u2,v2,rmesh);			
+			}
 			for( int nz = 0; nz < 20; nz++ )
 			{
 				double z1 = MINZ + (MAXZ-MINZ) * rand() / (double)RAND_MAX;
 				double z2 = MINZ + (MAXZ-MINZ) * rand() / (double)RAND_MAX;
-	
+
+				double alpha1 = 1.0;
+				double alpha2 = 1.0;
+
+				if( shape_correction )
+				{
+					if( z1 > 0 )
+						alpha1 = exp( -(z1-PP)*c1);
+					else
+						alpha1 = exp( -(z1+PP)*c1);
+
+					if( z1 > 0 )
+						alpha2 = exp( -(z2-PP)*c2);
+					else
+						alpha2 = exp( -(z2+PP)*c2);
+				}
+
 				double p1[3] = { r1[0] + z1 * nrm1[0],
 						 r1[1] + z1 * nrm1[1],
 						 r1[2] + z1 * nrm1[2] };
@@ -120,8 +146,8 @@ void surface::sample_B_hist( double *rmesh, double *B_hist, double *A2dz2_sample
 
 				int rbin = nbins * rv / maxr;
 
-				double b1 = evaluateSpline( z1, SANS_SPLINE );
-				double b2 = evaluateSpline( z2, SANS_SPLINE );
+				double b1 = alpha1*evaluateSpline( z1*alpha1, SANS_SPLINE );
+				double b2 = alpha2*evaluateSpline( z2*alpha2, SANS_SPLINE );
 
 				av_b_sampled += (b1+b2)/2;
 				av_b2_sampled += b1*b2;
