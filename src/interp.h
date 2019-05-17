@@ -268,6 +268,10 @@ struct surface
 	boxing *prBoxes;	
 	irr_kernel *kernels[20];
 
+	// BEGIN flags from input 
+	
+	// END flags from input
+
 	Bin *** box;
 	int xbox;
 	int ybox;
