@@ -156,6 +156,12 @@ void setupParallel( surface *theSurface, pcomplex **allComplexes, int ncomplex, 
 	for( int c = 0; c < ncomplex; c++ )
 		par_info.complexes[c] = c;
 	par_info.nc = ncomplex;
+	
+	par_info.nv     = nv;
+	par_info.verts  = (int *)malloc( sizeof(int) * nv );	
+
+	for( int v = 0; v < nv; v++ )
+		par_info.verts[v] = v;
 #else
 
 	int ierr=0;
