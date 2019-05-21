@@ -61,6 +61,7 @@ void setDefaults( parameterBlock *block )
 	block->hard_z_boundary = 0;
 	block->do_srd = 0;
 	block->do_ld = 0;
+	block->do_bd = 0;
 	block->nve_switch = -1; // switch to NVE dynamics at this timestep.
 	block->gamma_langevin = 10; 
 	block->planar_topology = 0;
@@ -278,6 +279,11 @@ int resolveParameters( parameterBlock *block )
 
 	if( block->time_step_collision < 0 )
 		block->time_step_collision = block->time_step;
+	if( block->do_ld && block->do_bd )
+	{
+		printf("ERROR: Langevin and Brownian dynamics are both activated.\n");
+		exit(1);
+	}
 
 	if( block->do_ld && block->do_srd )
 	{
@@ -634,6 +640,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				block->hard_z_boundary = 1;
 			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
 				block->hard_z_boundary = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}
+		}
+		else if( !strcasecmp( word1, "do_bd" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->do_bd = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->do_bd = 0;
 			else
 			{
 				printf("Could not interpret input line '%s'.\n", tbuf );

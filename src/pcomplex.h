@@ -15,6 +15,10 @@ struct pcomplex
 	int nattach;
 	int bound;
 	int debug;
+	int do_bd;
+
+	// diffusion constants.
+	double *DC;
 
 	// all masses.
 	double *mass;
@@ -81,6 +85,8 @@ struct pcomplex
 	virtual void unpackI( int *); 
 	
 	virtual int isElastic(void) { return 0; }	
+
+	void activateBrownianDynamics(void);
 
 	void printType( char **type );
 	void cacheVelocities( void );

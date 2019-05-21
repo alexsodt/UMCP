@@ -12,7 +12,9 @@
 #include <ctype.h>
 
 extern double kc;
+extern double kT;
 static double default_particle_area = 65;
+static double lipid_DC = 1e9; //Angstrom^2/s
 
 // For doing Newtonian/Langevin dynamics:
 static double default_mass = 20000;
@@ -28,6 +30,7 @@ static double default_dc   = (1e-6)*(1e8)*(1e8); // cm^2/s to Angstroms^2/s
 //
 void pcomplex::base_init( void )
 {
+	do_bd = 0;
 	debug = DEBUG_OFF;
 }
 
@@ -48,6 +51,10 @@ void pcomplex::alloc( void )
 	qdot = (double *)malloc( sizeof(double) * nsites * 3 );
 	memset( p, 0, sizeof(double) * 3 * nsites );
 	memset( qdot, 0, sizeof(double) * 3 * nsites );
+
+	DC = (double *)malloc( sizeof(double) * nsites );
+	for( int p = 0; p < nsites; p++ )		
+		DC[p] = lipid_DC;
 
 
 	grad_fs = (int *)malloc( sizeof(int) * nsites );
@@ -98,6 +105,11 @@ void pcomplex::print_type( char **outp )
 	sprintf(*outp, "%s", p );
 	
 	free(temp);
+}
+
+void pcomplex::activateBrownianDynamics( void )
+{
+	do_bd = 1;
 }
 
 
@@ -934,12 +946,54 @@ void pcomplex::propagate_surface_q( surface *theSurface, double *rsurf, double d
 {
 	// move a step.
 
-
 	for( int s = 0; s < nattach; s++ )
 	{
 		int last_f = fs[s];
 		double last_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
-		double duv[2] = { qdot[2*s+0] * dt * AKMA_TIME, qdot[2*s+1] * dt * AKMA_TIME };
+		double duv[2];
+
+		if( do_bd )
+		{
+			double gmat[4];
+			double gmat_u;
+			double gmat_v;
+			
+			double noise[2] = { 
+				gsl_ran_gaussian(r_gen_global, 1 ),
+				gsl_ran_gaussian(r_gen_global, 1 )
+				};
+	
+			double gval = theSurface->metric( fs[s], puv[2*s+0], puv[2*s+1], rsurf, gmat, &gmat_u, &gmat_v );
+
+			double val = sqrt(gmat[0]*gmat[0]+4*gmat[1]*gmat[1]-2*gmat[0]*gmat[3]+gmat[3]*gmat[3]);
+
+			double gamma_neg_half[4] = { 
+				(1.0/val) * ((-gmat[0]+gmat[3]+val)/sqrt(2*(gmat[0]+gmat[3]-val))-(-gmat[0]+gmat[3]-val)/sqrt(2*(gmat[0]+gmat[3]+val))),   	
+				(1.0/val) * ( -sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]-val) + sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]+val) ),
+				(1.0/val) * ( -sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]-val) + sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]+val) ),
+				(1.0/val) * (( gmat[0]-gmat[3]+val)/sqrt(2*(gmat[0]+gmat[3]-val))+(-gmat[0]+gmat[3]+val)/sqrt(2*(gmat[0]+gmat[3]+val))),   
+				};
+
+			double gamma_inv[4] = {
+				gmat[0]/(gval*gval), -gmat[1]/(gval*gval), -gmat[1]/(gval*gval), gmat[3]/(gval*gval)
+			};
+	
+			double pre_drift[2] = { 
+					save_grad[0]/kT + (-gmat_u/(2*gval*gval)), 
+					save_grad[1]/kT + (-gmat_v/(2*gval*gval))
+						};
+
+			double corr_noise[2] = { gamma_neg_half[0] * noise[0] + gamma_neg_half[1] * noise[1],
+						 gamma_neg_half[2] * noise[0] + gamma_neg_half[3] * noise[1] }; 
+
+			duv[0] = (gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt + noise[0] * sqrt(2 * DC[s] * dt) * corr_noise[0];
+			duv[1] = (gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt + noise[1] * sqrt(2 * DC[s] * dt) * corr_noise[1];	
+		}
+		else
+		{
+			duv[0] = qdot[2*s+0] * dt * AKMA_TIME;
+			duv[1] = qdot[2*s+1] * dt * AKMA_TIME;
+		}
 
 		puv[2*s+0] += duv[0];
 		puv[2*s+1] += duv[1];
@@ -948,20 +1002,8 @@ void pcomplex::propagate_surface_q( surface *theSurface, double *rsurf, double d
 		
 		double new_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
 		double fr = fabs(1-new_metric/last_metric);
-		if( fr > 0.1 )
-		{
-	//		printf("dMetric: %.14le last_f %d new_f %d u v %le %le\n",
-	//			new_metric/last_metric, last_f, fs[s], puv[2*s+0], puv[2*s+1] );
-		}
 	}
-/*
-	for( int s = nattach; s < nsites; s++ )
-	{
-		rall[3*s+0] += qdot[3*s+0] * dt * AKMA_TIME;
-		rall[3*s+1] += qdot[3*s+1] * dt * AKMA_TIME;
-		rall[3*s+2] += qdot[3*s+2] * dt * AKMA_TIME;
-	}
-*/
+	
 	if( bound )	
 	{
 		// 
@@ -1010,6 +1052,7 @@ void pcomplex::propagate_p( surface *theSurface, double *rsurf, double dt )
 
 void pcomplex::pfree( void )
 {
+	free(DC);
 	free(rall);
 	free(fs);
 	free(puv);

@@ -429,6 +429,7 @@ struct surface
 
 	void generateBorderMappings(void);
 	double g( int f, double u, double v, double *r );
+	double metric( int f, double u, double v, double *r, double *gmat, double *gmat_u, double *gmat_v );
 	void ru( int f, double u, double v, double *r, double *dr_u );
 	void rv( int f, double u, double v, double *r, double *dr_v );
 	void r2der( int f, double u, double v, double *r, double *dr_uu, double *dr_uv, double *dr_vv );

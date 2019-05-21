@@ -25,7 +25,7 @@
 #define BOXED
 
 
-//#define OLD_LANGEVIN
+#define OLD_LANGEVIN
 
 //#define FIX_MEMBRANE
 //#define MONTE_CARLO_HACK
@@ -121,6 +121,7 @@ int temp_main( int argc, char **argv )
 	int do_srd = block.do_srd;
 	int do_ld = block.do_ld;
 	int on_surface = block.on_surface;
+	int do_bd = block.do_bd;
 	int debug = block.debug;
 	double kcal_mol_K = (5.92186663194E-01/298);
 	kT = (5.92186663194E-01/298) * (block.T);
@@ -602,7 +603,7 @@ int temp_main( int argc, char **argv )
 	double running_time = 0;
 	double gamma_langevin = block.gamma_langevin;
 
-	if( do_ld )
+	if( do_ld || do_bd )
 	{
 #ifndef OLD_LANGEVIN
 		double prod =  gamma_langevin * time_step * AKMA_TIME;	
@@ -853,6 +854,9 @@ int temp_main( int argc, char **argv )
 	int nbins = 100;
 	
 	
+	for( int p = 0; p < ncomplex; p++ )
+		allComplexes[p]->activateBrownianDynamics();
+
 	FILE *alphaFile = NULL;
 
 	if( block.write_alpha_period > 0 )
@@ -1097,21 +1101,24 @@ int temp_main( int argc, char **argv )
 
 					double dt = allComplexes[c]->update_dH_dq( sub_surface, r, g, qdot, qdot0, time_remaining, time_step );
 			
-					if( do_ld || o < nequil )
+					if(  do_ld || o < nequil )
 					{					
 						allComplexes[c]->applyLangevinFriction( sub_surface, r, dt, gamma_langevin );
 						allComplexes[c]->applyLangevinNoise( sub_surface, r, dt,  gamma_langevin, temperature );
 					}
-	
-					allComplexes[c]->propagate_p( sub_surface, r, dt/2 );
-					allComplexes[c]->compute_qdot( sub_surface, r, qdot0, qdot_temp, dt/time_step );			
+
+					if( allComplexes[c]->do_bd )
+					{
+						allComplexes[c]->propagate_p( sub_surface, r, dt/2 );
+						allComplexes[c]->compute_qdot( sub_surface, r, qdot0, qdot_temp, dt/time_step );			
 			
-					// close enough.
-					PT += allComplexes[c]->T(sub_surface,r)  * (dt/time_step);
-
-					allComplexes[c]->propagate_p( sub_surface, r, dt/2 );
-					allComplexes[c]->compute_qdot( sub_surface, r, qdot0, qdot_temp,  dt/time_step );			
-
+						// close enough.
+						PT += allComplexes[c]->T(sub_surface,r)  * (dt/time_step);
+	
+						allComplexes[c]->propagate_p( sub_surface, r, dt/2 );
+						allComplexes[c]->compute_qdot( sub_surface, r, qdot0, qdot_temp,  dt/time_step );			
+					}
+						
 					allComplexes[c]->propagate_surface_q( sub_surface, r, dt );
 
 					time_remaining -= dt;
@@ -1172,7 +1179,7 @@ int temp_main( int argc, char **argv )
 			memcpy( next_pp, pp, sizeof(double) * NQ );
 			if( !block.disable_mesh )
 			{
-				if( do_ld || o < nequil || (switched) )
+				if( do_bd || do_ld || o < nequil || (switched) )
 				{
 					if( do_gen_q )
 						GenQMatVecIncrScale( next_pp, pp, EFFM, -gamma_langevin*AKMA_TIME*time_step );
@@ -1266,7 +1273,7 @@ int temp_main( int argc, char **argv )
 
 			if( !block.disable_mesh )
 			{
-				if( do_ld || o < nequil )
+				if( do_bd || do_ld || o < nequil )
 				{
 #ifdef OLD_LANGEVIN
 					for( int Q = 0; Q < NQ; Q++ )
@@ -1580,6 +1587,7 @@ int temp_main( int argc, char **argv )
 		if( o == block.nve_switch )
 		{
 			do_ld = 0;
+			do_bd = 0;
 			do_srd = 0;
 			sum_average_temp = 0;
 			n_temp = 0;

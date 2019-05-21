@@ -454,6 +454,432 @@ void surface::get_pt_dcoeffs( int f, double u, double v, double *coeffs, int *co
 	}	
 }
 
+double surface::metric( int f, double u, double v, double *r, double *gmat, double *gmat_u, double *gmat_v )
+{
+	double alpha_x = r[3*nv+0];
+	double alpha_y = r[3*nv+1];
+	double alpha_z = r[3*nv+2];
+
+	if( f >= nf_faces ) // an irrational face.
+	{
+		int frm = (f-nf_faces)*nf_irr_pts;
+
+		int i = theIrregularFormulas[frm].vertex;
+		int e = theIrregularFormulas[frm].edge;
+		int val = theVertices[i].valence;
+
+		irr_kernel *theKernel = kernels[val]; 
+		int ncoords_base = val + 6;
+
+		double fu = u;
+		double fv = v;					
+
+		int domain = theKernel->domain(fu,fv);
+		if( domain-1 >= theKernel->ndomains )
+			return 1e-100;
+
+		double *theMap = theKernel->get_map( &fu, &fv );
+		
+		double u_u = u, u_v=0, v_u=0, v_v = v;
+		theKernel->get_map_transform( &u_u, &u_v, &v_u, &v_v );
+
+		double u = fu;
+		double v = fv;
+		double w = 1 - u - v;
+
+
+		if( u +v > 1.0+THRESH || u < -THRESH || v < -THRESH )
+		{
+			printf("u: %.12le v: %.12le\n", u, v );
+			printf("ERROR: outside domain.\n");
+			exit(1);
+		}
+
+		double u2 = u*u;
+		double u3 = u*u*u;
+		double u4 = u*u*u*u;
+		
+		double v2 = v*v;
+		double v3 = v*v*v;
+		double v4 = v*v*v*v;
+		
+		double w2 = w*w;
+		double w3 = w*w*w;
+		double w4 = w*w*w*w;
+			
+		
+		// 8 : 0
+		// 7 : 1
+		// 4 : 2
+		// 5 : 3
+		// 9 : 4
+		// 12 : 5
+		// 11 : 6
+		// 10 : 7
+		// 6 : 8
+		// 3 : 9
+		// 1 : 10
+		// 2 : 11
+
+	
+
+		double n1 = (1.0/12.0)*(u4+2*u3*v); 
+		double n2 = (1.0/12.0)*(u4+2*u3*w); 
+		double n3 = (1.0/12.0)*(u4+2*u3*w+6*u3*v+6*u2*v*w+12*u2*v2+6*u*v2*w+6*u*v3+2*v3*w+v4); 
+		double n4 = (1.0/12.0)*(6*u4+24*u3*w+24*u2*w2+8*u*w3+w4+24*u3*v+60*u2*v*w+36*u*v*w2+6*v*w3+24*u2*v2+36*u*v2*w+12*v2*w2+8*u*v3+6*v3*w+v4); 
+		double n5 = (1.0/12.0)*(u4+6*u3*w+12*u2*w2+6*u*w3+w4+2*u3*v+6*u2*v*w+6*u*v*w2+2*v*w3); 
+		double n6 = (1.0/12.0)*(2*u*v3+v4); 
+		double n7 = (1.0/12.0)*(u4+6*u3*w+12*u2*w2+6*u*w3+w4+8*u3*v+36*u2*v*w+36*u*v*w2+8*v*w3+24*u2*v2+60*u*v2*w+24*v2*w2+24*u*v3+24*v3*w+6*v4); 
+		double n8 = (1.0/12.0)*(u4+8*u3*w+24*u2*w2+24*u*w3+6*w4+6*u3*v+36*u2*v*w+60*u*v*w2+24*v*w3+12*u2*v2+36*u*v2*w+24*v2*w2+6*u*v3+8*v3*w+v4); 
+		double n9 = (1.0/12.0)*(2*u*w3+w4); 
+		double n10 = (1.0/12.0)*(2*v3*w+v4); 
+		double n11 = (1.0/12.0)*(2*u*w3+w4+6*u*v*w2+6*v*w3+6*u*v2*w+12*v2*w2+2*u*v3+6*v3*w+v4); 
+		double n12 = (1.0/12.0)*(w4+2*v*w3);
+
+		double du_1 = Power(u,3)/3. + (Power(u,2)*v)/2.;
+		double du_2 = Power(u,2)/2. - Power(u,3)/3. - (Power(u,2)*v)/2.; 	
+		double du_3 =Power(u,2)/2. - Power(u,3)/3. + u*v - (Power(u,2)*v)/2. + Power(v,2)/2. - Power(v,3)/6.;
+		double du_4 = 0.3333333333333333 + u - Power(u,2) - Power(u,3)/3. + v/2. - u*v - (Power(u,2)*v)/2. - Power(v,2) + Power(v,3)/3.;	
+		double du_5 = 0.16666666666666666 - Power(u,2) + (2*Power(u,3))/3. - v/2. + Power(u,2)*v + Power(v,2)/2. - Power(v,3)/6.;
+		double du_6 = Power(v,3)/6.;	
+		double du_7 = 0.16666666666666666 - Power(u,2) + (2*Power(u,3))/3. + v/2. - 2*u*v + Power(u,2)*v - Power(v,2)/2. - Power(v,3)/6.;	
+		double du_8 = -2*u + 2*Power(u,2) - Power(u,3)/3. - v + 2*u*v - (Power(u,2)*v)/2. + Power(v,2) - Power(v,3)/6.;	
+		double du_9 = -0.16666666666666666 + Power(u,2)/2. - Power(u,3)/3. + v/2. - (Power(u,2)*v)/2. - Power(v,2)/2. + Power(v,3)/6.;	
+		double du_10 = -Power(v,3)/6.;
+		double du_11 = -0.16666666666666666 + Power(u,2)/2. - Power(u,3)/3. - v/2. + u*v - (Power(u,2)*v)/2. + Power(v,3)/3.;	
+		double du_12 = 	-0.3333333333333333 + u - Power(u,2) + Power(u,3)/3. + v/2. - u*v + (Power(u,2)*v)/2. - Power(v,3)/6.;
+
+		double dv_1 = Power(u,3)/6.;
+		double dv_2 = -Power(u,3)/6.;
+		double dv_3 = Power(u,2)/2. - Power(u,3)/6. + u*v + Power(v,2)/2. - (u*Power(v,2))/2. - Power(v,3)/3.;
+		double dv_4 = 0.16666666666666666 + u/2. - Power(u,2)/2. - Power(u,3)/6. - 2*u*v - Power(v,2) + u*Power(v,2) + (2*Power(v,3))/3.;
+		double dv_5 = -0.16666666666666666 - u/2. + Power(u,3)/3. + u*v + Power(v,2)/2. - (u*Power(v,2))/2. - Power(v,3)/3.;
+		double dv_6 = (u*Power(v,2))/2. + Power(v,3)/3.;
+		double dv_7 = 0.3333333333333333 + u/2. - Power(u,2) + Power(u,3)/3. + v - u*v - Power(v,2) - (u*Power(v,2))/2. - Power(v,3)/3.;
+		double dv_8 = -u + Power(u,2) - Power(u,3)/6. - 2*v + 2*u*v + 2*Power(v,2) - (u*Power(v,2))/2. - Power(v,3)/3.;
+		double dv_9 = -0.3333333333333333 + u/2. - Power(u,3)/6. + v - u*v - Power(v,2) + (u*Power(v,2))/2. + Power(v,3)/3.;
+		double dv_10 = Power(v,2)/2. - (u*Power(v,2))/2. - Power(v,3)/3.;
+		double dv_11 = 0.16666666666666666 - u/2. + Power(u,2)/2. - Power(u,3)/6. - Power(v,2) + u*Power(v,2) + (2*Power(v,3))/3.;
+		double dv_12 = -0.16666666666666666 + u/2. - Power(u,2)/2. + Power(u,3)/6. + Power(v,2)/2. - (u*Power(v,2))/2. - Power(v,3)/3.;
+			
+		double d_uu_1 = Power(u,2) + u*v;
+		double d_uu_2 = u - Power(u,2) - u*v;
+		double d_uu_3 = u - Power(u,2) + v - u*v;
+		double d_uu_4 = 1 - 2*u - Power(u,2) - v - u*v;
+		double d_uu_5 = -2*u + 2*Power(u,2) + 2*u*v;
+		double d_uu_6 = 0;
+		double d_uu_7 = -2*u + 2*Power(u,2) - 2*v + 2*u*v;
+		double d_uu_8 = -2 + 4*u - Power(u,2) + 2*v - u*v;
+		double d_uu_9 = u - Power(u,2) - u*v;
+		double d_uu_10 = 0;
+		double d_uu_11 = u - Power(u,2) + v - u*v;
+		double d_uu_12 = 1 - 2*u + Power(u,2) - v + u*v;
+		
+		double d_uv_1 = Power(u,2)/2.;
+		double d_uv_2 = -Power(u,2)/2.;
+		double d_uv_3 = u - Power(u,2)/2. + v - Power(v,2)/2.;
+		double d_uv_4 = 0.5 - u - Power(u,2)/2. - 2*v + Power(v,2);
+		double d_uv_5 = -0.5 + Power(u,2) + v - Power(v,2)/2.;
+		double d_uv_6 = Power(v,2)/2.;
+		double d_uv_7 = 0.5 - 2*u + Power(u,2) - v - Power(v,2)/2.;
+		double d_uv_8 = -1 + 2*u - Power(u,2)/2. + 2*v - Power(v,2)/2.;
+		double d_uv_9 = 0.5 - Power(u,2)/2. - v + Power(v,2)/2.;
+		double d_uv_10 = -Power(v,2)/2.;
+		double d_uv_11 = -0.5 + u - Power(u,2)/2. + Power(v,2);
+		double d_uv_12 = 0.5 - u + Power(u,2)/2. - Power(v,2)/2.;
+		
+		double d_vv_1 = 0;
+		double d_vv_2 = 0;
+		double d_vv_3 = u + v - u*v - Power(v,2);
+		double d_vv_4 = -2*u - 2*v + 2*u*v + 2*Power(v,2);
+		double d_vv_5 = u + v - u*v - Power(v,2);
+		double d_vv_6 = u*v + Power(v,2);
+		double d_vv_7 = 1 - u - 2*v - u*v - Power(v,2);
+		double d_vv_8 = -2 + 2*u + 4*v - u*v - Power(v,2);
+		double d_vv_9 = 1 - u - 2*v + u*v + Power(v,2);
+		double d_vv_10 = v - u*v - Power(v,2);
+		double d_vv_11 = -2*v + 2*u*v + 2*Power(v,2);
+		double d_vv_12 = v - u*v - Power(v,2);
+		
+		double ceff_map[12] = { n8, n7, n4, n5, n9, n12, n11, n10, n6, n3, n1, n2 };
+		double ceff_map_du[12] = { du_8, du_7, du_4, du_5, du_9, du_12, du_11, du_10, du_6, du_3, du_1, du_2 };
+		double ceff_map_dv[12] = { dv_8, dv_7, dv_4, dv_5, dv_9, dv_12, dv_11, dv_10, dv_6, dv_3, dv_1, dv_2 };
+		double ceff_map_duu[12] = { d_uu_8, d_uu_7, d_uu_4, d_uu_5, d_uu_9, d_uu_12, d_uu_11, d_uu_10, d_uu_6, d_uu_3, d_uu_1, d_uu_2 };
+		double ceff_map_duv[12] = { d_uv_8, d_uv_7, d_uv_4, d_uv_5, d_uv_9, d_uv_12, d_uv_11, d_uv_10, d_uv_6, d_uv_3, d_uv_1, d_uv_2 };
+		double ceff_map_dvv[12] = { d_vv_8, d_vv_7, d_vv_4, d_vv_5, d_vv_9, d_vv_12, d_vv_11, d_vv_10, d_vv_6, d_vv_3, d_vv_1, d_vv_2 };
+		
+		double lru[3] = { 0,0,0};
+		double lrv[3] = { 0,0,0};
+
+		double dr_uu[3] = {0,0,0};
+		double dr_uv[3] = {0,0,0};
+		double dr_vv[3] = {0,0,0};
+
+		for( int x = 0; x < ncoords_base; x++ )
+		{
+			int *cset = theVertices[i].irr_coord_set + e * ncoords_base;
+			double *lr = r + cset[x]*3;
+
+			for( int y = 0; y < 12; y++ )
+			{
+				lru[0] += (lr[0] + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * u_u;
+				lru[1] += (lr[1] + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * u_u;
+				lru[2] += (lr[2] + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * u_u;
+				
+				lrv[0] += (lr[0] + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * v_v;
+				lrv[1] += (lr[1] + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * v_v;
+				lrv[2] += (lr[2] + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * v_v;
+
+				dr_uu[0] += (lr[0]  + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_duu[y] * alpha_x * u_u * u_u;
+				dr_uu[1] += (lr[1]  + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_duu[y] * alpha_y * u_u * u_u;
+				dr_uu[2] += (lr[2]  + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_duu[y] * alpha_z * u_u * u_u;
+				
+				dr_uv[0] += (lr[0]  + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_duv[y] * alpha_x * u_u * v_v;
+				dr_uv[1] += (lr[1]  + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_duv[y] * alpha_y * u_u * v_v;
+				dr_uv[2] += (lr[2]  + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_duv[y] * alpha_z * u_u * v_v;
+				
+				dr_vv[0] += (lr[0]  + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_dvv[y] * alpha_x * v_v * v_v;
+				dr_vv[1] += (lr[1]  + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_dvv[y] * alpha_y * v_v * v_v;
+				dr_vv[2] += (lr[2]  + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_dvv[y] * alpha_z * v_v * v_v;
+			}
+		}
+	
+		gmat[0] = lru[0] * lru[0] + lru[1] * lru[1] + lru[2] * lru[2];	
+		gmat[1] = lrv[0] * lru[0] + lrv[1] * lru[1] + lrv[2] * lru[2];	
+		gmat[2] = lru[0] * lrv[0] + lru[1] * lrv[1] + lru[2] * lrv[2];	
+		gmat[3] = lrv[0] * lrv[0] + lrv[1] * lrv[1] + lrv[2] * lrv[2];	
+
+		(*gmat_u) = 2 * ( -lru[1]*lrv[0]+lru[0]*lrv[1] ) * ( -dr_uu[1] * lrv[0] - dr_uv[0] * lru[1] + dr_uu[0] * lrv[1] + dr_uv[1] * lru[0]) + 
+			    2 * ( -lru[2]*lrv[0]+lru[0]*lrv[2] ) * (  dr_uu[2] * lrv[0] + dr_uv[0] * lru[2] - dr_uu[0] * lrv[2] - dr_uv[2] * lru[0]) +
+			    2 * ( -lru[2]*lrv[1]+lru[1]*lrv[2] ) * ( -dr_uu[2] * lrv[1] - dr_uv[1] * lru[2] + dr_uu[1] * lrv[2] + dr_uv[2] * lru[1]);
+		
+		(*gmat_v) = 2 * ( -lru[1]*lrv[0]+lru[0]*lrv[1] ) * ( -dr_uv[1] * lrv[0] - dr_vv[0] * lru[1] + dr_uv[0] * lrv[1] + dr_vv[1] * lru[0]) + 
+			    2 * ( -lru[2]*lrv[0]+lru[0]*lrv[2] ) * (  dr_uv[2] * lrv[0] + dr_vv[0] * lru[2] - dr_uv[0] * lrv[2] - dr_vv[2] * lru[0]) +
+			    2 * ( -lru[2]*lrv[1]+lru[1]*lrv[2] ) * ( -dr_uv[2] * lrv[1] - dr_vv[1] * lru[2] + dr_uv[1] * lrv[2] + dr_vv[2] * lru[1]);
+/*
+		gmat_u[0] = 2 * tSuu[0] * Ru[0] + 2 * tSuu[1] * Ru[1] + 2 * tSuu[2] * Ru[2];
+		
+		gmat_u[1]  = tSuu[0] * Rv[0] + tSuu[1] * Rv[1] + tSuu[2] * Rv[2];
+		gmat_u[1] += tSuv[0] * Ru[0] + tSuv[1] * Ru[1] + tSuv[2] * Ru[2];
+
+		gmat_u[2]  = tSuu[0] * Rv[0] + tSuu[1] * Rv[1] + tSuu[2] * Rv[2];
+		gmat_u[2] += tSuv[0] * Ru[0] + tSuv[1] * Ru[1] + tSuv[2] * Ru[2];
+
+		gmat_u[3] = 2 * tSuv[0] * Rv[0] + 2 * tSuv[1] * Rv[1] + 2 * tSuv[2] * Rv[2];
+		
+		gmat_v[0] = 2 * tSuv[0] * Ru[0] + 2 * tSuv[1] * Ru[1] + 2 * tSuv[2] * Ru[2];
+		
+		gmat_v[1]  = tSvv[0] * Ru[0] + tSvv[1] * Ru[1] + tSvv[2] * Ru[2];
+		gmat_v[1] += tSuv[0] * Rv[0] + tSuv[1] * Rv[1] + tSuv[2] * Rv[2];
+		
+		gmat_v[2]  = tSvv[0] * Ru[0] + tSvv[1] * Ru[1] + tSvv[2] * Ru[2];
+		gmat_v[2] += tSuv[0] * Rv[0] + tSuv[1] * Rv[1] + tSuv[2] * Rv[2];
+
+		gmat_v[3] = 2 * tSvv[0] * Rv[0] + 2 * tSvv[1] * Rv[1] + 2 * tSvv[2] * Rv[2];
+*/
+		double nrm[3];	
+		cross( lru, lrv, nrm );
+
+		return normalize(nrm);
+	}
+	else
+	{
+		int frm = f*nf_g_q_p;
+	
+		int *cp = theFormulas[frm].cp;
+	
+		double w = 1-u-v;
+	
+		double u2 = u*u;
+		double u3 = u*u*u;
+		double u4 = u*u*u*u;
+		
+		double v2 = v*v;
+		double v3 = v*v*v;
+		double v4 = v*v*v*v;
+		
+		double w2 = w*w;
+		double w3 = w*w*w;
+		double w4 = w*w*w*w;
+			
+		
+		// 8 : 0
+		// 7 : 1
+		// 4 : 2
+		// 5 : 3
+		// 9 : 4
+		// 12 : 5
+		// 11 : 6
+		// 10 : 7
+		// 6 : 8
+		// 3 : 9
+		// 1 : 10
+		// 2 : 11
+	
+		double n1 = (1.0/12.0)*(u4+2*u3*v); 
+		double n2 = (1.0/12.0)*(u4+2*u3*w); 
+		double n3 = (1.0/12.0)*(u4+2*u3*w+6*u3*v+6*u2*v*w+12*u2*v2+6*u*v2*w+6*u*v3+2*v3*w+v4); 
+		double n4 = (1.0/12.0)*(6*u4+24*u3*w+24*u2*w2+8*u*w3+w4+24*u3*v+60*u2*v*w+36*u*v*w2+6*v*w3+24*u2*v2+36*u*v2*w+12*v2*w2+8*u*v3+6*v3*w+v4); 
+		double n5 = (1.0/12.0)*(u4+6*u3*w+12*u2*w2+6*u*w3+w4+2*u3*v+6*u2*v*w+6*u*v*w2+2*v*w3); 
+		double n6 = (1.0/12.0)*(2*u*v3+v4); 
+		double n7 = (1.0/12.0)*(u4+6*u3*w+12*u2*w2+6*u*w3+w4+8*u3*v+36*u2*v*w+36*u*v*w2+8*v*w3+24*u2*v2+60*u*v2*w+24*v2*w2+24*u*v3+24*v3*w+6*v4); 
+		double n8 = (1.0/12.0)*(u4+8*u3*w+24*u2*w2+24*u*w3+6*w4+6*u3*v+36*u2*v*w+60*u*v*w2+24*v*w3+12*u2*v2+36*u*v2*w+24*v2*w2+6*u*v3+8*v3*w+v4); 
+		double n9 = (1.0/12.0)*(2*u*w3+w4); 
+		double n10 = (1.0/12.0)*(2*v3*w+v4); 
+		double n11 = (1.0/12.0)*(2*u*w3+w4+6*u*v*w2+6*v*w3+6*u*v2*w+12*v2*w2+2*u*v3+6*v3*w+v4); 
+		double n12 = (1.0/12.0)*(w4+2*v*w3);
+						
+		double du_1 = Power(u,3)/3. + (Power(u,2)*v)/2.;
+		double du_2 = Power(u,2)/2. - Power(u,3)/3. - (Power(u,2)*v)/2.; 	
+		double du_3 =Power(u,2)/2. - Power(u,3)/3. + u*v - (Power(u,2)*v)/2. + Power(v,2)/2. - Power(v,3)/6.;
+		double du_4 = 0.3333333333333333 + u - Power(u,2) - Power(u,3)/3. + v/2. - u*v - (Power(u,2)*v)/2. - Power(v,2) + Power(v,3)/3.;	
+		double du_5 = 0.16666666666666666 - Power(u,2) + (2*Power(u,3))/3. - v/2. + Power(u,2)*v + Power(v,2)/2. - Power(v,3)/6.;
+		double du_6 = Power(v,3)/6.;	
+		double du_7 = 0.16666666666666666 - Power(u,2) + (2*Power(u,3))/3. + v/2. - 2*u*v + Power(u,2)*v - Power(v,2)/2. - Power(v,3)/6.;	
+		double du_8 = -2*u + 2*Power(u,2) - Power(u,3)/3. - v + 2*u*v - (Power(u,2)*v)/2. + Power(v,2) - Power(v,3)/6.;	
+		double du_9 = -0.16666666666666666 + Power(u,2)/2. - Power(u,3)/3. + v/2. - (Power(u,2)*v)/2. - Power(v,2)/2. + Power(v,3)/6.;	
+		double du_10 = -Power(v,3)/6.;
+		double du_11 = -0.16666666666666666 + Power(u,2)/2. - Power(u,3)/3. - v/2. + u*v - (Power(u,2)*v)/2. + Power(v,3)/3.;	
+		double du_12 = 	-0.3333333333333333 + u - Power(u,2) + Power(u,3)/3. + v/2. - u*v + (Power(u,2)*v)/2. - Power(v,3)/6.;
+	
+		double dv_1 = Power(u,3)/6.;
+		double dv_2 = -Power(u,3)/6.;
+		double dv_3 = Power(u,2)/2. - Power(u,3)/6. + u*v + Power(v,2)/2. - (u*Power(v,2))/2. - Power(v,3)/3.;
+		double dv_4 = 0.16666666666666666 + u/2. - Power(u,2)/2. - Power(u,3)/6. - 2*u*v - Power(v,2) + u*Power(v,2) + (2*Power(v,3))/3.;
+		double dv_5 = -0.16666666666666666 - u/2. + Power(u,3)/3. + u*v + Power(v,2)/2. - (u*Power(v,2))/2. - Power(v,3)/3.;
+		double dv_6 = (u*Power(v,2))/2. + Power(v,3)/3.;
+		double dv_7 = 0.3333333333333333 + u/2. - Power(u,2) + Power(u,3)/3. + v - u*v - Power(v,2) - (u*Power(v,2))/2. - Power(v,3)/3.;
+		double dv_8 = -u + Power(u,2) - Power(u,3)/6. - 2*v + 2*u*v + 2*Power(v,2) - (u*Power(v,2))/2. - Power(v,3)/3.;
+		double dv_9 = -0.3333333333333333 + u/2. - Power(u,3)/6. + v - u*v - Power(v,2) + (u*Power(v,2))/2. + Power(v,3)/3.;
+		double dv_10 = Power(v,2)/2. - (u*Power(v,2))/2. - Power(v,3)/3.;
+		double dv_11 = 0.16666666666666666 - u/2. + Power(u,2)/2. - Power(u,3)/6. - Power(v,2) + u*Power(v,2) + (2*Power(v,3))/3.;
+		double dv_12 = -0.16666666666666666 + u/2. - Power(u,2)/2. + Power(u,3)/6. + Power(v,2)/2. - (u*Power(v,2))/2. - Power(v,3)/3.;
+		
+		double d_uu_1 = Power(u,2) + u*v;
+		double d_uu_2 = u - Power(u,2) - u*v;
+		double d_uu_3 = u - Power(u,2) + v - u*v;
+		double d_uu_4 = 1 - 2*u - Power(u,2) - v - u*v;
+		double d_uu_5 = -2*u + 2*Power(u,2) + 2*u*v;
+		double d_uu_6 = 0;
+		double d_uu_7 = -2*u + 2*Power(u,2) - 2*v + 2*u*v;
+		double d_uu_8 = -2 + 4*u - Power(u,2) + 2*v - u*v;
+		double d_uu_9 = u - Power(u,2) - u*v;
+		double d_uu_10 = 0;
+		double d_uu_11 = u - Power(u,2) + v - u*v;
+		double d_uu_12 = 1 - 2*u + Power(u,2) - v + u*v;
+		
+		double d_uv_1 = Power(u,2)/2.;
+		double d_uv_2 = -Power(u,2)/2.;
+		double d_uv_3 = u - Power(u,2)/2. + v - Power(v,2)/2.;
+		double d_uv_4 = 0.5 - u - Power(u,2)/2. - 2*v + Power(v,2);
+		double d_uv_5 = -0.5 + Power(u,2) + v - Power(v,2)/2.;
+		double d_uv_6 = Power(v,2)/2.;
+		double d_uv_7 = 0.5 - 2*u + Power(u,2) - v - Power(v,2)/2.;
+		double d_uv_8 = -1 + 2*u - Power(u,2)/2. + 2*v - Power(v,2)/2.;
+		double d_uv_9 = 0.5 - Power(u,2)/2. - v + Power(v,2)/2.;
+		double d_uv_10 = -Power(v,2)/2.;
+		double d_uv_11 = -0.5 + u - Power(u,2)/2. + Power(v,2);
+		double d_uv_12 = 0.5 - u + Power(u,2)/2. - Power(v,2)/2.;
+		
+		double d_vv_1 = 0;
+		double d_vv_2 = 0;
+		double d_vv_3 = u + v - u*v - Power(v,2);
+		double d_vv_4 = -2*u - 2*v + 2*u*v + 2*Power(v,2);
+		double d_vv_5 = u + v - u*v - Power(v,2);
+		double d_vv_6 = u*v + Power(v,2);
+		double d_vv_7 = 1 - u - 2*v - u*v - Power(v,2);
+		double d_vv_8 = -2 + 2*u + 4*v - u*v - Power(v,2);
+		double d_vv_9 = 1 - u - 2*v + u*v + Power(v,2);
+		double d_vv_10 = v - u*v - Power(v,2);
+		double d_vv_11 = -2*v + 2*u*v + 2*Power(v,2);
+		double d_vv_12 = v - u*v - Power(v,2);
+		
+		double ceff_map[12] = { n8, n7, n4, n5, n9, n12, n11, n10, n6, n3, n1, n2 };
+		double ceff_map_du[12] = { du_8, du_7, du_4, du_5, du_9, du_12, du_11, du_10, du_6, du_3, du_1, du_2 };
+		double ceff_map_dv[12] = { dv_8, dv_7, dv_4, dv_5, dv_9, dv_12, dv_11, dv_10, dv_6, dv_3, dv_1, dv_2 };
+		double ceff_map_duu[12] = { d_uu_8, d_uu_7, d_uu_4, d_uu_5, d_uu_9, d_uu_12, d_uu_11, d_uu_10, d_uu_6, d_uu_3, d_uu_1, d_uu_2 };
+		double ceff_map_duv[12] = { d_uv_8, d_uv_7, d_uv_4, d_uv_5, d_uv_9, d_uv_12, d_uv_11, d_uv_10, d_uv_6, d_uv_3, d_uv_1, d_uv_2 };
+		double ceff_map_dvv[12] = { d_vv_8, d_vv_7, d_vv_4, d_vv_5, d_vv_9, d_vv_12, d_vv_11, d_vv_10, d_vv_6, d_vv_3, d_vv_1, d_vv_2 };
+	
+		double lru[3] = {0,0,0};
+		double lrv[3] = {0,0,0};
+
+		double dr_uu[3] = {0,0,0};
+		double dr_uv[3] = {0,0,0};
+		double dr_vv[3] = {0,0,0};
+
+		int ncoords_base = theFormulas[frm].ncoor;
+		for( int x = 0; x < ncoords_base; x++ )
+		{
+			double *lr = r + cp[x]*3;
+	
+			lru[0] += ceff_map_du[x] * (lr[0] + theFormulas[frm].r_pbc[3*x+0]);
+			lru[1] += ceff_map_du[x] * (lr[1] + theFormulas[frm].r_pbc[3*x+1]);
+			lru[2] += ceff_map_du[x] * (lr[2] + theFormulas[frm].r_pbc[3*x+2]);
+			
+			lrv[0] += ceff_map_dv[x] * (lr[0] + theFormulas[frm].r_pbc[3*x+0]);
+			lrv[1] += ceff_map_dv[x] * (lr[1] + theFormulas[frm].r_pbc[3*x+1]);
+			lrv[2] += ceff_map_dv[x] * (lr[2] + theFormulas[frm].r_pbc[3*x+2]);
+				
+			dr_uu[0] += ceff_map_duu[x] * alpha_x*(lr[0] + theFormulas[frm].r_pbc[3*x+0]); 
+			dr_uu[1] += ceff_map_duu[x] * alpha_y*(lr[1] + theFormulas[frm].r_pbc[3*x+1]); 
+			dr_uu[2] += ceff_map_duu[x] * alpha_z*(lr[2] + theFormulas[frm].r_pbc[3*x+2]); 
+			                                                                         
+			dr_uv[0] += ceff_map_duv[x] * alpha_x*(lr[0] + theFormulas[frm].r_pbc[3*x+0]); 
+			dr_uv[1] += ceff_map_duv[x] * alpha_y*(lr[1] + theFormulas[frm].r_pbc[3*x+1]); 
+			dr_uv[2] += ceff_map_duv[x] * alpha_z*(lr[2] + theFormulas[frm].r_pbc[3*x+2]); 
+			                                                                         
+			dr_vv[0] += ceff_map_dvv[x] * alpha_x*(lr[0] + theFormulas[frm].r_pbc[3*x+0]); 
+			dr_vv[1] += ceff_map_dvv[x] * alpha_y*(lr[1] + theFormulas[frm].r_pbc[3*x+1]); 
+			dr_vv[2] += ceff_map_dvv[x] * alpha_z*(lr[2] + theFormulas[frm].r_pbc[3*x+2]); 
+		}
+	
+		gmat[0] = lru[0] * lru[0] + lru[1] * lru[1] + lru[2] * lru[2];	
+		gmat[1] = lrv[0] * lru[0] + lrv[1] * lru[1] + lrv[2] * lru[2];	
+		gmat[2] = lru[0] * lrv[0] + lru[1] * lrv[1] + lru[2] * lrv[2];	
+		gmat[3] = lrv[0] * lrv[0] + lrv[1] * lrv[1] + lrv[2] * lrv[2];	
+
+		(*gmat_u) = 2 * ( -lru[1]*lrv[0]+lru[0]*lrv[1] ) * ( -dr_uu[1] * lrv[0] - dr_uv[0] * lru[1] + dr_uu[0] * lrv[1] + dr_uv[1] * lru[0]) + 
+			    2 * ( -lru[2]*lrv[0]+lru[0]*lrv[2] ) * (  dr_uu[2] * lrv[0] + dr_uv[0] * lru[2] - dr_uu[0] * lrv[2] - dr_uv[2] * lru[0]) +
+			    2 * ( -lru[2]*lrv[1]+lru[1]*lrv[2] ) * ( -dr_uu[2] * lrv[1] - dr_uv[1] * lru[2] + dr_uu[1] * lrv[2] + dr_uv[2] * lru[1]);
+		
+		(*gmat_v) = 2 * ( -lru[1]*lrv[0]+lru[0]*lrv[1] ) * ( -dr_uv[1] * lrv[0] - dr_vv[0] * lru[1] + dr_uv[0] * lrv[1] + dr_vv[1] * lru[0]) + 
+			    2 * ( -lru[2]*lrv[0]+lru[0]*lrv[2] ) * (  dr_uv[2] * lrv[0] + dr_vv[0] * lru[2] - dr_uv[0] * lrv[2] - dr_vv[2] * lru[0]) +
+			    2 * ( -lru[2]*lrv[1]+lru[1]*lrv[2] ) * ( -dr_uv[2] * lrv[1] - dr_vv[1] * lru[2] + dr_uv[1] * lrv[2] + dr_vv[2] * lru[1]);
+		/*
+		gmat[0] = Ru[0] * Ru[0] + Ru[1] * Ru[1] + Ru[2] * Ru[2];	
+		gmat[1] = Rv[0] * Ru[0] + Rv[1] * Ru[1] + Rv[2] * Ru[2];	
+		gmat[2] = Ru[0] * Rv[0] + Ru[1] * Rv[1] + Ru[2] * Rv[2];	
+		gmat[3] = Rv[0] * Rv[0] + Rv[1] * Rv[1] + Rv[2] * Rv[2];	
+
+		gmat_u[0] = 2 * tSuu[0] * Ru[0] + 2 * tSuu[1] * Ru[1] + 2 * tSuu[2] * Ru[2];
+		
+		gmat_u[1]  = tSuu[0] * Rv[0] + tSuu[1] * Rv[1] + tSuu[2] * Rv[2];
+		gmat_u[1] += tSuv[0] * Ru[0] + tSuv[1] * Ru[1] + tSuv[2] * Ru[2];
+
+		gmat_u[2]  = tSuu[0] * Rv[0] + tSuu[1] * Rv[1] + tSuu[2] * Rv[2];
+		gmat_u[2] += tSuv[0] * Ru[0] + tSuv[1] * Ru[1] + tSuv[2] * Ru[2];
+
+		gmat_u[3] = 2 * tSuv[0] * Rv[0] + 2 * tSuv[1] * Rv[1] + 2 * tSuv[2] * Rv[2];
+		
+		gmat_v[0] = 2 * tSuv[0] * Ru[0] + 2 * tSuv[1] * Ru[1] + 2 * tSuv[2] * Ru[2];
+		
+		gmat_v[1]  = tSvv[0] * Ru[0] + tSvv[1] * Ru[1] + tSvv[2] * Ru[2];
+		gmat_v[1] += tSuv[0] * Rv[0] + tSuv[1] * Rv[1] + tSuv[2] * Rv[2];
+		
+		gmat_v[2]  = tSvv[0] * Ru[0] + tSvv[1] * Ru[1] + tSvv[2] * Ru[2];
+		gmat_v[2] += tSuv[0] * Rv[0] + tSuv[1] * Rv[1] + tSuv[2] * Rv[2];
+
+		gmat_v[3] = 2 * tSvv[0] * Rv[0] + 2 * tSvv[1] * Rv[1] + 2 * tSvv[2] * Rv[2];
+
+*/	
+		double nrm[3];
+		cross( lru, lrv, nrm );
+		return normalize(nrm);
+	}	
+
+	return 1e-100;
+}
 
 double surface::g( int f, double u, double v, double *r )
 {
