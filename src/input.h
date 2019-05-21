@@ -168,6 +168,8 @@ class parameterBlock
 	int planar_topology;
 	int collect_hk;
 
+	int on_surface;
+
 	parameterBlock(void);
 };
 

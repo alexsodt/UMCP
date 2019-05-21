@@ -48,6 +48,7 @@ extern double kg;
 extern double KA;
 extern double KA4;
 extern double VR;
+extern double kT;
 
 double mode_KA = 0; // a ``global'' KA to use when doing modes, because with "z" movements individual elements cannot relax -- this is artificial. 
 double dist_nrm = 0;
@@ -119,8 +120,10 @@ int temp_main( int argc, char **argv )
 	int nequil = block.nequil;
 	int do_srd = block.do_srd;
 	int do_ld = block.do_ld;
+	int on_surface = block.on_surface;
 	int debug = block.debug;
 	double kcal_mol_K = (5.92186663194E-01/298);
+	kT = (5.92186663194E-01/298) * (block.T);
 	double temperature = kcal_mol_K * (block.T);
 	printf("temperature: %le (kcal/mol) %le T\n", temperature, block.T );
 	double eta_SI = block.eta; //8.90*(1e-4); // Joule second per meter cubed)	

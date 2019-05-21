@@ -157,6 +157,8 @@ void setDefaults( parameterBlock *block )
 	block->s_q_period = 1000; // 1000 steps per S_q	
 	block->shape_correction = 0;
 
+	block->on_surface = 0;
+
 	// request a timestep analysis
 	block->timestep_analysis = 0;
 
@@ -953,6 +955,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}	
 		}
+		else if( !strcasecmp( word1, "on_surface" ) )
+		  {
+		    if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+		      block->on_surface = 1;
+		    else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+		      block->on_surface = 0;
+		    else
+		      {
+			printf("Could not interpret input line '%s'.\n", tbuf );
+			ERROR = 1;
+		      }
+		  }
 		else if( !strcasecmp( word1, "add") )
 		{
 			// format: add COMPLEX_NAME nbound        %d  [inside|outside]

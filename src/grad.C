@@ -17,7 +17,8 @@ extern double k_reg;
 extern double KA;
 extern double kg;
 extern double k_strain;
-extern int do_face, do_pt, debug_bit;
+extern double kT;
+extern int do_face, do_pt, debug_bit, on_surface;
 static double THRESH = 1e-8;
 double nrm_grad[6];
 
@@ -5894,6 +5895,30 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 			dedr[3*p+2] += d_e_d_rvz * ceff_map_dv[p];
 		}
 		
+		if ( on_surface )
+		  {
+		    for( int p = 0; p < np; p++ )
+		      {
+			
+			gr[3*cp[p]+0] -= 0.5 * kT * d_g_d_rux * ceff_map_du[p] * alpha_x;
+			gr[3*cp[p]+1] -= 0.5 * kT * d_g_d_ruy * ceff_map_du[p] * alpha_y;
+			gr[3*cp[p]+2] -= 0.5 * kT * d_g_d_ruz * ceff_map_du[p] * alpha_z;
+
+			gr[3*cp[p]+0] -= 0.5 * kT * d_g_d_rvx * ceff_map_dv[p] * alpha_x;
+			gr[3*cp[p]+1] -= 0.5 * kT * d_g_d_rvy * ceff_map_dv[p] * alpha_y;
+			gr[3*cp[p]+2] -= 0.5 * kT * d_g_d_rvz * ceff_map_dv[p] * alpha_z;
+
+			dedr[3*p+0] -= 0.5 * kT * d_g_d_rux * ceff_map_du[p];
+			dedr[3*p+1] -= 0.5 * kT * d_g_d_ruy * ceff_map_du[p];
+			dedr[3*p+2] -= 0.5 * kT * d_g_d_ruz * ceff_map_du[p];
+
+			dedr[3*p+0] -= 0.5 * kT * d_g_d_rvx * ceff_map_dv[p];
+			dedr[3*p+1] -= 0.5 * kT * d_g_d_rvy * ceff_map_dv[p];
+			dedr[3*p+2] -= 0.5 * kT * d_g_d_rvz * ceff_map_dv[p];
+
+		      }
+		  }
+
 		for( int p = 0; p < np; p++ )
 		{
 			gr[3*nv+0] += dedr[3*p+0] * (r[cp[p]*3+0] + theFormulas[frm].r_pbc[3*p+0]); 
