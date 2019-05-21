@@ -11,9 +11,8 @@
 #include <typeinfo>
 #include <ctype.h>
 
-double kT = 0.592;
-
 extern double kc;
+extern double kT;
 static double default_particle_area = 65;
 static double lipid_DC = 1e9; //Angstrom^2/s
 

@@ -269,7 +269,7 @@ struct surface
 	irr_kernel *kernels[20];
 
 	// BEGIN flags from input 
-	
+        int on_surface;
 	// END flags from input
 
 	Bin *** box;
