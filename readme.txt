@@ -1,5 +1,5 @@
 If the underlying automake'd files are changed you may need to run:
 
-automake -f -c
+autoreconf
 
 to avoid a version mismatch error.
