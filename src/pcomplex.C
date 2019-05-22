@@ -10,9 +10,9 @@
 #include "p_p.h"
 #include <typeinfo>
 #include <ctype.h>
+#include "globals.h"
 
 extern double kc;
-extern double kT;
 static double default_particle_area = 65;
 static double lipid_DC = 1e9; //Angstrom^2/s
 
@@ -955,15 +955,16 @@ void pcomplex::propagate_surface_q( surface *theSurface, double *rsurf, double d
 		if( do_bd )
 		{
 			double gmat[4];
-			double gmat_u;
-			double gmat_v;
+			double g_u; // derivative of |g|, not root wrt u
+			double g_v; //                             wrt v
 			
 			double noise[2] = { 
 				gsl_ran_gaussian(r_gen_global, 1 ),
 				gsl_ran_gaussian(r_gen_global, 1 )
 				};
 	
-			double gval = theSurface->metric( fs[s], puv[2*s+0], puv[2*s+1], rsurf, gmat, &gmat_u, &gmat_v );
+			// gval is the sqrt metric
+			double root_g = theSurface->metric( fs[s], puv[2*s+0], puv[2*s+1], rsurf, gmat, &g_u, &g_v );
 
 			double val = sqrt(gmat[0]*gmat[0]+4*gmat[1]*gmat[1]-2*gmat[0]*gmat[3]+gmat[3]*gmat[3]);
 
@@ -975,12 +976,12 @@ void pcomplex::propagate_surface_q( surface *theSurface, double *rsurf, double d
 				};
 
 			double gamma_inv[4] = {
-				gmat[0]/(gval*gval), -gmat[1]/(gval*gval), -gmat[1]/(gval*gval), gmat[3]/(gval*gval)
+				gmat[0]/(root_g*root_g), -gmat[1]/(root_g*root_g), -gmat[1]/(root_g*root_g), gmat[3]/(root_g*root_g)
 			};
 	
 			double pre_drift[2] = { 
-					save_grad[0]/kT + (-gmat_u/(2*gval*gval)), 
-					save_grad[1]/kT + (-gmat_v/(2*gval*gval))
+					save_grad[0]/kT + (-g_u/(2*root_g*root_g)), // 1/g done with sqrt
+					save_grad[1]/kT + (-g_v/(2*root_g*root_g))
 						};
 
 			double corr_noise[2] = { gamma_neg_half[0] * noise[0] + gamma_neg_half[1] * noise[1],

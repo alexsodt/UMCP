@@ -7,6 +7,7 @@
 #include "mutil.h"
 #include "l-bfgs.h"
 #include "parallel.h"
+#include "globals.h"
 
 //#define DEBUG_NRMX
 //#define DEBUG_G
@@ -17,7 +18,6 @@ extern double k_reg;
 extern double KA;
 extern double kg;
 extern double k_strain;
-extern double kT;
 extern int do_face, do_pt, debug_bit, on_surface;
 static double THRESH = 1e-8;
 double nrm_grad[6];

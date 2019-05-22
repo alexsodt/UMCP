@@ -20,6 +20,7 @@
 #include "npt.h"
 #include "random_global.h"
 #include "sans.h"
+#include "globals.h"
 
 #define MM_METHOD_1
 #define BOXED
@@ -48,7 +49,6 @@ extern double kg;
 extern double KA;
 extern double KA4;
 extern double VR;
-extern double kT;
 
 double mode_KA = 0; // a ``global'' KA to use when doing modes, because with "z" movements individual elements cannot relax -- this is artificial. 
 double dist_nrm = 0;
