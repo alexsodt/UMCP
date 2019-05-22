@@ -978,17 +978,19 @@ void pcomplex::propagate_surface_q( surface *theSurface, double *rsurf, double d
 			double gamma_inv[4] = {
 				gmat[0]/(root_g*root_g), -gmat[1]/(root_g*root_g), -gmat[1]/(root_g*root_g), gmat[3]/(root_g*root_g)
 			};
+
 	
 			double pre_drift[2] = { 
 					save_grad[0]/kT + (-g_u/(2*root_g*root_g)), // 1/g done with sqrt
 					save_grad[1]/kT + (-g_v/(2*root_g*root_g))
 						};
 
+
 			double corr_noise[2] = { gamma_neg_half[0] * noise[0] + gamma_neg_half[1] * noise[1],
 						 gamma_neg_half[2] * noise[0] + gamma_neg_half[3] * noise[1] }; 
 
-			duv[0] = (gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt + noise[0] * sqrt(2 * DC[s] * dt) * corr_noise[0];
-			duv[1] = (gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt + noise[1] * sqrt(2 * DC[s] * dt) * corr_noise[1];	
+			duv[0] = (gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[0];
+			duv[1] = (gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[1];	
 		}
 		else
 		{

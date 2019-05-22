@@ -2850,7 +2850,7 @@ void surface::approxSparseEffectiveMass( force_set * theForceSet, int *use_map, 
 
 // this is the square-root mass matrix, not its inverse.
 //
-void surface::getSparseMass( force_set * theForceSet, SparseMatrix **theMatrix )
+void surface::getSparseRoot( force_set * theForceSet, SparseMatrix **theMatrix )
 {
 	SparseMatrix *mass_matrix = new SparseMatrix;
 	mass_matrix->init( nv ); 
