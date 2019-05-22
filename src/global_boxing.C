@@ -4,46 +4,43 @@
 #include <stdlib.h>
 #include <math.h>
 
-global_boxing *boxing = NULL;
-int global_boxing_init = 0;
+//global_boxing *boxing = NULL;
+//int global_boxing_init = 0;
 
-void setup_global_boxing( double target_box_width, double PBC[3][3] )
+void global_boxing::setup_boxing( double target_box_width, double PBC[3][3] )
 {
-	global_boxing_init = 1;
-	boxing = (global_boxing *)malloc( sizeof(global_boxing) );
-
-	boxing->nx = ceil(PBC[0][0] / target_box_width);	
-	boxing->ny = ceil(PBC[1][1] / target_box_width);	
-	boxing->nz = ceil(PBC[2][2] / target_box_width);	
+	nx = ceil(PBC[0][0] / target_box_width);	
+	ny = ceil(PBC[1][1] / target_box_width);	
+	nz = ceil(PBC[2][2] / target_box_width);	
 
 	for( int i = 0; i < 3; i++ )
 	for( int j = 0; j < 3; j++ )
-		boxing->PBC[i][j] = PBC[i][j];
+		PBC[i][j] = PBC[i][j];
 
-	if( boxing->nx < 0 ) boxing->nx = 1;
-	if( boxing->ny < 0 ) boxing->ny = 1;
-	if( boxing->nz < 0 ) boxing->nz = 1;
+	if( nx < 0 ) nx = 1;
+	if( ny < 0 ) ny = 1;
+	if( nz < 0 ) nz = 1;
 
-	int tot_boxes = boxing->nx * boxing->ny * boxing->nz;
+	int tot_boxes = nx * ny * nz;
 
 	if( tot_boxes > 1e6 )
 	{
-		if( boxing->nx > 100 ) boxing->nx = 100;
-		if( boxing->ny > 100 ) boxing->ny = 100;
-		if( boxing->nz > 100 ) boxing->nz = 100;
+		if( nx > 100 ) nx = 100;
+		if( ny > 100 ) ny = 100;
+		if( nz > 100 ) nz = 100;
 	}
 	
-	tot_boxes = boxing->nx * boxing->ny * boxing->nz;
+	tot_boxes = nx * ny * nz;
 
-	boxing->boxes = (box *)malloc( sizeof(box) * tot_boxes );
+	boxes = (box *)malloc( sizeof(box) * tot_boxes );
 
 	for( int b = 0; b < tot_boxes; b++ )
 	{
-		boxing->boxes[b].npspace = 1;
-		boxing->boxes[b].plist = (int *)malloc( sizeof(int) * boxing->boxes[b].npspace );
+		boxes[b].npspace = 1;
+		boxes[b].plist = (int *)malloc( sizeof(int) * boxes[b].npspace );
 	}
 
-	boxing->clearBoxing();
+	clearBoxing();
 }
 
 int global_boxing::getNearPts( double *r, int *plist, double rad_search )
@@ -96,9 +93,9 @@ int global_boxing::getNearPts( double *r, int *plist, double rad_search )
 
 		int box = (tx * ny + ty) * nz + tz;	
 
-		for( int tp = 0; tp < boxing->boxes[box].np; tp++ )
+		for( int tp = 0; tp <boxes[box].np; tp++ )
 		{
-			plist[np] = boxing->boxes[box].plist[tp];
+			plist[np] = boxes[box].plist[tp];
 			np++;
 		}	
 	}

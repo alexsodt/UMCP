@@ -24,6 +24,8 @@ static double SMOOTH_THRESH = 1e-2;
 static int *elastic_exclusion_list = NULL;
 static int nexcluded = 0;
 
+static global_boxing *pp_boxing = NULL;
+
 /*
 int pos_pot = 12;
 int neg_pot = 6;
@@ -53,7 +55,8 @@ void local_setup( surface *theSurface, pcomplex **allComplexes, int ncomplex )
 
 	use_max_sigma = max_sigma;
 
-	setup_global_boxing(2 * max_sigma, theSurface->PBC_vec  );
+	pp_boxing = (global_boxing *)malloc( sizeof(global_boxing) );
+	pp_boxing->setup_boxing(2 * max_sigma, theSurface->PBC_vec  );
 }
 
 /* potential */
@@ -373,10 +376,10 @@ double Boxed_PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 	for( int c = 0; c < ncomplex; c++ )
 		allComplexes[c]->setrall(theSurface, rsurf);
 
-	if( ! global_boxing_init || !boxing )
+	if( !pp_boxing )
 		local_setup( theSurface, allComplexes, ncomplex );
 
-	boxing->setPBC( theSurface->PBC_vec, alphas );
+	pp_boxing->setPBC( theSurface->PBC_vec, alphas );
 
 	int ntotp = 0;
 	for( int c = 0; c < ncomplex; c++ )
@@ -405,7 +408,7 @@ double Boxed_PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 		{
 			complex_for_id[id] = c1;
 			subp_for_id[id] = p;
-			to_clear[id] = boxing->addp(allComplexes[c1]->rall+3*p, id );
+			to_clear[id] = pp_boxing->addp(allComplexes[c1]->rall+3*p, id );
 			id++;
 		}
 	}
@@ -428,7 +431,7 @@ double Boxed_PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 
 			if( !(max_sigma1>0) ) continue;
 	
-			int np  = boxing->getNearPts( allComplexes[c1]->rall+3*p1, nearlist, 1.25 * rmin_mult * (use_max_sigma + max_sigma1) );
+			int np  = pp_boxing->getNearPts( allComplexes[c1]->rall+3*p1, nearlist, 1.25 * rmin_mult * (use_max_sigma + max_sigma1) );
 
 			for( int x = 0; x < np; x++ )
 			{
@@ -520,7 +523,7 @@ double Boxed_PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 	free(complex_for_id);
 	free(subp_for_id);
 	
-	boxing->clearBoxing(to_clear, ntotp);
+	pp_boxing->clearBoxing(to_clear, ntotp);
 	free(to_clear);
 	return v;
 }
@@ -532,9 +535,9 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 #ifdef DISABLE_PP
 	return 0;
 #endif
-	if( ! global_boxing_init || !boxing )
+	if( !pp_boxing )
 		local_setup( theSurface, allComplexes, ncomplex );
-	boxing->setPBC( theSurface->PBC_vec, alphas );
+	pp_boxing->setPBC( theSurface->PBC_vec, alphas );
 
 
 	int ntotp = 0;
@@ -564,7 +567,7 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 		{
 			complex_for_id[id] = c1;
 			subp_for_id[id] = p;
-			to_clear[id] = boxing->addp(allComplexes[c1]->rall+3*p, id );
+			to_clear[id] = pp_boxing->addp(allComplexes[c1]->rall+3*p, id );
 			id++;
 		}
 	}
@@ -590,7 +593,7 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 
 			if( !(max_sigma1>0) ) continue;
 	
-			int np  = boxing->getNearPts( allComplexes[c1]->rall+3*p1, nearlist, 1.25 * rmin_mult * (use_max_sigma + max_sigma1) );
+			int np  = pp_boxing->getNearPts( allComplexes[c1]->rall+3*p1, nearlist, 1.25 * rmin_mult * (use_max_sigma + max_sigma1) );
 
 			for( int x = 0; x < np; x++ )
 			{
@@ -786,7 +789,7 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 	free(complex_for_id);
 	free(subp_for_id);
 	
-	boxing->clearBoxing(to_clear, ntotp);
+	pp_boxing->clearBoxing(to_clear, ntotp);
 	free(to_clear);
 	return v;
 }
@@ -798,9 +801,9 @@ double handleElasticCollisions( surface *theSurface, double *rsurf, pcomplex **a
 #endif
 
 	double *alphas = rsurf + theSurface->nv*3;
-	if( ! global_boxing_init || !boxing )
+	if( ! pp_boxing )
 		local_setup( theSurface, allComplexes, ncomplex );
-	boxing->setPBC( theSurface->PBC_vec, alphas );
+	pp_boxing->setPBC( theSurface->PBC_vec, alphas );
 
 	int ntotp = 0;
 	for( int c = 0; c < ncomplex; c++ )
@@ -830,7 +833,7 @@ double handleElasticCollisions( surface *theSurface, double *rsurf, pcomplex **a
 		{
 			complex_for_id[id] = c1;
 			subp_for_id[id] = p;
-			to_clear[id] = boxing->addp(allComplexes[c1]->rall+3*p, id );
+			to_clear[id] = pp_boxing->addp(allComplexes[c1]->rall+3*p, id );
 			id++;
 		}
 	}
@@ -850,7 +853,7 @@ double handleElasticCollisions( surface *theSurface, double *rsurf, pcomplex **a
 		{
 			double sigma1 = allComplexes[c1]->sigma[p1];
 	
-			int np  = boxing->getNearPts( allComplexes[c1]->rall+3*p1, nearlist, 1.25 * rmin_mult * (use_max_sigma + sigma1) );
+			int np  = pp_boxing->getNearPts( allComplexes[c1]->rall+3*p1, nearlist, 1.25 * rmin_mult * (use_max_sigma + sigma1) );
 
 			for( int x = 0; x < np; x++ )
 			{
@@ -1048,7 +1051,7 @@ double handleElasticCollisions( surface *theSurface, double *rsurf, pcomplex **a
 	free(complex_for_id);
 	free(subp_for_id);
 	
-	boxing->clearBoxing(to_clear, ntotp);
+	pp_boxing->clearBoxing(to_clear, ntotp);
 	free(to_clear);
 
 	return v;
@@ -1059,9 +1062,9 @@ double handleElasticCollisions( surface *theSurface, double *rsurf, pcomplex **a
 double nElasticCollisions( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex )
 {
 	double *alphas = rsurf + theSurface->nv*3;
-	if( ! global_boxing_init || !boxing )
+	if( ! pp_boxing )
 		local_setup( theSurface, allComplexes, ncomplex );
-	boxing->setPBC( theSurface->PBC_vec, alphas );
+	pp_boxing->setPBC( theSurface->PBC_vec, alphas );
 
 	int ntotp = 0;
 	for( int c = 0; c < ncomplex; c++ )
@@ -1091,7 +1094,7 @@ double nElasticCollisions( surface *theSurface, double *rsurf, pcomplex **allCom
 		{
 			complex_for_id[id] = c1;
 			subp_for_id[id] = p;
-			to_clear[id] = boxing->addp(allComplexes[c1]->rall+3*p, id );
+			to_clear[id] = pp_boxing->addp(allComplexes[c1]->rall+3*p, id );
 			id++;
 		}
 	}
@@ -1115,7 +1118,7 @@ double nElasticCollisions( surface *theSurface, double *rsurf, pcomplex **allCom
 			for( int p2 = allComplexes[c2]->nattach; p2 < allComplexes[c2]->nsites; p2++ )
 			{
 #else	
-			int np  = boxing->getNearPts( allComplexes[c1]->rall+3*p1, nearlist, 1.25 * rmin_mult * (use_max_sigma + sigma1) );
+			int np  = pp_boxing->getNearPts( allComplexes[c1]->rall+3*p1, nearlist, 1.25 * rmin_mult * (use_max_sigma + sigma1) );
 
 			for( int x = 0; x < np; x++ )
 			{
@@ -1166,7 +1169,7 @@ double nElasticCollisions( surface *theSurface, double *rsurf, pcomplex **allCom
 	free(complex_for_id);
 	free(subp_for_id);
 	
-	boxing->clearBoxing(to_clear, ntotp);
+	pp_boxing->clearBoxing(to_clear, ntotp);
 	free(to_clear);
 
 #ifdef DISABLE_ELASTIC
@@ -1183,9 +1186,9 @@ double timePrecedingElasticCollision( surface *theSurface, double *rsurf, pcompl
 #endif
 
 	double *alphas = rsurf + theSurface->nv*3;
-	if( ! global_boxing_init || !boxing )
+	if(!pp_boxing )
 		local_setup( theSurface, allComplexes, ncomplex );
-	boxing->setPBC( theSurface->PBC_vec, alphas );
+	pp_boxing->setPBC( theSurface->PBC_vec, alphas );
 
 	int ntotp = 0;
 	for( int c = 0; c < ncomplex; c++ )
@@ -1215,7 +1218,7 @@ double timePrecedingElasticCollision( surface *theSurface, double *rsurf, pcompl
 		{
 			complex_for_id[id] = c1;
 			subp_for_id[id] = p;
-			to_clear[id] = boxing->addp(allComplexes[c1]->rall+3*p, id );
+			to_clear[id] = pp_boxing->addp(allComplexes[c1]->rall+3*p, id );
 			id++;
 		}
 	}
@@ -1240,7 +1243,7 @@ double timePrecedingElasticCollision( surface *theSurface, double *rsurf, pcompl
 		{
 			double sigma1 = allComplexes[c1]->sigma[p1];
 	
-			int np  = boxing->getNearPts( allComplexes[c1]->rall+3*p1, nearlist, 1.25 * rmin_mult * (use_max_sigma + sigma1) );
+			int np  = pp_boxing->getNearPts( allComplexes[c1]->rall+3*p1, nearlist, 1.25 * rmin_mult * (use_max_sigma + sigma1) );
 
 			for( int x = 0; x < np; x++ )
 			{
@@ -1394,7 +1397,7 @@ double timePrecedingElasticCollision( surface *theSurface, double *rsurf, pcompl
 	free(complex_for_id);
 	free(subp_for_id);
 	
-	boxing->clearBoxing(to_clear, ntotp);
+	pp_boxing->clearBoxing(to_clear, ntotp);
 	free(to_clear);
 
 	return time_preceding_collision;

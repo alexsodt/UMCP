@@ -18,13 +18,9 @@ typedef struct global_boxing
 	int addp( double *r, int pind );
 	void clearBoxing( int *list= NULL, int nclear=0 );
 	int getNearPts( double *r, int *plist, double rad_search );
+	void setup_boxing( double target_box_width, double PBC[3][3] );
 } global_boxing;
 
-void setup_global_boxing( double target_box_width, double PBC[3][3] );
 
-#ifndef __global_boxingc__
-extern int global_boxing_init;
-extern global_boxing *boxing;
-#endif
 
 #endif
