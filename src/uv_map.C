@@ -650,11 +650,11 @@ double surface::metric( int f, double u, double v, double *r, double *gmat, doub
 		gmat[3] = lrv[0] * lrv[0] + lrv[1] * lrv[1] + lrv[2] * lrv[2];	
 
 		(*gmat_u) = 2 * ( -lru[1]*lrv[0]+lru[0]*lrv[1] ) * ( -dr_uu[1] * lrv[0] - dr_uv[0] * lru[1] + dr_uu[0] * lrv[1] + dr_uv[1] * lru[0]) + 
-			    2 * ( -lru[2]*lrv[0]+lru[0]*lrv[2] ) * (  dr_uu[2] * lrv[0] + dr_uv[0] * lru[2] - dr_uu[0] * lrv[2] - dr_uv[2] * lru[0]) +
+			    2 * (  lru[2]*lrv[0]-lru[0]*lrv[2] ) * (  dr_uu[2] * lrv[0] + dr_uv[0] * lru[2] - dr_uu[0] * lrv[2] - dr_uv[2] * lru[0]) +
 			    2 * ( -lru[2]*lrv[1]+lru[1]*lrv[2] ) * ( -dr_uu[2] * lrv[1] - dr_uv[1] * lru[2] + dr_uu[1] * lrv[2] + dr_uv[2] * lru[1]);
 		
 		(*gmat_v) = 2 * ( -lru[1]*lrv[0]+lru[0]*lrv[1] ) * ( -dr_uv[1] * lrv[0] - dr_vv[0] * lru[1] + dr_uv[0] * lrv[1] + dr_vv[1] * lru[0]) + 
-			    2 * ( -lru[2]*lrv[0]+lru[0]*lrv[2] ) * (  dr_uv[2] * lrv[0] + dr_vv[0] * lru[2] - dr_uv[0] * lrv[2] - dr_vv[2] * lru[0]) +
+			    2 * (  lru[2]*lrv[0]-lru[0]*lrv[2] ) * (  dr_uv[2] * lrv[0] + dr_vv[0] * lru[2] - dr_uv[0] * lrv[2] - dr_vv[2] * lru[0]) +
 			    2 * ( -lru[2]*lrv[1]+lru[1]*lrv[2] ) * ( -dr_uv[2] * lrv[1] - dr_vv[1] * lru[2] + dr_uv[1] * lrv[2] + dr_vv[2] * lru[1]);
 /*
 		gmat_u[0] = 2 * tSuu[0] * Ru[0] + 2 * tSuu[1] * Ru[1] + 2 * tSuu[2] * Ru[2];
@@ -840,11 +840,11 @@ double surface::metric( int f, double u, double v, double *r, double *gmat, doub
 		gmat[3] = lrv[0] * lrv[0] + lrv[1] * lrv[1] + lrv[2] * lrv[2];	
 
 		(*gmat_u) = 2 * ( -lru[1]*lrv[0]+lru[0]*lrv[1] ) * ( -dr_uu[1] * lrv[0] - dr_uv[0] * lru[1] + dr_uu[0] * lrv[1] + dr_uv[1] * lru[0]) + 
-			    2 * ( -lru[2]*lrv[0]+lru[0]*lrv[2] ) * (  dr_uu[2] * lrv[0] + dr_uv[0] * lru[2] - dr_uu[0] * lrv[2] - dr_uv[2] * lru[0]) +
+			    2 * (  lru[2]*lrv[0]-lru[0]*lrv[2] ) * (  dr_uu[2] * lrv[0] + dr_uv[0] * lru[2] - dr_uu[0] * lrv[2] - dr_uv[2] * lru[0]) +
 			    2 * ( -lru[2]*lrv[1]+lru[1]*lrv[2] ) * ( -dr_uu[2] * lrv[1] - dr_uv[1] * lru[2] + dr_uu[1] * lrv[2] + dr_uv[2] * lru[1]);
 		
 		(*gmat_v) = 2 * ( -lru[1]*lrv[0]+lru[0]*lrv[1] ) * ( -dr_uv[1] * lrv[0] - dr_vv[0] * lru[1] + dr_uv[0] * lrv[1] + dr_vv[1] * lru[0]) + 
-			    2 * ( -lru[2]*lrv[0]+lru[0]*lrv[2] ) * (  dr_uv[2] * lrv[0] + dr_vv[0] * lru[2] - dr_uv[0] * lrv[2] - dr_vv[2] * lru[0]) +
+			    2 * (  lru[2]*lrv[0]-lru[0]*lrv[2] ) * (  dr_uv[2] * lrv[0] + dr_vv[0] * lru[2] - dr_uv[0] * lrv[2] - dr_vv[2] * lru[0]) +
 			    2 * ( -lru[2]*lrv[1]+lru[1]*lrv[2] ) * ( -dr_uv[2] * lrv[1] - dr_vv[1] * lru[2] + dr_uv[1] * lrv[2] + dr_vv[2] * lru[1]);
 		/*
 		gmat[0] = Ru[0] * Ru[0] + Ru[1] * Ru[1] + Ru[2] * Ru[2];	
