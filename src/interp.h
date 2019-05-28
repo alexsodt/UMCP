@@ -194,16 +194,18 @@ struct boxel
 	int *f; // face
 	int *p; // subpoint
 };
-
 struct boxing
 {
+
 	int nx;
 	int ny;
 	int nz;
 	
 	int *pbox; // id of box for each particle.	
 	boxel *boxes;
+	
 };
+
 
 struct surface
 {
@@ -366,6 +368,13 @@ struct surface
 	int getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int mode_min, int mode_max, double **gen_transform, double **output_qvals, double **scaling_factors );
 	int origPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int mode_min, int mode_max, double **gen_transform, double **output_qvals, double **scaling_factors );
 
+	// THESE SHOULD EVENTUALLY BE DELETED	
+	void addParticleToFace( int f, int pid, double c0, double p_area );
+	int getNear( double *p_in, int id_in, double *all_p, double cut, double alpha_x, double alpha_y, double alpha_z, int *plist, double *rads );
+	void addParticle( double *r, int id, double alpha_x, double alpha_y, double alpha_z );
+	void updateParticle( double *r, int id, double alpha_x, double alpha_y, double alpha_z );
+	void setupBoxing( double *r, double *lcoords, int npts=0, double rad=0, int do_pr=0  ); // setup surface or pt boxing.
+
 
 	void mode_perturb( double *r, double *ro, int qi, int qj, int nx, int ny, double Lx, double Ly, double mag, int do_cosine);
 	void setup_mode_perturb( double *ro, int qi, int qj, int nx, int ny, double Lx, double Ly );
@@ -399,14 +408,9 @@ struct surface
 	double spatialConstraintEnergy( double * r);	
 	void writeXYZandPSFPeriodic( const char *baseName );
 	void getReport( double *r, double cmin, double cmax, int nbins, double *J_hist, double *K_hist, double *jtot, double *ktot);
-	void setupBoxing( double *r, double *lcoords, int npts=0, double rad=0, int do_pr_boxing=0 ); // setup surface or pt boxing.
 	void nearPt( double *p, double *lcoords, double cut, double alpha_x, double alpha_y, double alpha_z, int *bf, int *bp );
 	void storeDipoleOP( double *r, int f, int p, double *dr );
 	void removeParticleFromFace( int f, int pid, double c0, double p_area );
-	void addParticleToFace( int f, int pid, double c0, double p_area );
-	int getNear( double *p_in, int id_in, double *all_p, double cut, double alpha_x, double alpha_y, double alpha_z, int *plist, double *rads );
-	void addParticle( double *r, int id, double alpha_x, double alpha_y, double alpha_z );
-	void updateParticle( double *r, int id, double alpha_x, double alpha_y, double alpha_z );
 	void computeEdgeCurvature( double *r );
 	void sortFaces( void );
 	void constructIrregularKernels( void );
@@ -478,7 +482,7 @@ struct surface
 	void dKE_dx_and2( force_set *theForceSet,SparseMatrix *effM, double *vp, double *unit_f_vec, int f, double u, double v, double *dKEdx, double *d2KEdx2 );
 	void getEffectiveMass( force_set * theForceSet, double *effective_mass );
 	void getSparseEffectiveMass( force_set * theForceSet, int *use_map, int *nuse, SparseMatrix **, double *gen_transform=NULL, int NQ=-1, double *mass_scaling=NULL);
-	void getSparseMass( force_set * theForceSet, SparseMatrix **theMatrix );
+	void getSparseRoot( force_set * theForceSet, SparseMatrix **theMatrix );
 	void approxSparseEffectiveMass( force_set * theForceSet, int *use_map, int *nuse, SparseMatrix **, double *gen_transform=NULL, int NQ=-1, double *mass_scaling=NULL);
 	void applyForceAtPoint( int f, double u, double v, double *dp, double *force_vector, force_set *theForceSet );
 	void velocityAtPoint( int f, double u, double v, double *vp, double *velocity_out );

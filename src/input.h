@@ -156,7 +156,8 @@ class parameterBlock
 	// thermostats, LD and SRD
 	int sub_com_period;
 	int do_ld;
-	int do_bd;
+	int do_bd_particles;
+	int do_bd_membrane;
 	int nve_switch; // outer loop iteration to switch to NVE dynamics
 	int hard_z_boundary;
 	double srd_M;

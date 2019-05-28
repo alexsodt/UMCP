@@ -121,7 +121,8 @@ int temp_main( int argc, char **argv )
 	int do_srd = block.do_srd;
 	int do_ld = block.do_ld;
 	int on_surface = block.on_surface;
-	int do_bd = block.do_bd;
+	int do_bd_membrane = block.do_bd_membrane;
+	int do_bd_particles = block.do_bd_particles;
 	int debug = block.debug;
 	double kcal_mol_K = (5.92186663194E-01/298);
 	kT = (5.92186663194E-01/298) * (block.T);
@@ -602,7 +603,7 @@ int temp_main( int argc, char **argv )
 	double running_time = 0;
 	double gamma_langevin = block.gamma_langevin;
 
-	if( do_ld || do_bd )
+	if( do_ld || do_bd_membrane || do_bd_particles )
 	{
 #ifndef OLD_LANGEVIN
 		double prod =  gamma_langevin * time_step * AKMA_TIME;	
@@ -677,17 +678,16 @@ int temp_main( int argc, char **argv )
 	
 
 	setupParallel( sub_surface, allComplexes, ncomplex, ( do_gen_q ? NQ : 0) );
-	SparseMatrix *EFFM;
-	SparseMatrix *MMat;
+	SparseMatrix *EFFM = NULL;
+	SparseMatrix *MMat = NULL;
 	int max_mat = nv;
 	if( NQ > nv )
 		max_mat = NQ;
 	int *sparse_use = (int *)malloc( sizeof(int) * (NQ > nv ? NQ : nv) );
 	int n_vuse = 0;
-	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, NULL );	
-	if( do_bd )
-		sub_surface->getSparseMass( theForceSet, &MMat ); 
-
+	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
+	if( do_bd_membrane )
+		sub_surface->getSparseRoot( theForceSet, &MMat ); 
 	setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
 
 
@@ -855,9 +855,11 @@ int temp_main( int argc, char **argv )
 	int nbins = 100;
 	
 	
-	for( int p = 0; p < ncomplex; p++ )
-		allComplexes[p]->activateBrownianDynamics();
-
+	if( do_bd_particles )
+	{
+		for( int p = 0; p < ncomplex; p++ )
+			allComplexes[p]->activateBrownianDynamics();
+	}
 	FILE *alphaFile = NULL;
 
 	if( block.write_alpha_period > 0 )
@@ -1108,7 +1110,7 @@ int temp_main( int argc, char **argv )
 						allComplexes[c]->applyLangevinNoise( sub_surface, r, dt,  gamma_langevin, temperature );
 					}
 
-					if( allComplexes[c]->do_bd )
+					if( !allComplexes[c]->do_bd )
 					{
 						allComplexes[c]->propagate_p( sub_surface, r, dt/2 );
 						allComplexes[c]->compute_qdot( sub_surface, r, qdot0, qdot_temp, dt/time_step );			
@@ -1180,7 +1182,7 @@ int temp_main( int argc, char **argv )
 			memcpy( next_pp, pp, sizeof(double) * NQ );
 			if( !block.disable_mesh )
 			{
-				if( do_bd || do_ld || o < nequil || (switched) )
+				if( do_bd_membrane || do_ld || o < nequil || (switched) )
 				{
 					if( do_gen_q )
 						GenQMatVecIncrScale( next_pp, pp, EFFM, -gamma_langevin*AKMA_TIME*time_step );
@@ -1274,7 +1276,7 @@ int temp_main( int argc, char **argv )
 
 			if( !block.disable_mesh )
 			{
-				if( do_bd || do_ld || o < nequil )
+				if( do_bd_membrane || do_ld || o < nequil )
 				{
 #ifdef OLD_LANGEVIN
 					for( int Q = 0; Q < NQ; Q++ )
@@ -1588,7 +1590,8 @@ int temp_main( int argc, char **argv )
 		if( o == block.nve_switch )
 		{
 			do_ld = 0;
-			do_bd = 0;
+			do_bd_membrane = 0;
+			do_bd_particles = 0;
 			do_srd = 0;
 			sum_average_temp = 0;
 			n_temp = 0;
