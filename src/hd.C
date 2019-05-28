@@ -407,7 +407,6 @@ int temp_main( int argc, char **argv )
 	int doing_spherical_harmonics = 0;
 	int doing_planar_harmonics = 0;
 	double *output_qvals=NULL;
-	double *mass_scaling = NULL;
 
 	if( block.mode_max >= 0 )
 	{
@@ -685,8 +684,10 @@ int temp_main( int argc, char **argv )
 		max_mat = NQ;
 	int *sparse_use = (int *)malloc( sizeof(int) * (NQ > nv ? NQ : nv) );
 	int n_vuse = 0;
-	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
-	sub_surface->getSparseMass( theForceSet, &MMat ); 
+	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, NULL );	
+	if( do_bd )
+		sub_surface->getSparseMass( theForceSet, &MMat ); 
+
 	setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
 
 
@@ -1689,7 +1690,7 @@ int temp_main( int argc, char **argv )
 			if( doing_planar_harmonics )
 				printf(" q %le", output_qvals[Q] );
 			else if( doing_spherical_harmonics )
-				printf(" l %d", lround(output_qvals[Q]) ); 
+				printf(" l %d", (int)lround(output_qvals[Q]) ); 
 			printf("<h> %le <h^2> %le k_c_apparent %le\n",
 					av_Q[Q], av_Q2[Q], kc_app );
 		}
@@ -1697,6 +1698,14 @@ int temp_main( int argc, char **argv )
 		
 	}
 
+	if( block.create_all_atom )
+	{
+		char fileName[256];
+		sprintf(fileName, "%s.crd", block.jobName );
+		FILE *crdOut = fopen( fileName, "w" );
+		sub_surface->createAllAtom(  crdOut, &block );
+		fclose(crdOut);
+	}
 
 /*	FILE *saveFile = fopen("file.save", "w");
 

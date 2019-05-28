@@ -28,7 +28,7 @@ void setDefaults( parameterBlock *block )
 
 	const char *defaultBZ = "beta.z";
 	block->betazFile = (char *)malloc( sizeof(char) * ( strlen(defaultBZ)+1) );
-	sprintf(block->betazFile, defaultBZ );
+	sprintf(block->betazFile, "%s", defaultBZ );
 
 	block->loadName = NULL;
 	block->concentration = 0;
@@ -37,7 +37,6 @@ void setDefaults( parameterBlock *block )
 	block->record_curvature = 0;
 	
 
-	block->mass_scaling = 0;
 	block->mode_x = -1;
 	block->mode_y = -1;
 	block->mode_KA = 0;
@@ -159,6 +158,9 @@ void setDefaults( parameterBlock *block )
 	block->shape_correction = 0;
 
 	block->on_surface = 0;
+
+	block->patchPDB = NULL;
+	block->create_all_atom = 0;
 
 	// request a timestep analysis
 	block->timestep_analysis = 0;
@@ -491,18 +493,6 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->write_alpha_period = atoi( word2 );
 		else if( !strcasecmp( word1, "nruns" ) )
 			block->nruns = atoi( word2 );
-		else if( !strcasecmp( word1, "mass_scaling" ) )
-		{
-			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
-				block->mass_scaling = 1;
-			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
-				block->mass_scaling = 0;
-			else
-			{
-				printf("Could not interpret input line '%s'.\n", tbuf );
-				ERROR = 1;
-			}	
-		}
 		else if( !strcasecmp( word1, "record_curvature" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
@@ -985,6 +975,25 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			ERROR = 1;
 		      }
 		  }
+		else if( !strcasecmp( word1, "create_all_atom" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->create_all_atom = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->create_all_atom = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
+		else if( !strcasecmp( word1, "patchPDB" ) )
+		{
+			if( block->patchPDB )
+				free(block->patchPDB);
+			block->patchPDB = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->patchPDB, word2 );
+		}
 		else if( !strcasecmp( word1, "add") )
 		{
 			// format: add COMPLEX_NAME nbound        %d  [inside|outside]

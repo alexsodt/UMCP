@@ -528,6 +528,7 @@ struct surface
 #endif
 	void readLipidComposition( FILE *inputFile );
 	void debugDeformation( double *r);
+	void createAllAtom( FILE *outputFile, parameterBlock *block );
 };
 
 struct volel

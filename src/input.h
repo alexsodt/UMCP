@@ -171,6 +171,14 @@ class parameterBlock
 
 	int on_surface;
 
+	// BEGIN section for creating all-atom structures
+
+	char *patchPDB;
+	int create_all_atom;
+
+	// END section for creating all-atom structures
+
+
 	parameterBlock(void);
 };
 
