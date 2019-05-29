@@ -30,12 +30,14 @@ void setDefaults( parameterBlock *block )
 	block->betazFile = (char *)malloc( sizeof(char) * ( strlen(defaultBZ)+1) );
 	sprintf(block->betazFile, defaultBZ );
 
+	block->qvals = NULL;
 	block->loadName = NULL;
 	block->concentration = 0;
 	block->rho = 0;
-	
+	block->lipid_lib = NULL;
+
 	block->record_curvature = 0;
-	
+	block->create_all_atom = 0;	
 
 	block->mass_scaling = 0;
 	block->mode_x = -1;
@@ -53,6 +55,9 @@ void setDefaults( parameterBlock *block )
 	block->mab_k_theta = 1;
 	block->mab_bond_length = 60;
 	block->mab_d_theta = 10; // 10 degrees.
+
+	block->create_all_atom = 0;
+	block->lipid_lib = NULL;
 
 	block->sub_com_period = 10;
 	block->complex_records = NULL;
@@ -448,6 +453,13 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->meshName = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
 			strcpy( block->meshName, word2 );
 		}
+		else if( !strcasecmp( word1, "lipid_lib" ) )
+		{
+			if( block->lipid_lib )
+				free(block->lipid_lib);
+			block->lipid_lib = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->lipid_lib, word2 );
+		}
 		else if( !strcasecmp( word1, "betaz" ) )
 		{
 			free(block->betazFile);
@@ -465,6 +477,12 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			free(block->loadName);
 			block->loadName = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
 			strcpy( block->loadName, word2 );
+		}
+		else if( !strcasecmp( word1, "qvals" ) )
+		{
+			free(block->qvals);
+			block->qvals = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->qvals, word2 );
 		}
 		else if( !strcasecmp( word1, "rho" ) )
 			block->rho = atof( word2 );
@@ -498,6 +516,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				block->mass_scaling = 1;
 			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
 				block->mass_scaling = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
+		else if( !strcasecmp( word1, "create" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->create_all_atom = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->create_all_atom = 0;
 			else
 			{
 				printf("Could not interpret input line '%s'.\n", tbuf );

@@ -255,7 +255,9 @@ int temp_main( int argc, char **argv )
 		sphere_rad = sqrt(area0/(4*M_PI));
 	}
 
-	sub_surface->processSANS( &block );
+	double *qvals = NULL;
+
+	sub_surface->processSANS( &block, &qvals, &(block.nq) );
 	double A2dz2_sampled = 0;
 	double *B_hist = NULL;
 	double sans_max_r = 0;
@@ -1606,7 +1608,7 @@ int temp_main( int argc, char **argv )
 			char fileName[256];
 			sprintf(fileName, "%s.sq", block.jobName );
 
-			writeSq( fileName, B_hist, A2dz2_sampled, sans_max_r, nsans_bins, block.q_min, block.q_max, block.nq );
+			writeSq( fileName, B_hist, A2dz2_sampled, sans_max_r, nsans_bins, block.q_min, block.q_max, block.nq, qvals );
 			
 		}
 

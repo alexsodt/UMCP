@@ -452,7 +452,7 @@ struct surface
 
 	// COMPUTING S(q)
 	void sample_B_hist( double *rmesh, double *B_hist, double *A2dz2_sampled, int sample_type, int nsamples, double max_r, int nbins, int shape_correction );
-	void processSANS( parameterBlock *block );	
+	void processSANS( parameterBlock *block, double **qvals, int *nq );	
 
 //	void ComputeSq( double *Sq, double *r, double * p_r_m, int np, double b_av, double b_p, double q_min, double q_max, int n_q, int Sq_res, int do_planar );
 //	void binCurvature( double *cdist, double minc, double maxc, int nbins, double *r, int Sq_res );
@@ -472,7 +472,7 @@ struct surface
 	void rebox_system(void);
 	void box_system( double edge_length=-1);
 	void findBox(double* pt, int *f, double *u, double *v, double **M, int mlow, int mhigh, double *distance, double L);
-	double returnRadius (double *pt, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, double distance, double currentR, double L, double defaultR, double *vertex_data, int *ptr_to_data, int *nump, int inside_outside=-1, int disable_PBC_z=0);
+	double returnRadius (double *pt, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, double distance, double currentR, double L, double defaultR, double *vertex_data, int *ptr_to_data, int *nump, int inside_outside=-1, int disable_PBC_z=0, double reflecting_surface);
 	void returnSizeofBox(int* x, int* y, int* z);
 	void moveParticleonSurface(int *f, double *u, double *v, double *p);	
 	void checkCurvature(FILE* file);

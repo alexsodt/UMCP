@@ -24,6 +24,9 @@ class parameterBlock
 	char *loadName;
 	char *meshName;
 	char *jobName;
+	char *qvals;
+	char *lipid_lib;
+
 	double rho;
 
 
@@ -46,6 +49,8 @@ class parameterBlock
 	int lipid_mc_period; // period which to do monte-carlo lipid movement
 	int npt_mc_period; // period which to do monte-carlo lipid movement
 	int cyl_tension_mc_period;
+
+	int create_all_atom;
 
 	double alpha_restraint_x;
 	double alpha_restraint_y;
