@@ -394,14 +394,6 @@ int surface::writeTachyon( const char *name,
 		int dx_min_lim=0, dx_max_lim=0;
 		int dy_min_lim=0, dy_max_lim=0;
 		int dz_min_lim=0, dz_max_lim=0;
-		if( do_planar && 0)
-		{
-			dx_min_lim=-1;
-			dx_max_lim=1;
-			dy_min_lim=-1;
-			dy_max_lim=1;
-		}
-
 		if( do_cyl )
 		{
 			dz_min_lim = -1;

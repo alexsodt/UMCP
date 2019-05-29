@@ -685,6 +685,8 @@ int temp_main( int argc, char **argv )
 		max_mat = NQ;
 	int *sparse_use = (int *)malloc( sizeof(int) * (NQ > nv ? NQ : nv) );
 	int n_vuse = 0;
+	double *mass_scaling = NULL;
+
 	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
 	if( do_bd_membrane )
 		sub_surface->getSparseRoot( theForceSet, &MMat ); 
@@ -756,7 +758,7 @@ int temp_main( int argc, char **argv )
 
 	if( block.nsteps == 0 )
 	{
-		printf("Requested no dynamics, exitting.\n");
+		printf("Requested no dynamics, exiting.\n");
 	}
 	else
 	{
