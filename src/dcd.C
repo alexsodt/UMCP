@@ -35,9 +35,9 @@ struct DCDheader
 };
 
 
-static char **res_name;
-static char **at_name;
-static char **seg_name;
+static char **res_name = NULL;
+static char **at_name = NULL;
+static char **seg_name = NULL;
 static int  *at_num;
 static double *at_q;
 static int  *res_num;
@@ -144,14 +144,14 @@ void printSingleCRD( FILE *theFile, struct atom_rec *at )
 
 		fprintf(theFile, "%s", printBuffer );
 
-		if( strlen(printBuffer) < 4 ) 
+		if( strlen(printBuffer) < 10 ) 
 		{
-                	for( int p = 0; p < 4 - strlen(printBuffer); p++ )
+                	for( int p = 0; p < 10 - strlen(printBuffer); p++ )
 				fprintf(theFile, " ");
 		}
 		
 		sprintf(printBuffer, "%s", at[x].atname );
-		fprintf(theFile,"      ");
+//		fprintf(theFile,"      ");
 		fprintf(theFile, "%s", printBuffer );
 
 		if( strlen(printBuffer) < 8 ) 
@@ -1379,6 +1379,28 @@ void loadPDB( FILE *theFile, struct atom_rec *at)
                 if( !strncasecmp( buffer, "ATOM", 4 ) )
                 {    
                         readATOM( buffer, at+a );
+
+			if( res_name && res_name[a])
+			{
+				free(at[a].resname);
+				at[a].resname = (char *)malloc( sizeof(char) * (strlen(res_name[a])+1) );
+				strcpy( at[a].resname, res_name[a] );
+			}
+			
+			if( at_name && at_name[a])
+			{
+				free(at[a].atname);
+				at[a].atname = (char *)malloc( sizeof(char) * (strlen(at_name[a])+1) );
+				strcpy( at[a].atname, at_name[a] );
+			}
+			
+			if( seg_name && seg_name[a])
+			{
+				free(at[a].segid);
+				at[a].segid = (char *)malloc( sizeof(char) * (strlen(seg_name[a])+1) );
+				strcpy( at[a].segid, seg_name[a] );
+			}
+
                         a++; 
                 }     
                 if( a >= psf_natoms) break;     

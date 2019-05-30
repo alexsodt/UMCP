@@ -161,6 +161,7 @@ void setDefaults( parameterBlock *block )
 	block->on_surface = 0;
 
 	block->patchPDB = NULL;
+	block->patchPSF = NULL;
 	block->create_all_atom = 0;
 
 	// request a timestep analysis
@@ -1016,6 +1017,13 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				free(block->patchPDB);
 			block->patchPDB = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
 			strcpy( block->patchPDB, word2 );
+		}
+		else if( !strcasecmp( word1, "patchPSF" ) )
+		{
+			if( block->patchPSF )
+				free(block->patchPSF);
+			block->patchPSF = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->patchPSF, word2 );
 		}
 		else if( !strcasecmp( word1, "add") )
 		{

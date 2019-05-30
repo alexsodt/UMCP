@@ -28,7 +28,7 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 		printf("Structure building requires a valid pdb file \"patchPDB\"\n");
 		exit(1); 
 	}
-
+	
 	pdbFile = fopen(block->patchPDB,"r");
 
 	if( !pdbFile )
@@ -37,7 +37,20 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 		exit(1);
 	}
 
-	loadPSFfromPDB( pdbFile );
+	if( block->patchPSF )
+	{
+		FILE *psfFile = fopen(block->patchPSF,"r");
+
+		if( !psfFile )
+		{
+			printf("Couldn't open file \"%s\"\n", block->patchPDB );
+			exit(1);
+		}
+
+		loadPSF( psfFile );
+	}
+	else
+		loadPSFfromPDB( pdbFile );
 
 	struct atom_rec *at = (struct atom_rec *)malloc( sizeof(struct atom_rec ) * curNAtoms() );
 	
@@ -48,7 +61,11 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 
 	double Lx,Ly,Lz,alpha,beta,gamma;
 	
-	PBCD( &Lx,&Ly,&Lz,&alpha,&beta,&gamma);
+	if( PBCD( &Lx,&Ly,&Lz,&alpha,&beta,&gamma) )
+	{
+		printf("Couldn't read CRYST1 record from PDB.\n");
+		exit(1);
+	}
 	
 	// the index where a lipid's atoms start
 	int *lipid_start = (int *)malloc( sizeof(int) * curNAtoms() );

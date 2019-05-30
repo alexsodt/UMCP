@@ -9,7 +9,7 @@ int getNPSFCarbons( void );
 void putPSFCarbons( int *carbon_buffer );
 void loadPSF( FILE *theFile );
 void loadPSFfromPDB( FILE *theFile );
-double PBCD( double *Lx, double *Ly, double *Lz, double *alpha, double *beta, double *gamma );
+int PBCD( double *Lx, double *Ly, double *Lz, double *alpha, double *beta, double *gamma );
 int curNAtoms( void );
 int curNFrames( void );
 void setFractional( void );
