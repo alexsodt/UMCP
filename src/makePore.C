@@ -9,8 +9,6 @@
 #include "util.h"
 #include <sys/time.h>
 
-const char *program_base = "/Users/sodtaj/git_projects/HD/optimized";
-
 int glob_n_outer = 5;
 int glob_n_anneal = 50;
 int glob_n_opt = 50;
@@ -94,14 +92,14 @@ void fdiff_check_particle( double *ruv, int p_outer );
 
 void getPlanarMesh( double **rvals, int **edges, int **nedges, int *nv, double Lx, int NXI );
 void getCylinderMesh( double **rvals, int **edges, int **nedges, int *nv, int grain, double R, double LC);
-void getSphereMesh( double **rvals, int **edges, int **nedges, int *nv, int ndiv, double R);
+
 void getPath( int start, int *path, int *pl_out, int *ne_arr, int *e_arr, int *interior_tag, int nr );
 
 int main( int argc, char **argv )
 {
-	if( argc < 6 )
+	if( argc < 5 )
 	{	
-		printf("Syntax: makeBud NX LX neckRadius neckHeight SphereRadius\n");
+		printf("Syntax: makePore NX LX neckRadius neckHeight\n");
 		return 0;
 	}
 
@@ -119,7 +117,6 @@ int main( int argc, char **argv )
 
 	double neckR = atof(argv[3]);
 	double neckH = atof(argv[4]);
-	double sphR = atof(argv[5]);
 
 	int *interior_tag = (int *)malloc( sizeof(int) * nr_pl );
 
@@ -184,13 +181,8 @@ int main( int argc, char **argv )
 	int repeat = 0;
 	int nr_cyl_ex = 0;
 
-	while( !done || repeat )
+	while( !done && !repeat )
 	{
-		if( repeat )
-		{
-			printf("This is the repeat run, cur_NX: %d\n", cur_NX );
-		}
-
 		getCylinderMesh( &r_cyl, &e_cyl, &ne_cyl, &nr_cyl, cur_NX, neckR, neckH * 1.2 );
 		
 		cyl_interior_tag = (int *)malloc( sizeof(int) * nr_cyl );
@@ -229,7 +221,6 @@ int main( int argc, char **argv )
 		{
 			best = fabs(cpl-(double)pl);
 			NXBest = cur_NX;
-			printf("Setting NXBest to %d\n", NXBest );
 		}
 
 		if( repeat )
@@ -275,12 +266,8 @@ int main( int argc, char **argv )
 		}
 		if( repeat == cur_NX )
 			repeat = 0;
-
 		if( repeat )
-		{
 			cur_NX = repeat;
-			printf("Repeating with cur_NX: %d\n", cur_NX );
-		}
 	}
 		
 	start = -1;
@@ -301,141 +288,6 @@ int main( int argc, char **argv )
 	getPath( start, pathc2, &cpl2, ne_cyl, e_cyl, cyl_interior_tag, nr_cyl );
 
 	printf("PL: %d CPL: %d CPL2: %d\n", pl, cpl, cpl2 );
-
-	// now get a spherical mesh that works with CPL2.
-	// we control: #subdivisions and where we position the sphere vertically.
-	// first, get approximate # of subdivisions for a good z position.
-	// it is so coarse there is no point in looping.
-		
-	// approximate ntri is two times the number of edges
-	int ntri_sph = 12 * 6 / 3; // * pow( 4, nsub );
-	// edges per unit area.
-	double tri_density = ntri_sph / (4*M_PI*sphR*sphR);
-	double planar_density = nr_pl * 2 / (Lx*Lx);
-	int nsub_try = ceil( log(  planar_density / tri_density ) / log(4.0) );
-
-	double dens1 = pow( 4, nsub_try - 1 ) * 12 * 6 / 3 / (4*M_PI*sphR*sphR);
-	double dens2 = pow( 4, nsub_try     ) * 12 * 6 / 3 / (4*M_PI*sphR*sphR);
-	double dens3 = pow( 4, nsub_try + 1 ) * 12 * 6 / 3 / (4*M_PI*sphR*sphR);
-
-	printf("pdens %lf dens1 %lf dens2 %lf dens3 %lf\n", planar_density, dens1, dens2, dens3 );
-
-	int nsub = nsub_try -1;
-	double sdens = dens1;
-
-	if( fabs(dens2/planar_density-1) < fabs(sdens/planar_density-1) )
-	{
-		nsub = nsub_try;
-		sdens = dens2;
-	}
-	
-	if( fabs(dens3/planar_density-1) < fabs(sdens/planar_density-1) )
-	{
-		nsub = nsub_try+1;
-		sdens = dens3;
-	}
-	
-	printf("selecting nsub %d, density of sphere is %lf times the planar density.\n",
-		nsub, sdens / planar_density );
-
-	printf("nsub: %d\n", nsub ); 
-
-	double *r_sph;
-	int *e_sph;
-	int *ne_sph;
-	int nr_sph;
-	int nr_sph_ex;
-	int *paths;
-
-	getSphereMesh( &r_sph, &e_sph, &ne_sph, &nr_sph, nsub, sphR );
-	int *sph_interior_tag = (int *)malloc( sizeof(int) * nr_sph );
-
-	double zcen = neckH + sphR * (2.0/3.0);
-
-	int spl = 0;
-	repeat = 0;
-	double zbest = zcen;
-	
-	move_dir = 0;
-	done = 0;
-	while( ! done )
-	{
-		memset( sph_interior_tag, 0, sizeof(int) * nr_sph );
-		
-		for( int ir = 0; ir < nr_sph; ir++ )
-			r_sph[3*ir+2] += zcen;
-		
-		nr_sph_ex = 0;	
-
-		for( int v = 0; v < nr_sph; v++ )
-		{
-			if( r_sph[3*v+2] < neckH )
-				sph_interior_tag[v] = 1; 
-			else
-				nr_sph_ex++;
-//			printf("rsp %lf %lf %lf %s\n", r_sph[3*v+0], r_sph[3*v+1], r_sph[3*v+2], ( sph_interior_tag[v] ? "interior" : "exterior") );
-		}	
-		
-		paths = (int *)malloc( sizeof(int) * nr_sph );
-
-		getPath( -1, paths, &spl, ne_sph, e_sph, sph_interior_tag, nr_sph );
-
-//		printf("ZCEN: %lf SPL: %d\n", zcen, spl );
-
-		for( int ir = 0; ir < nr_sph; ir++ )
-			r_sph[3*ir+2] -= zcen;
-
-		if( fabs(spl-(double)cpl2) < best )
-		{
-			best = fabs(spl-(double)cpl2);
-			zbest = zcen;
-		}
-
-		if( repeat )
-		{
-			done = 1;
-			repeat = 0;
-		}
-		else if( spl != cpl2 )
-		{
-			if( spl > cpl2 )
-			{
-				if( move_dir == -1 )
-				{
-					done = 1;
-					repeat = 1;		
-				}	
-				else
-					zcen += 1;
-				move_dir  = 1;
-			}
-			else if( move_dir == 1 )
-			{
-				done = 1;
-				repeat = 1;			
-			}
-			else
-			{
-				zcen -= 1;
-				move_dir  = -1;
-			}
-		}
-		else
-		{
-			done = 1;
-		}
-
-		if( !done )
-			free(paths);
-
-		if( repeat )
-			zcen = zbest;
-	}
-		
-	for( int ir = 0; ir < nr_sph; ir++ )
-		r_sph[3*ir+2] += zcen;
-
-	printf("SPL: %d CPL2: %d\n", spl, cpl2 );
 
 	for( int v = 0; v < nr_cyl; v++ )
 	{
@@ -460,52 +312,40 @@ int main( int argc, char **argv )
 	/* connect the first loop */
 	int startcyl[2] = {-1,-1};
 
+	int v = path[0];
 
 	for( int layer = 0; layer < 2; layer++ )
 	{
-		double *r_alt = r_pl;
-		int alt_start = path[0];	
-		int alt_next  = path[3];
-		int clim = cpl;
-
-		if( layer == 1 )
-		{
-			r_alt = r_sph;		
-			alt_start = paths[0];
-			alt_next = paths[3];
-			clim = cpl2;
-		}
-		int v = alt_start;
-
 		double bestr2 = 1e20;
 
-		for( int x = 0; x < clim; x++ )
+		for( int x = 0; x < cpl; x++ )
 		{
 			int v2 = pathc[x];
 			if( layer == 1 )
 				v2 = pathc2[x];
 	
-			double dr[3] = { r_cyl[3*v2+0] - r_alt[3*v+0], r_cyl[3*v2+1] - r_alt[3*v+1], r_cyl[3*v2+2] - (r_alt[3*v+2]) };
+			double dr[3] = { r_cyl[3*v2+0] - r_pl[3*v+0], r_cyl[3*v2+1] - r_pl[3*v+1], r_cyl[3*v2+2] - (r_pl[3*v+2]+layer*neckH) };
 			double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
-
+	
 			if( r < bestr2 )
 			{
 				startcyl[layer] = x;
 				bestr2 = r;
 			}
 		}
-
+		
+	
 		// which direction to go.
 	
 		int next3 = startcyl[layer]+3;
-		if( next3 >= clim ) next3 -= clim;
+		if( next3 > cpl ) next3 -= cpl;
 		int prev3 = startcyl[layer]-3;
-		if( prev3 < 0 ) prev3 += clim;
+		if( prev3 < 0 ) prev3 += cpl;
 
 		int v2n,v2p;
 
 		if( layer == 0 )
-		{
+		{	
 			v2n = pathc[next3];
 			v2p = pathc[prev3];
 		}
@@ -516,16 +356,15 @@ int main( int argc, char **argv )
 
 		}
 
-		printf("layer %d v2n: %d v2p: %d\n", layer, v2n, v2p );
 		double rd1[3] = { 
-				r_cyl[v2n*3+0] - r_alt[3*(alt_next)+0],
-				r_cyl[v2n*3+1] - r_alt[3*(alt_next)+1],
-				r_cyl[v2n*3+2] - r_alt[3*(alt_next)+2] };
+				r_cyl[v2n*3+0] - r_pl[3*(path[3])+0],
+				r_cyl[v2n*3+1] - r_pl[3*(path[3])+1],
+				r_cyl[v2n*3+2] - (r_pl[3*(path[3])+2]+layer*neckH) };
 		
 		double rd2[3] = { 
-				r_cyl[v2p*3+0] - r_alt[3*(alt_next)+0],
-				r_cyl[v2p*3+1] - r_alt[3*(alt_next)+1],
-				r_cyl[v2p*3+2] - r_alt[3*(alt_next)+2] };
+				r_cyl[v2p*3+0] - r_pl[3*(path[3])+0],
+				r_cyl[v2p*3+1] - r_pl[3*(path[3])+1],
+				r_cyl[v2p*3+2] - (r_pl[3*(path[3])+2]+layer*neckH) };
 		
 		double rv1 = rd1[0]*rd1[0]+rd1[1]*rd1[1]+rd1[2]*rd1[2];
 		double rv2 = rd2[0]*rd2[0]+rd2[1]*rd2[1]+rd2[2]*rd2[2];
@@ -570,13 +409,13 @@ int main( int argc, char **argv )
 		}
 	}
 
-	int nvtot = nr_ex + nr_sph_ex + nr_cyl_ex;
+	int nvtot = 2*nr_ex + nr_cyl_ex;
 	double *allr = (double *)malloc( sizeof(double) * 3 * nvtot );
 	int    *alle = (int *)malloc( sizeof(int) * nvtot * MAX_EDGES );
 	int    *ne = (int *)malloc( sizeof(int) * nvtot );
 	memset( ne, 0, sizeof(int) * nvtot );
 	int *pl_map = (int *)malloc( sizeof(int) * nr_pl );
-	int *sph_map = (int *)malloc( sizeof(int) * nr_sph );
+	int *pl_map2 = (int *)malloc( sizeof(int) * nr_pl );
 	int *cyl_map = (int *)malloc( sizeof(int) * nr_cyl );
 
 	int ii = 0;
@@ -584,27 +423,15 @@ int main( int argc, char **argv )
 	for( int v = 0; v < nr_pl; v++ )
 	{
 		pl_map[v] = -1;
+		pl_map2[v] = -1;
 		if( interior_tag[v] ) continue;
 
  		pl_map[v] = ii;
+		pl_map2[v] = ii + nr_ex;
 		ii++;
 	}
 	
 	printf("ii: %d nr_ex: %d\n", ii, nr_ex );
-	
-	ii = 0;
-
-	for( int v = 0; v < nr_sph; v++ )
-	{
-		sph_map[v] = -1;
-
-		if( sph_interior_tag[v] ) continue;
-
-		sph_map[v] = nr_ex + ii;
-		ii++;
-	}
-	
-	printf("ii: %d nr_ex: %d\n", ii, nr_sph_ex );
 	
 	ii = 0;
 
@@ -613,7 +440,7 @@ int main( int argc, char **argv )
 		cyl_map[v] = -1;
 		if( cyl_interior_tag[v] ) continue;
 
- 		cyl_map[v] = nr_ex+nr_sph_ex+ii;
+ 		cyl_map[v] = 2*nr_ex+ii;
 		ii++;
 	}	
 	printf("ii: %d nr_cyl_ex: %d\n", ii, nr_cyl_ex );
@@ -622,9 +449,11 @@ int main( int argc, char **argv )
 	memcpy( path2, path, sizeof(int) * pl );
 
 	for( int px = 0; px < pl; px++ )
+	{
 		path[px]  = pl_map[path[px]];
-	for( int px = 0; px < spl; px++ )
-		paths[px] = sph_map[paths[px]];
+		path2[px] = pl_map2[path2[px]];
+	}
+
 	for( int px = 0; px < cpl; px++ )
 		pathc[px] = cyl_map[pathc[px]];
 	for( int px = 0; px < cpl2; px++ )
@@ -651,21 +480,21 @@ int main( int argc, char **argv )
 		}
 	}
 	
-	for( int vx = 0; vx < nr_sph; vx++ )
+	for( int vx = 0; vx < nr_pl; vx++ )
 	{
-		int v = sph_map[vx];
+		int v = pl_map2[vx];
 
 		if( v >= 0 )
 		{	
-			allr[3*v+0] = r_sph[3*vx+0];
-			allr[3*v+1] = r_sph[3*vx+1];
-			allr[3*v+2] = r_sph[3*vx+2];
+			allr[3*v+0] = r_pl[3*vx+0];
+			allr[3*v+1] = r_pl[3*vx+1];
+			allr[3*v+2] = r_pl[3*vx+2] + neckH;
 			
-			for( int e = 0; e < ne_sph[vx]; e++ )
+			for( int e = 0; e < ne_pl[vx]; e++ )
 			{
-				if( sph_map[e_sph[vx*MAX_EDGES+e]] >= 0 )
+				if( pl_map2[e_pl[vx*MAX_EDGES+e]] >= 0 )
 				{
-					alle[v*MAX_EDGES+ne[v]] = sph_map[e_sph[vx*MAX_EDGES+e]];
+					alle[v*MAX_EDGES+ne[v]] = pl_map2[e_pl[vx*MAX_EDGES+e]];
 					ne[v]++; 
 				}
 			}
@@ -696,17 +525,13 @@ int main( int argc, char **argv )
 
 	// loop over both paths.
 
-#ifdef SPLIT
 	for( int layer = 0; layer < 2; layer++ )
 	{
 		int *mpath = path;
-		int mlim = pl;
 
 		if( layer == 1 )
-		{
-			mpath = paths;
-			mlim = spl;
-		}
+			mpath = path2;
+
 		int p2 = startcyl[layer];
 		int clim = cpl;
 		if( layer == 1 )
@@ -716,12 +541,10 @@ int main( int argc, char **argv )
 		if( layer == 1 )
 			alt_path = pathc2;
 
-		if( mlim <= clim )
+		if( pl <= clim )
 		{
-			int excess = clim - mlim;
-
 			// cylinder path is longer
-			for( int p = 0; p < mlim; p++, p2++ )
+			for( int p = 0; p < pl; p++, p2++ )
 			{
 				if( p2 >= clim )
 					p2 -= clim;
@@ -731,7 +554,6 @@ int main( int argc, char **argv )
 				int vcp = alt_path[(p2-1<0?p2-1+clim:p2-1)];
 				int vc = alt_path[p2];
 		 
-
 				alle[v*MAX_EDGES+ne[v]] = vcp; ne[v]++;
 				alle[v*MAX_EDGES+ne[v]]  = vc; ne[v]++;
 			
@@ -739,253 +561,65 @@ int main( int argc, char **argv )
 				alle[vc*MAX_EDGES+ne[vc]]   = v; ne[vc]++;	
 			}
 				
-			for( int px = mlim; px < clim; px++, p2++ )
+			for( int px = pl; px < clim; px++, p2++ )
 			{
 				int vc = mpath[p2];		
-				int v = alt_path[mlim-1];
-				
+				int v = alt_path[pl-1];
 		 
 				alle[vc*MAX_EDGES+ne[vc]]  =    v; ne[vc]++;
 				alle[v*MAX_EDGES+ne[v]]    =   vc; ne[v]++;	
-				
 			}
 		}
 		else
 		{
 			// planar path is longer.
-			int excess = mlim - clim;
 	
-			double excess_cntr = 0;
-	
-			int p = 0;
-
-			for( int pc = 0; pc < clim; pc++, p2++, p++ )
+			for( int p = 0; p < clim; p++, p2++ )
 			{
 				if( p2 >= clim )
 					p2 -= clim;
 		
 				int vc = alt_path[p2];
 				
-				int vp = mpath[(p-1<0?p-1+mlim:p-1)];
+				int vp = mpath[(p-1<0?p-1+pl:p-1)];
 				int v = mpath[p];
-				int vn = mpath[(p+1>=mlim?p+1-mlim:p+1)];
-						 
-				if( excess_cntr >= 1.0 && ne[vc] <= 4 && excess > 0 )
-				{
-					alle[vc*MAX_EDGES+ne[vc]]   = vp; ne[vc]++;
-					alle[vc*MAX_EDGES+ne[vc]]  =   v; ne[vc]++;
-					alle[vc*MAX_EDGES+ne[vc]]  =  vn; ne[vc]++;
+		 
+				alle[vc*MAX_EDGES+ne[vc]]   = vp; ne[vc]++;
+				alle[vc*MAX_EDGES+ne[vc]]  =   v; ne[vc]++;
 			
-					alle[vp*MAX_EDGES+ne[vp]] = vc; ne[vp]++;	
-					alle[v*MAX_EDGES+ne[v]]   = vc; ne[v]++;	
-					alle[vn*MAX_EDGES+ne[vn]]   = vc; ne[vn]++;
-
-					printf("Assigning excess, cntr = %lf\n", excess_cntr );
-					p++;	
-					excess_cntr -= 1;
-					excess -= 1;
-				}
-				else
-				{
-					alle[vc*MAX_EDGES+ne[vc]]   = vp; ne[vc]++;
-					alle[vc*MAX_EDGES+ne[vc]]  =   v; ne[vc]++;
-			
-					alle[vp*MAX_EDGES+ne[vp]] = vc; ne[vp]++;	
-					alle[v*MAX_EDGES+ne[v]]   = vc; ne[v]++;	
-					
-				}
-
-				excess_cntr += (mlim-clim) / (double)clim;
+				alle[vp*MAX_EDGES+ne[vp]] = vc; ne[vp]++;	
+				alle[v*MAX_EDGES+ne[v]]   = vc; ne[v]++;	
 			}
 
 			p2--;
 	
-			for( int pc = 0; pc < excess; pc++ ) // clim; p < mlim; p++ )
+			for( int p = clim; p < pl; p++ )
 			{
 				int vc = alt_path[p2];		
 				int v = mpath[p];
-						 
+		 
 				alle[vc*MAX_EDGES+ne[vc]]  =    v; ne[vc]++;
 				alle[v*MAX_EDGES+ne[v]]    =   vc; ne[v]++;	
-				
-			}
-
-			printf("Final vertex has valence %d.\n", ne[alt_path[p2]] );
-		}
-	}	
-#else
-	for( int layer = 0; layer < 2; layer++ )
-	{
-		printf("Layer %d\n", layer );
-		int *path1 = path;
-		int *path2 = pathc;
-		int lim1 = pl;
-		int lim2 = cpl;
-		int pstart1 = 0;
-		int pstart2 = startcyl[layer];
-
-		if( layer == 1 )
-		{
-			path1 = paths;
-			path2 = pathc2;
-			lim1 = spl;
-			lim2 = cpl2;
-		}
-
-		if( lim2 > lim1 )
-		{
-			int t = lim1;
-			lim1 = lim2;
-			lim2 = t;
-			int *tp = path1;
-			path1 = path2;
-			path2 = tp;
-
-			t = pstart1;
-			pstart1 = pstart2;
-			pstart2 = t;
-		}
-
-		int *mpath = path;
-		int mlim = pl;
-
-		if( layer == 1 )
-		{
-			mpath = paths;
-			mlim = spl;
-		}
-
-		// planar path is longer.
-		int excess = lim1 - lim2;
-	
-		double excess_cntr = 0;
-	
-		int p  = pstart1;
-		int p2 = pstart2;
-
-	
-
-		for( int pc = 0; pc < lim2; pc++, p2++, p++ )
-		{
-			if( p >= lim1 )
-				p -= lim1;
-
-			if( p2 >= lim2 )
-				p2 -= lim2;
-	
-			int vc = path2[p2];
-			
-			int vp = path1[(p-1<0?p-1+lim1:p-1)];
-			int v = path1[p];
-			int vn = path1[(p+1>=lim1?p+1-lim1:p+1)];
-					 
-//			if( excess_cntr >= 1.0 && ne[vc] <= 4 && excess > 0 )
-			if( excess > 0 && ne[vc] <= 4 )
-			{
-				alle[vc*MAX_EDGES+ne[vc]]   = vp; ne[vc]++;
-				alle[vc*MAX_EDGES+ne[vc]]  =   v; ne[vc]++;
-				alle[vc*MAX_EDGES+ne[vc]]  =  vn; ne[vc]++;
-		
-				alle[vp*MAX_EDGES+ne[vp]] = vc; ne[vp]++;	
-				alle[v*MAX_EDGES+ne[v]]   = vc; ne[v]++;	
-				alle[vn*MAX_EDGES+ne[vn]]   = vc; ne[vn]++;
-
-				printf("Assigning excess to reach valence %d, cntr = %lf\n", ne[vc], excess_cntr );
-				p++;	
-				excess_cntr -= 1;
-				excess -= 1;
-			}
-			else
-			{
-				alle[vc*MAX_EDGES+ne[vc]]   = vp; ne[vc]++;
-				alle[vc*MAX_EDGES+ne[vc]]  =   v; ne[vc]++;
-		
-				alle[vp*MAX_EDGES+ne[vp]] = vc; ne[vp]++;	
-				alle[v*MAX_EDGES+ne[v]]   = vc; ne[v]++;	
-				
-			}
-
-			excess_cntr += (lim1-lim2) / (double)lim2;
-		}
-
-		// tack on at the end, hopefully we don't get here.
-
-		p2--;
-		if( p2 < 0 ) 
-			p2 += lim2;
-
-		if( excess > 0 )
-		{
-			printf("EXCESS: %d\n", excess );
-		}	
-	
-		for( int pc = 0; pc < excess; pc++ ) // lim2; p < lim1; p++ )
-		{
-			int vc = path2[p2];		
-			int v = path1[p];
-	
-			printf("vc: %d p2: %d\n", vc, p2 );				 
-			alle[vc*MAX_EDGES+ne[vc]]  =    v; ne[vc]++;
-			alle[v*MAX_EDGES+ne[v]]    =   vc; ne[v]++;	
-			
-			p += 1;			
-			
-			if( p >= lim1 )
-				p -= lim1;
-		}
-
-		printf("Final vertex has valence %d.\n", ne[path2[p2]] );
-
-		printf("lim1: %d\n", lim1 );
-		for( int x = 0; x < lim1; x++ )
-		{
-			printf("ne: %d\n", ne[path1[x]] );
-			if( ne[path1[x]] < 5 || ne[path1[x]] > 7 )
-			{
-				if( layer == 0 )
-					printf("WARNING: valence %d v %d in path linking plane to cylinder. PL %d CPL %d\n", ne[path1[x]], path1[x], pl, cpl );
-				else
-					printf("WARNING: valence %d v %d in path linking cylinder to sphere. CPL2 %d SPL %d\n", ne[path1[x]], path1[x], cpl2, spl );
-			}
-			
-		}
-		printf("lim2: %d\n", lim2 );
-		for( int x = 0; x < lim2; x++ )
-		{
-			printf("ne: %d %d \n", ne[path2[x]], path2[x]  );
-			if( ne[path2[x]] < 5 || ne[path2[x]] > 7 )
-			{
-				if( layer == 0 )
-					printf("WARNING: valence %d v %d in path linking plane to cylinder. PL %d CPL %d\n", ne[path2[x]], path2[x], pl, cpl );
-				else
-					printf("WARNING: valence %d v %d in path linking cylinder to sphere. CPL2 %d SPL %d\n", ne[path2[x]], path2[x], cpl2, spl );
 			}
 		}
 	}	
-	
-
-#endif	
-
-	
+		
 	char fileName[256];
-	sprintf(fileName,"bud.mesh" );
+	sprintf(fileName,"fusion.mesh" );
 
 	FILE *theLattice = fopen(fileName,"w");
 
 	fprintf(theLattice, "3d R = %lf\n", R );
 	fprintf(theLattice, "%lf 0.0 0.0\n", Lx );
 	fprintf(theLattice, "0.0 %lf 0.0\n", Lx );
-	fprintf(theLattice, "0.0 0.0 %lf\n", Lx + neckH + 2*sphR );
+	fprintf(theLattice, "0.0 0.0 %lf\n", 2*Lx + neckH );
 
 	int p = 0;
 	for( ; p < nvtot; p++ )
 	{
+		if( ne[p] < 5 || ne[p]  > 7 )
+			printf("ATTN: Valence %d.\n", ne[p] );
 		fprintf(theLattice, "%d %lf %lf %lf %d", p, allr[3*p+0], allr[3*p+1], allr[3*p+2], ne[p] );
-
-		if( ne[p] < 5 || ne[p] > 7 )
-		{
-			printf("WARNING: unusual valence %d.\n", ne[p] );
-		}
 
 		for( int b = 0; b < ne[p]; b++ )
 			fprintf(theLattice, " %d", alle[max_bonds*p+b] );
@@ -1677,133 +1311,3 @@ void getPath( int start, int *path, int *pl_out, int *ne_arr, int *e_arr, int *i
 	}
 	*pl_out = pl;
 }
-
-
-
-void getSphereMesh( double **r_io, int **edges_io, int **nedges_io, int *nv_io, int ndiv, double R)
-{
-	// use external calls for this.
-
-	char command[256];
-	sprintf(command, "%s/icosahedron.opt %lf > subdiv.mesh", program_base, R);
-	system(command);
-	
-	for( int x = 0; x < ndiv; x++ )
-	{
-		char command[256];
-		sprintf(command, "%s/subdivide.opt subdiv.mesh", program_base );
-		system(command);
-	}
-
-	// read the mesh.
-
-	FILE *theFile = fopen("subdiv.mesh", "r" );
-
-	if( !theFile )
-	{
-		printf("Failed to create the sphere mesh.\n");
-		exit(1);
-	}
-
-	char buffer[4096];
-
-	getLine( theFile, buffer );
-	getLine( theFile, buffer );
-	getLine( theFile, buffer );
-	getLine( theFile, buffer );
-
-	int nvs = 10;
-	int nv = 0;
-	double *r = (double *)malloc( sizeof(double ) * 3 * nvs );
-	int *edges = (int *)malloc( sizeof(int) * MAX_EDGES * nvs );
-	int *nedges = (int *)malloc( sizeof(int) * nvs );
-	
-
-	while( !feof(theFile) )	
-	{
-		getLine( theFile, buffer );
-
-		if( !strncasecmp( buffer, "ntri", 4 ) )
-			break;
-
-		if( nvs == nv )
-		{
-			nvs *= 2;
-			r = (double *)realloc( r, sizeof(double ) * 3 * nvs );
-			edges = (int *)realloc( edges, sizeof(int) * MAX_EDGES * nvs );
-			nedges = (int *)realloc( nedges, sizeof(int) * nvs );
-		
-		}
-		
-		double x,y,z;
-		int ver;
-		int edge_buffer[12];
-		int nr = sscanf( buffer, "%d %lf %lf %lf %d "
-					 "%d %d %d %d %d %d %d %d %d %d %d %d",
-					&ver, r+3*nv, r+3*nv+1, r+3*nv+2,
-					nedges+nv,
-				 	edge_buffer+0,
-				 	edge_buffer+1,
-				 	edge_buffer+2,
-				 	edge_buffer+3,
-				 	edge_buffer+4,
-				 	edge_buffer+5,
-				 	edge_buffer+6,
-				 	edge_buffer+7,
-				 	edge_buffer+8,
-				 	edge_buffer+9,
-				 	edge_buffer+10,
-				 	edge_buffer+11 );
-		if( nr > 5 + MAX_EDGES )
-		{
-			printf("MAX_EDGES too small to hold mesh.\n");
-			exit(1);
-		}
-
-		for( int e = 0; e < nedges[nv]; e++ )
-			edges[nv*MAX_EDGES+e] = edge_buffer[e];
-
-		nv += 1;
-	}
-
-	// subtract out the c.o.m.
-
-	double com[3] = {0,0,0};
-	for( int v = 0; v < nv; v++ )
-	{
-		com[0] += r[3*v+0];
-		com[1] += r[3*v+1];
-		com[2] += r[3*v+2];
-	}
-
-	for( int v = 0; v < nv; v++ )
-	{
-		r[3*v+0] -= com[0]/nv;
-		r[3*v+1] -= com[1]/nv;
-		r[3*v+2] -= com[2]/nv;
-	}
-
-	fclose(theFile);
-	*r_io = r;
-	*edges_io = edges;
-	*nedges_io = nedges;
-	*nv_io = nv;	
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

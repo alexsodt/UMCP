@@ -437,7 +437,7 @@ struct surface
 	void ru( int f, double u, double v, double *r, double *dr_u );
 	void rv( int f, double u, double v, double *r, double *dr_v );
 	void r2der( int f, double u, double v, double *r, double *dr_uu, double *dr_uv, double *dr_vv );
-	double c( int f, double u, double v, double *r );
+	double c( int f, double u, double v, double *r, double *c_vec_1=NULL, double *c_vec_2=NULL, double *c_val_1=NULL, double *c_val_2=NULL);
 	double dG( int f, double u, double v, double grad[5], double *r );
 	void get_pt_coeffs( int f, double u, double v, double *coeffs, int *coord_list, int *ncoords );
         void get_pt_dcoeffs( int f, double u, double v, double *coeffs, int *coord_list, int *ncoords );
@@ -527,11 +527,11 @@ struct surface
 				int face_center=-1
 			);
 	
-#ifdef PARALLEL
 	void getRegions( int *regions, int nregions );
-#endif
 	void readLipidComposition( FILE *inputFile );
 	void debugDeformation( double *r);
+	void createAllAtom( FILE *outputFile, parameterBlock *block );
+	int evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf );
 };
 
 struct volel

@@ -5,8 +5,7 @@
 #include "mutil.h"
 #include "vpass.h"
 
-#define DEBUG_1
-#define DEBUG_2
+#define DEBUG
 #define ALL_EDGES
 
 static int max_edges = 30;
@@ -131,542 +130,6 @@ void vpass( double *verts, int *tris, int *eft_tris, int ntri, int *edges, int n
 		free(sgamma);
 		free(srho);
 	}
-/*
-	for( int x = 0; x < ntri; x++ )
-		states[x] = -1;
-
-	double *area_i = (double *)malloc( sizeof(double) * ntri );
-	double *gamma_i = (double *)malloc( sizeof(double) * 3 * ntri );
-	double putv[3];
-
-	for( int t = 0; t < ntri; t++ )
-	{
-		int p1 = tris[3*t+0];
-		int p2 = tris[3*t+1];
-		int p3 = tris[3*t+2];
-
-		double r1[3] = { verts[3*p1+0], verts[3*p1+1], verts[3*p1+2] };
-		double dr2[3] = { verts[3*p2+0]-r1[0], verts[3*p2+1]-r1[1], verts[3*p2+2]-r1[2] };
-		double dr3[3] = { verts[3*p3+0]-r1[0], verts[3*p3+1]-r1[1], verts[3*p3+2]-r1[2] };
-
-		MinImage3D( dr2, PBC_vec, putv );
-		MinImage3D( dr3, PBC_vec, putv );
-
-		gamma_i[3*t+0] = r1[0]+(dr2[0]+dr3[0])/3.0;
-		gamma_i[3*t+1] = r1[1]+(dr2[1]+dr3[1])/3.0;
-		gamma_i[3*t+2] = r1[2]+(dr2[2]+dr3[2])/3.0;
-
-		double o[3] = {0,0,0};
-
-		area_i[t] = triangle_area( o, dr2, dr3 );
-	}
-	
-	double *sgamma = (double *)malloc( sizeof(double) * ntarget*3 );
-	double *srho   = (double *)malloc( sizeof(double) * ntarget );
-	int t = 0;
-	
-	while( t != ntarget )
-	{
-		int the_tri = rand() % ntri;
-	
-		if( states[the_tri] == -1 )	
-		{
-			sgamma[3*t+0] = gamma_i[3*the_tri+0] * area_i[the_tri];  
-			sgamma[3*t+1] = gamma_i[3*the_tri+1] * area_i[the_tri];  
-			sgamma[3*t+2] = gamma_i[3*the_tri+2] * area_i[the_tri];
-			srho[t] = area_i[the_tri]; 
-			states[the_tri] = t;
-
-			t++;
-		}
-	}
-
-	// assign the other states.
-	
-	int assignment_done = 0;
-	int bad_pass = 0;
-	while( !assignment_done )
-	{
-		assignment_done = 1;
-		bad_pass = 1;
-
-		for( int t = 0; t < ntri; t++ )
-		{
-			if( states[t] >= 0 ) continue;
-	
-			int best_target = 0;
-			double best_dF = 1e10;
-	
-			for( int s = 0; s < ntarget; s++ )
-			{
-				double val1 = (sgamma[3*s+0]*sgamma[3*s+0] + sgamma[3*s+1]*sgamma[3*s+1] +sgamma[3*s+2]*sgamma[3*s+2])/srho[s];
-				double dr[3] = { gamma_i[3*t+0] - sgamma[3*s+0]/srho[s], gamma_i[3*t+1] - sgamma[3*s+1]/srho[s], gamma_i[3*t+2] - sgamma[3*s+2]/srho[s] };
-				MinImage3D( dr, PBC_vec, putv );
-	
-				dr[0] += sgamma[3*s+0]/srho[s];
-				dr[1] += sgamma[3*s+1]/srho[s];
-				dr[2] += sgamma[3*s+2]/srho[s];
-	
-				// with
-				double val2 = 
-					((sgamma[3*s+0]+area_i[t]*dr[0])*(sgamma[3*s+0]+area_i[t]*dr[0]) + 
-					(sgamma[3*s+1]+area_i[t]*dr[1])*(sgamma[3*s+1]+area_i[t]*dr[1]) + 
-					(sgamma[3*s+2]+area_i[t]*dr[2])*(sgamma[3*s+2]+area_i[t]*dr[2]))/(srho[s]+area_i[t]); 
-				
-				double dF = area_i[t] * (dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]) - val2 + val1;
-	
-				if( dF < best_dF )
-				{
-					best_target = s;
-					best_dF = dF;
-				}
-			}
-			//if( border_best || bad_pass )
-			{
-				int s = best_target;
-				
-				double dr[3] = { gamma_i[3*t+0] - sgamma[3*s+0]/srho[s], gamma_i[3*t+1] - sgamma[3*s+1]/srho[s], gamma_i[3*t+2] - sgamma[3*s+2]/srho[s] };
-				MinImage3D( dr, PBC_vec, putv );
-	
-				dr[0] += sgamma[3*s+0]/srho[s];
-				dr[1] += sgamma[3*s+1]/srho[s];
-				dr[2] += sgamma[3*s+2]/srho[s];
-	
-				states[t] = s;
-				sgamma[3*s+0] += area_i[t] * dr[0]; 
-				sgamma[3*s+1] += area_i[t] * dr[1]; 
-				sgamma[3*s+2] += area_i[t] * dr[2]; 
-				srho[s] += area_i[t];
-				bad_pass = 0;
-			}
-//			else
-//				assignment_done = 0;
-		}
-	}
-
-
-	int *border_edges = (int *)malloc( sizeof(int) * nedges );
-	int *is_border = (int *)malloc( sizeof(int) * nedges );
-	memset( is_border, 0, sizeof(int) * nedges );
-	int nborder = 0;
-
-	for( int e = 0; e < nedges; e++ )
-	{
-		int t1 = edges[edge_dim*e+2];
-		int t2 = edges[edge_dim*e+3];
-
-		if( t1 < 0 || t2 <0 ) continue;
-
-		if( states[t1] != states[t2] )
-		{
-			is_border[e] = 1;
-			border_edges[nborder] = e;
-			nborder++;
-		}
-	}
-
-
-	for( int pass = 0; pass < 2; pass ++ )
-	{
-		int v_done = 0;
-		while( !v_done )
-		{
-			printf("Border iteration.\n");
-			v_done = 1;
-	
-#ifdef ALL_EDGES
-			for( int e = 0; e < nedges; e++ )
-			{
-#else
-			for( int b = 0; b < nborder; b++ )
-			{
-				int e = border_edges[b];
-#endif		
-				int t1 = edges[edge_dim*e+2];
-				int t2 = edges[edge_dim*e+3];
-	
-
-				double dF12 = 0; // one to two
-				double dF21 = 0; // two to one
-	
-				int s1 = states[t1];
-				int s2 = states[t2];
-	
-				if( s1 == s2 ) continue;
-	
-				double dr11[3] = { 
-					gamma_i[3*t1+0] - sgamma[3*s1+0]/srho[s1],
-					gamma_i[3*t1+1] - sgamma[3*s1+1]/srho[s1],
-					gamma_i[3*t1+2] - sgamma[3*s1+2]/srho[s1] };
-				double dr12[3] = { 
-					gamma_i[3*t1+0] - sgamma[3*s2+0]/srho[s2],
-					gamma_i[3*t1+1] - sgamma[3*s2+1]/srho[s2],
-					gamma_i[3*t1+2] - sgamma[3*s2+2]/srho[s2] };
-				
-				double dr21[3] = { 
-					gamma_i[3*t2+0] - sgamma[3*s1+0]/srho[s1],
-					gamma_i[3*t2+1] - sgamma[3*s1+1]/srho[s1],
-					gamma_i[3*t2+2] - sgamma[3*s1+2]/srho[s1] };
-				double dr22[3] = { 
-					gamma_i[3*t2+0] - sgamma[3*s2+0]/srho[s2],
-					gamma_i[3*t2+1] - sgamma[3*s2+1]/srho[s2],
-					gamma_i[3*t2+2] - sgamma[3*s2+2]/srho[s2] };
-						
-				MinImage3D( dr11, PBC_vec, putv );
-				MinImage3D( dr12, PBC_vec, putv );
-				MinImage3D( dr21, PBC_vec, putv );
-				MinImage3D( dr22, PBC_vec, putv );
-		
-				dr11[0] += sgamma[3*s1+0]/srho[s1];
-				dr11[1] += sgamma[3*s1+1]/srho[s1];
-				dr11[2] += sgamma[3*s1+2]/srho[s1];
-				
-				dr12[0] += sgamma[3*s2+0]/srho[s2];
-				dr12[1] += sgamma[3*s2+1]/srho[s2];
-				dr12[2] += sgamma[3*s2+2]/srho[s2];
-				
-				dr21[0] += sgamma[3*s1+0]/srho[s1];
-				dr21[1] += sgamma[3*s1+1]/srho[s1];
-				dr21[2] += sgamma[3*s1+2]/srho[s1];
-				
-				dr22[0] += sgamma[3*s2+0]/srho[s2];
-				dr22[1] += sgamma[3*s2+1]/srho[s2];
-				dr22[2] += sgamma[3*s2+2]/srho[s2];
-		
-				double state_1_with_2 = 0;
-				double state_2_with_1 = 0;
-	
-				double F11 = area_i[t1] * (dr11[0]*dr11[0]+dr11[1]*dr11[1]+dr11[2]*dr11[2]);
-				double F12 = area_i[t1] * (dr12[0]*dr12[0]+dr12[1]*dr12[1]+dr12[2]*dr12[2]);
-				double F21 = area_i[t2] * (dr21[0]*dr21[0]+dr21[1]*dr21[1]+dr21[2]*dr21[2]);
-				double F22 = area_i[t2] * (dr22[0]*dr22[0]+dr22[1]*dr22[1]+dr22[2]*dr22[2]);
-	
-				double v1_1[3] = { sgamma[3*s1+0], sgamma[3*s1+1], sgamma[3*s1+2] };
-				double v1_0[3] = { 
-							v1_1[0] - dr11[0] * area_i[t1],
-							v1_1[1] - dr11[1] * area_i[t1],
-							v1_1[2] - dr11[2] * area_i[t1] };
-	
-	
-				double v1_12[3] = { 
-							v1_1[0] + dr21[0] * area_i[t2],
-							v1_1[1] + dr21[1] * area_i[t2],
-							v1_1[2] + dr21[2] * area_i[t2] };
-				
-				double v2_2[3] = { sgamma[3*s2+0], sgamma[3*s2+1], sgamma[3*s2+2] };
-				double v2_0[3] = { 
-							v2_2[0] - dr22[0] * area_i[t2],
-							v2_2[1] - dr22[1] * area_i[t2],
-							v2_2[2] - dr22[2] * area_i[t2] };
-				double v2_12[3] = { 
-							v2_2[0] + dr12[0] * area_i[t1],
-							v2_2[1] + dr12[1] * area_i[t1],
-							v2_2[2] + dr12[2] * area_i[t1] };
-	
-				double t_F1_00 = (v1_0[0]*v1_0[0] + v1_0[1]*v1_0[1] + v1_0[2]*v1_0[2])/(srho[s1]-area_i[t1]+1e-15);
-				double t_F1_X0 = (v1_1[0]*v1_1[0] + v1_1[1]*v1_1[1] + v1_1[2]*v1_1[2])/(srho[s1]);
-				double t_F1_XX = (v1_12[0]*v1_12[0] + v1_12[1]*v1_12[1] + v1_12[2]*v1_12[2])/(srho[s1]+area_i[t2]);
-				double t_F2_00 = (v2_0[0]*v2_0[0] + v2_0[1]*v2_0[1] + v2_0[2]*v2_0[2])/(srho[s2]-area_i[t2]+1e-15);
-				double t_F2_0X = (v2_2[0]*v2_2[0] + v2_2[1]*v2_2[1] + v2_2[2]*v2_2[2])/(srho[s2]);
-				double t_F2_XX = (v2_12[0]*v2_12[0] + v2_12[1]*v2_12[1] + v2_12[2]*v2_12[2])/(srho[s2]+area_i[t1]);
-	
-				double F0 = F11 + F22 - t_F1_X0 - t_F2_0X;
-				double F1 = F11 + F21 - t_F1_XX - t_F2_00;
-				double F2 = F12 + F22 - t_F1_00 - t_F2_XX;
-			
-				if( F0 <= F1 && F0 <= F2 )
-				{
-	//				printf("REJECTING F0 %le F1 %le F2 %le\n", F0, F1, F2 );	
-				}
-				else 
-				{
-					
-					v_done = 0;
-#ifdef ALL_EDGES
-	
-#else
-					is_border[e] = 0;
-					border_edges[b] = border_edges[nborder-1];
-					nborder--;
-#endif
-					double dF_expected = 0;
-					int *es;
-	
-#ifdef DEBUG_1				
-					double FCUR = 0;
-					{
-						for( int t = 0; t < ntri; t++ )
-						{
-							int st = states[t];
-							double dr[3] = { gamma_i[3*t+0] - sgamma[3*st+0]/srho[st],
-									 gamma_i[3*t+1] - sgamma[3*st+1]/srho[st],
-									 gamma_i[3*t+2] - sgamma[3*st+2]/srho[st] };
-							double put[3];
-							MinImage3D( dr, PBC_vec, put );		
-							dr[0] += sgamma[3*st+0]/srho[st];
-							dr[1] += sgamma[3*st+1]/srho[st];
-							dr[2] += sgamma[3*st+2]/srho[st];
-							FCUR += area_i[t] *(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);					
-						}	
-						for( int s = 0; s < ntarget; s++ )
-							FCUR -= (sgamma[3*s+0] * sgamma[3*s+0] + sgamma[3*s+1] * sgamma[3*s+1] + sgamma[3*s+2] * sgamma[3*s+2])/srho[s];
-					}
-#endif
-					if( F1 <= F0 && F1 <= F2 )
-					{
-						states[t2] = s1;
-						es = eft_tris+3*t2;
-
-	
-						sgamma[3*s2+0] -= dr22[0] * area_i[t2];	
-						sgamma[3*s2+1] -= dr22[1] * area_i[t2];	
-						sgamma[3*s2+2] -= dr22[2] * area_i[t2];	
-						                         
-						sgamma[3*s1+0] += dr21[0] * area_i[t2];	
-						sgamma[3*s1+1] += dr21[1] * area_i[t2];	
-						sgamma[3*s1+2] += dr21[2] * area_i[t2];	
-						
-						srho[s2] -= area_i[t2];
-						srho[s1] += area_i[t2];
-						dF_expected = F1 - F0;
-					}
-					else
-					{
-						states[t1] = s2;	
-						es = eft_tris+3*t1;	
-						
-						sgamma[3*s1+0] -= dr11[0] * area_i[t1];	
-						sgamma[3*s1+1] -= dr11[1] * area_i[t1];	
-						sgamma[3*s1+2] -= dr11[2] * area_i[t1];	
-						                         
-						sgamma[3*s2+0] += dr12[0] * area_i[t1];	
-						sgamma[3*s2+1] += dr12[1] * area_i[t1];	
-						sgamma[3*s2+2] += dr12[2] * area_i[t1];	
-	
-						srho[s1] -= area_i[t1];
-						srho[s2] += area_i[t1];
-						dF_expected = F2 - F0;
-					}
-	
-#ifndef ALL_EDGES
-					for( int ex = 0; ex < 3; ex++ )
-					{
-						int ne = es[ex];
-						if( is_border[ne] ) continue;
-	
-						int t1 = edges[edge_dim*ne+2];
-						int t2 = edges[edge_dim*ne+3];
-			
-						if( t1 < 0 || t2 <0 ) continue;
-	
-						if( states[t1] != states[t2] )
-						{
-							is_border[ne] = 1;
-							border_edges[nborder] = ne;
-							nborder++;
-						}
-					}
-#endif
-	
-#ifdef DEBUG_1				
-					double FNEW = 0;
-					{
-						for( int t = 0; t < ntri; t++ )
-						{
-							int st = states[t];
-							double dr[3] = { gamma_i[3*t+0] - sgamma[3*st+0]/srho[st],
-									 gamma_i[3*t+1] - sgamma[3*st+1]/srho[st],
-									 gamma_i[3*t+2] - sgamma[3*st+2]/srho[st] };
-							double put[3];
-							MinImage3D( dr, PBC_vec, put );		
-							dr[0] += sgamma[3*st+0]/srho[st];
-							dr[1] += sgamma[3*st+1]/srho[st];
-							dr[2] += sgamma[3*st+2]/srho[st];
-							FNEW += area_i[t] *(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);					
-						}	
-						for( int s = 0; s < ntarget; s++ )
-							FNEW -= (sgamma[3*s+0] * sgamma[3*s+0] + sgamma[3*s+1] * sgamma[3*s+1] + sgamma[3*s+2] * sgamma[3*s+2])/srho[s];
-					}
-#ifdef DEBUG_2
-					double abs_F = compute_F( ntarget, ntri, tris, gamma_i, area_i, states, PBC_vec);
-#else
-					double abs_F = -1;
-#endif
-	
-					if( fabs(dF_expected-(FNEW-FCUR)) > 1e-4 )
-					{
-						printf("PROBLEM_dF_expected: %lf got: %lf FCUR %lf FNEW %lf ABSF %lf F0: %le F1: %le F2: %le\n", dF_expected, FNEW-FCUR, FCUR, FNEW, abs_F, F0, F1, F2  ); 
-					}
-					else
-						printf("dF_expected: %lf got: %lf FCUR %lf FNEW %lf ABSF %lf F0: %le F1: %le F2: %le\n", dF_expected, FNEW-FCUR, FCUR, FNEW, abs_F, F0, F1, F2  ); 
-#endif
-				}
-			}
-#ifdef ALL_EDGES
-		}
-#else
-		}
-#endif
-
-		for( int t = 0; t < ntri; t++ )
-		{
-			int e_t[3];
-			int b = 0;
-	
-			for( int xt = 0; xt < 3; xt++ )
-			{
-				int be = eft_tris[3*t+xt];
-
-				if( edges[edge_dim*be+2] == t )
-					e_t[xt] = edges[edge_dim*be+3];
-				else
-					e_t[xt] = edges[edge_dim*be+2];
-	
-				if( states[t] == states[e_t[xt]] )
-					b = 1;
-			}
-
-			if( ! b )
-			{
-				printf("triangle %d has no common borders.\n", t);
-			}
-
-		}
-
-	}
-	{
-		FILE *vFile = fopen("v.lattice", "w" );
-		fprintf(vFile, "3D Lattice\n" );
-		fprintf(vFile, "%lf %lf %lf\n", PBC_vec[0][0], PBC_vec[0][1], PBC_vec[0][2] );
-		fprintf(vFile, "%lf %lf %lf\n", PBC_vec[1][0], PBC_vec[1][1], PBC_vec[1][2] );
-		fprintf(vFile, "%lf %lf %lf\n", PBC_vec[2][0], PBC_vec[2][1], PBC_vec[2][2] );
-	
-		int *lbonds = (int *)malloc( sizeof(int) * max_edges * ntarget );
-		int *nlbonds = (int *)malloc( sizeof(int) * ntarget );
-		memset( nlbonds, 0, sizeof(int) * ntarget );
-	
-		int *all_bonds = (int*)malloc( sizeof(int) * ntarget * max_edges);
-		int xbonds = 0;
-	
-		for( int s = 0; s < ntarget; s++ )
-		{
-			double put[3];
-			double r1[3] = { sgamma[3*s+0] / srho[s], sgamma[3*s+1] / srho[s], sgamma[3*s+2] / srho[s] };
-			MinImage3D(r1,PBC_vec,put);
-			sgamma[3*s+0] = r1[0] * srho[s];
-			sgamma[3*s+1] = r1[1] * srho[s];
-			sgamma[3*s+2] = r1[2] * srho[s];
-		}
-
-		for( int e = 0; e < nedges; e++ )
-		{
-			int t1 = edges[(edge_dim)*e+2];
-			int t2 = edges[(edge_dim)*e+3];
-
-			int s1 = states[t1];
-			int s2 = states[t2];
-
-			if( s1 == s2 ) continue; 
-
-			int gotit =0;
-			for( int x = 0; x < nlbonds[s1]; x++ )
-			{
-				if( lbonds[max_edges*s1+x] == s2 )
-					gotit =1;
-			}
-			if( !gotit )
-			{
-				lbonds[s1*max_edges+nlbonds[s1]] = s2;
-				nlbonds[s1]++;
-			}
-			gotit =0;
-			for( int x = 0; x < nlbonds[s2]; x++ )
-			{
-				if( lbonds[max_edges*s2+x] == s1 )
-					gotit =1;
-			}
-			if( !gotit )
-			{
-				lbonds[s2*max_edges+nlbonds[s2]] = s1;
-				nlbonds[s2]++;
-			}
-		}
-		
-
-		FILE *vxyz = fopen("c.xyz","w");
-		fprintf(vxyz, "%d\n", ntarget );
-		fprintf(vxyz, "c.xyz\n");
-		for( int x = 0; x < ntarget;x++)
-			fprintf(vxyz, "C %lf %lf %lf\n", sgamma[3*x+0]/srho[x], sgamma[3*x+1]/srho[x], sgamma[3*x+2]/srho[x] );
-		fclose(vxyz);
-	
-		FILE *vpsf = fopen("c.psf","w");
-		writePSF( vpsf, ntarget, NULL, all_bonds, xbonds );
-		fclose(vpsf);
-	
-		for( int x = 0; x < ntarget; x++ )
-		{
-			fprintf(vFile, "%d %lf %lf %lf %d", x, sgamma[3*x+0] / srho[x], sgamma[3*x+1] / srho[x], sgamma[3*x+2] / srho[x], nlbonds[x] );
-	
-			for( int b = 0; b < nlbonds[x]; b++ )
-				fprintf( vFile, " %d", lbonds[x*max_edges+b] );
-			fprintf(vFile, "\n");
-		} 
-		fclose(vFile);
-	
-	FILE *triFile = fopen("v.vmd","w");
-	
-	for( int t = 0; t < ntri; t++ )
-	{
-		int curp = tris[3*t+0];
-		int curp1 = tris[3*t+1];
-		int curp2 = tris[3*t+2];
-	
-		const char *colors[] = { "red", "green", "blue", "white", "orange", "yellow", "pink", "purple", "cyan", "lime", "mauve", "ochre", "iceblue", "yellow2", "yellow3", "green2", "green3", "cyan2", "cyan3" };
-		int ncol = sizeof(colors)/sizeof(const char *);
-
-		int st = states[t];
-		fprintf(triFile, "draw color %s\n", colors[st%ncol] );
-		int x1 = tris[3*t+1];
-		int x2 = tris[3*t+2];
-		
-		double p1[3] = { verts[3*curp+0], verts[3*curp+1], verts[3*curp+2] };
-		double p2[3] = { verts[3*x1+0], verts[3*x1+1], verts[3*x1+2] };
-		double p3[3] = { verts[3*x2+0], verts[3*x2+1], verts[3*x2+2] };
-
-		double dr1[3] = { p2[0]-p1[0],p2[1]-p1[1],p2[2]-p1[2] };
-		double dr2[3] = { p3[0]-p1[0],p3[1]-p1[1],p3[2]-p1[2] };
-		double put[3];
-	
-		MinImage3D( dr1, PBC_vec, put );
-		MinImage3D( dr2, PBC_vec, put );
-	
-		p2[0] = p1[0] + dr1[0];
-		p2[1] = p1[1] + dr1[1];
-		p2[2] = p1[2] + dr1[2];
-		
-		p3[0] = p1[0] + dr2[0];
-		p3[1] = p1[1] + dr2[1];
-		p3[2] = p1[2] + dr2[2];
-
-
-		int dx = 0, dy = 0;
-//		for( int dx = -1; dx <= 1; dx++ )
-//		for( int dy = -1; dy <= 1; dy++ )
-		{
-			fprintf(triFile, "draw triangle { %lf %lf %lf } { %lf %lf %lf } { %lf %lf %lf }\n",
-				verts[3*curp+0] + dx * PBC_vec[0][0], verts[3*curp+1]+dy*PBC_vec[1][1], verts[3*curp+2],
-				p2[0]+dx*PBC_vec[0][0],p2[1]+dy*PBC_vec[1][1],p2[2],
-				p3[0]+dx*PBC_vec[0][0],p3[1]+dy*PBC_vec[1][1],p3[2] 
-				 );
-		}
-	}
-	}
-	free(sgamma);
-	free(srho);
-	free(gamma_i);
-	free(area_i);
-*/
 	free(states);
 }	
 
@@ -725,6 +188,16 @@ void cpass( double *gamma_i, double *gamma_nrm, int nv, int *bonds, int nbonds_p
 	
 			for( int s = 0; s < ntarget; s++ )
 			{
+				double dr[3] = { gamma_i[3*t+0] - sgamma[3*s+0]/srho[s],
+						 gamma_i[3*t+1] - sgamma[3*s+1]/srho[s],
+						 gamma_i[3*t+2] - sgamma[3*s+2]/srho[s] };
+				double r2 = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+				if( r2 < best_dF )
+				{
+					best_dF = r2;
+					best_target = s;
+				}
+/*
 				double val1 = (sgamma[3*s+0]*sgamma[3*s+0] + sgamma[3*s+1]*sgamma[3*s+1] +sgamma[3*s+2]*sgamma[3*s+2])/srho[s];
 				double dr[3] = { gamma_i[3*t+0] - sgamma[3*s+0]/srho[s], gamma_i[3*t+1] - sgamma[3*s+1]/srho[s], gamma_i[3*t+2] - sgamma[3*s+2]/srho[s] };
 				MinImage3D( dr, PBC_vec, putv );
@@ -751,7 +224,7 @@ void cpass( double *gamma_i, double *gamma_nrm, int nv, int *bonds, int nbonds_p
 				{
 					best_target = s;
 					best_dF = dF;
-				}
+				}*/
 			}
 
 			int border_best = 0;
@@ -1526,6 +999,18 @@ void vpass_inner(
 	
 			for( int s = 0; s < ntarget; s++ )
 			{
+				double dr[3] = { gamma_i[3*t+0] - sgamma[3*s+0]/srho[s],
+						 gamma_i[3*t+1] - sgamma[3*s+1]/srho[s],
+						 gamma_i[3*t+2] - sgamma[3*s+2]/srho[s] };
+				MinImage3D(dr,PBC_vec,putv);
+				double r2 = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+				if( r2 < best_dF )
+				{
+					best_dF = r2;
+					best_target = s;
+				}
+
+/*
 				double val1 = (sgamma[3*s+0]*sgamma[3*s+0] + sgamma[3*s+1]*sgamma[3*s+1] +sgamma[3*s+2]*sgamma[3*s+2])/srho[s];
 				double dr[3] = { gamma_i[3*t+0] - sgamma[3*s+0]/srho[s], gamma_i[3*t+1] - sgamma[3*s+1]/srho[s], gamma_i[3*t+2] - sgamma[3*s+2]/srho[s] };
 				MinImage3D( dr, PBC_vec, putv );
@@ -1546,7 +1031,7 @@ void vpass_inner(
 				{
 					best_target = s;
 					best_dF = dF;
-				}
+				}*/
 			}
 /*
 			int border_best = 0;
@@ -1630,7 +1115,7 @@ void vpass_inner(
 		int niter = 0;
 		while( !v_done )
 		{
-//			printf("Border iteration.\n");
+			printf("Border iteration.\n");
 			v_done = 1;
 			niter++;
 			if( niter > 50 )
@@ -1705,46 +1190,62 @@ void vpass_inner(
 				dr22[1] += sgamma[3*s2+1]/srho[s2];
 				dr22[2] += sgamma[3*s2+2]/srho[s2];
 		
-
 				double state_1_with_2 = 0;
 				double state_2_with_1 = 0;
-	
+
+				// the energy of triangle one in its state	
 				double F11 = area_i[t1] * (dr11[0]*dr11[0]+dr11[1]*dr11[1]+dr11[2]*dr11[2]);
+				// the energy of triangle one in the other state	
 				double F12 = area_i[t1] * (dr12[0]*dr12[0]+dr12[1]*dr12[1]+dr12[2]*dr12[2]);
+				// the energy of triangle two in the first state	
 				double F21 = area_i[t2] * (dr21[0]*dr21[0]+dr21[1]*dr21[1]+dr21[2]*dr21[2]);
+				// the energy of triangle two in its own state	
 				double F22 = area_i[t2] * (dr22[0]*dr22[0]+dr22[1]*dr22[1]+dr22[2]*dr22[2]);
 	
+				// the current weighted center of mass
 				double v1_1[3] = { sgamma[3*s1+0], sgamma[3*s1+1], sgamma[3*s1+2] };
+				// if we subtracted off state 1.
 				double v1_0[3] = { 
 							v1_1[0] - dr11[0] * area_i[t1],
 							v1_1[1] - dr11[1] * area_i[t1],
 							v1_1[2] - dr11[2] * area_i[t1] };
 	
-	
+				// if we added in state 2.
 				double v1_12[3] = { 
 							v1_1[0] + dr21[0] * area_i[t2],
 							v1_1[1] + dr21[1] * area_i[t2],
 							v1_1[2] + dr21[2] * area_i[t2] };
 				
+				// the current weighted center of mass of two.
 				double v2_2[3] = { sgamma[3*s2+0], sgamma[3*s2+1], sgamma[3*s2+2] };
+				// if we removed the second.
 				double v2_0[3] = { 
 							v2_2[0] - dr22[0] * area_i[t2],
 							v2_2[1] - dr22[1] * area_i[t2],
 							v2_2[2] - dr22[2] * area_i[t2] };
+				// or if we added the first
 				double v2_12[3] = { 
 							v2_2[0] + dr12[0] * area_i[t1],
 							v2_2[1] + dr12[1] * area_i[t1],
 							v2_2[2] + dr12[2] * area_i[t1] };
-	
+				// if we subtract off one
 				double t_F1_00 = (v1_0[0]*v1_0[0] + v1_0[1]*v1_0[1] + v1_0[2]*v1_0[2])/(srho[s1]-area_i[t1]+1e-15);
+				// current
 				double t_F1_X0 = (v1_1[0]*v1_1[0] + v1_1[1]*v1_1[1] + v1_1[2]*v1_1[2])/(srho[s1]);
+				// if we add in the second
 				double t_F1_XX = (v1_12[0]*v1_12[0] + v1_12[1]*v1_12[1] + v1_12[2]*v1_12[2])/(srho[s1]+area_i[t2]);
+				// if we subtract off two from its state
 				double t_F2_00 = (v2_0[0]*v2_0[0] + v2_0[1]*v2_0[1] + v2_0[2]*v2_0[2])/(srho[s2]-area_i[t2]+1e-15);
+				// current
 				double t_F2_0X = (v2_2[0]*v2_2[0] + v2_2[1]*v2_2[1] + v2_2[2]*v2_2[2])/(srho[s2]);
+				// if we added one.
 				double t_F2_XX = (v2_12[0]*v2_12[0] + v2_12[1]*v2_12[1] + v2_12[2]*v2_12[2])/(srho[s2]+area_i[t1]);
-	
+
+				// the base energy: current	
 				double F0 = F11 + F22 - t_F1_X0 - t_F2_0X;
+				// switching to two to one.	
 				double F1 = F11 + F21 - t_F1_XX - t_F2_00;
+				// switching to one to two.	
 				double F2 = F12 + F22 - t_F1_00 - t_F2_XX;
 		
 				if( aux_i )
@@ -1769,7 +1270,7 @@ void vpass_inner(
 				}
 				else 
 				{
-#ifdef DEBUG_2
+#ifdef DEBUG
 					double abs_F_p = compute_F( ntarget, ntri, tris, gamma_i, area_i, states, PBC_vec, load_cens, aux_i, aux_w);
 	memcpy( load_cens, sgamma, 3 * ntarget * sizeof(double) );
 	for( int s = 0; s < ntarget; s++ )
@@ -1778,8 +1279,6 @@ void vpass_inner(
 		load_cens[3*s+1] /= srho[s];
 		load_cens[3*s+2] /= srho[s];
 	}
-#else
-					double abs_F_p = -1;
 #endif
 					
 					v_done = 0;
@@ -1793,43 +1292,6 @@ void vpass_inner(
 					double dF_expected = 0;
 					int *es;
 	
-#ifdef DEBUG_1				
-					double FCUR = 0;
-					{
-						double check_sgamma[3*ntarget];
-						memset( check_sgamma, 0, sizeof(double) * 3 * ntarget );
-						for( int t = 0; t < ntri; t++ )
-						{
-							int st = states[t];
-							double dr[3] = { gamma_i[3*t+0] - sgamma[3*st+0]/srho[st],
-									 gamma_i[3*t+1] - sgamma[3*st+1]/srho[st],
-									 gamma_i[3*t+2] - sgamma[3*st+2]/srho[st] };
-							double put[3];
-							MinImage3D( dr, PBC_vec, put );		
-
-							dr[0] += sgamma[3*st+0]/srho[st];
-							dr[1] += sgamma[3*st+1]/srho[st];
-							dr[2] += sgamma[3*st+2]/srho[st];
-							FCUR += area_i[t] *(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
-							if( aux_i ) FCUR += aux_w * aux_i[t] * aux_i[t] * area_i[t];					
-		
-							check_sgamma[3*st+0] += dr[0] * area_i[t];
-							check_sgamma[3*st+1] += dr[1] * area_i[t];
-							check_sgamma[3*st+2] += dr[2] * area_i[t];
-						}	
-						for( int s = 0; s < ntarget; s++ )
-						{
-							double dr[3] = { sgamma[3*s+0] - check_sgamma[3*s+0],
-										sgamma[3*s+1] - check_sgamma[3*s+1],
-										sgamma[3*s+2] - check_sgamma[3*s+2] };
-							if( dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2] > 1e-4 )
-//							printf("%le %le %le versus %le %le %le\n", check_sgamma[3*s+0], check_sgamma[3*s+1], check_sgamma[3*s+2],
-//								sgamma[3*s+0], sgamma[3*s+1], sgamma[3*s+2] );
-							FCUR -= (sgamma[3*s+0] * sgamma[3*s+0] + sgamma[3*s+1] * sgamma[3*s+1] + sgamma[3*s+2] * sgamma[3*s+2])/srho[s];
-							if( aux_i ) FCUR -= aux_w * saux[s] * saux[s] / srho[s]; 				
-						}	
-					}
-#endif
 					if( F1 <= F0 && F1 <= F2 )
 					{
 						states[t2] = s1;
@@ -1850,7 +1312,7 @@ void vpass_inner(
 						srho[s1] += area_i[t2];
 						dF_expected = F1 - F0;
 					}
-					else
+					else if( F2 <= F0 )
 					{
 						states[t1] = s2;	
 						es = eft_tris+3*t1;	
@@ -1890,31 +1352,8 @@ void vpass_inner(
 						}
 					}
 #endif
-	
-#ifdef DEBUG_1				
-					double FNEW = 0;
-					{
-						for( int t = 0; t < ntri; t++ )
-						{
-							int st = states[t];
-							double dr[3] = { gamma_i[3*t+0] - sgamma[3*st+0]/srho[st],
-									 gamma_i[3*t+1] - sgamma[3*st+1]/srho[st],
-									 gamma_i[3*t+2] - sgamma[3*st+2]/srho[st] };
-							double put[3];
-							MinImage3D( dr, PBC_vec, put );		
-							dr[0] += sgamma[3*st+0]/srho[st];
-							dr[1] += sgamma[3*st+1]/srho[st];
-							dr[2] += sgamma[3*st+2]/srho[st];
-							FNEW += area_i[t] *(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);					
-							if( aux_i ) FNEW += aux_w * aux_i[t] * aux_i[t] * area_i[t];					
-						}	
-						for( int s = 0; s < ntarget; s++ )
-						{
-							FNEW -= (sgamma[3*s+0] * sgamma[3*s+0] + sgamma[3*s+1] * sgamma[3*s+1] + sgamma[3*s+2] * sgamma[3*s+2])/srho[s];
-							if( aux_i ) FNEW -= aux_w * saux[s] * saux[s] / srho[s]; 				
-						}
-					}
-#ifdef DEBUG_2
+
+#ifdef DEBUG
 	memcpy( load_cens, sgamma, 3 * ntarget * sizeof(double) );
 	for( int s = 0; s < ntarget; s++ )
 	{
@@ -1923,18 +1362,19 @@ void vpass_inner(
 		load_cens[3*s+2] /= srho[s];
 	}
 					double abs_F = compute_F( ntarget, ntri, tris, gamma_i, area_i, states, PBC_vec, load_cens, aux_i, aux_w);
-#else
-					double abs_F = -1;
 #endif
 	
 					running_F += dF_expected;
 
-					if( fabs(dF_expected-(FNEW-FCUR)) > 1e-4 )
+//					if( fabs(dF_expected-(FNEW-FCUR)) > 1e-4 )
+#ifdef DEBUG
+					if( fabs(dF_expected-(abs_F-abs_F_p)) > 1e-4 )
 					{
-//						printf("PROBLEM_dF_expected: %lf got: %lf FCUR %lf FNEW %lf ABSF %lf dABS: %le F0: %le F1: %le F2: %le\n", dF_expected, FNEW-FCUR, FCUR, FNEW, abs_F, abs_F-abs_F_p,F0, F1, F2  ); 
+						printf("PROBLEM_dF_expected: %lf got: %lf ABSF %lf F0: %le F1: %le F2: %le\n", dF_expected, abs_F-abs_F_p,abs_F,F0, F1, F2  ); 
+						//printf("PROBLEM_dF_expected: %lf got: %lf FCUR %lf FNEW %lf ABSF %lf dABS: %le F0: %le F1: %le F2: %le\n", dF_expected, FNEW-FCUR, FCUR, FNEW, abs_F, abs_F-abs_F_p,F0, F1, F2  ); 
 					}
-//					else
-//						printf("dF_expected: %lf got: %lf FCUR %lf FNEW %lf ABSF %lf dABS: %le F0: %le F1: %le F2: %le\n", dF_expected, FNEW-FCUR, FCUR, FNEW, abs_F, abs_F-abs_F_p, F0, F1, F2  ); 
+					else
+						printf("GREAT dF_expected: %lf got: %lf ABSF %lf F0: %le F1: %le F2: %le\n", dF_expected, abs_F-abs_F_p, abs_F, F0, F1, F2  ); 
 #endif
 				}
 			}

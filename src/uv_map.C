@@ -2288,7 +2288,7 @@ int surface::map( int face_from, int face_to, double u, double v )
 }
 
 
-double surface::c( int f, double u, double v, double *r )
+double surface::c( int f, double u, double v, double *r, double *c_vec_1, double *c_vec_2, double *c_val_1, double *c_val_2 )
 {
 	double alpha_x = r[3*nv+0];
 	double alpha_y = r[3*nv+1];
@@ -2513,6 +2513,13 @@ double surface::c( int f, double u, double v, double *r )
 			c2 = tSuu[2] * dudy * dudy + tSuv[2] * dudy * dvdy + tSuv[2] * dvdy * dudy + tSvv[2] * dvdy * dvdy; 
 
 			csum = c1+c2;
+
+			if( c_vec_1 && c_vec_2 && c_val_1 && c_val_2 )
+			{
+				printf("Monge full c vecs NYI and probably never will be.\n");
+				exit(1);	
+			}
+
 		}
 		else
 		{
@@ -2531,12 +2538,39 @@ double surface::c( int f, double u, double v, double *r )
 			double d = Sop[3];
 	
 			double c0 = theFormulas[frm].c0;
-			c1 = -0.5*(a+d-sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d));
-			c2 = -0.5*(a+d+sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d));
+			double fac = sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d);
+			c1 = -0.5*(a+d-fac);
+			c2 = -0.5*(a+d+fac);
 			
+			if( c_vec_1 && c_vec_2 && c_val_1 && c_val_2 )
+			{
+				*c_val_1 = c1;
+
+				double vec1[2] = { -(a+d+fac)/(2*c),1.0};
+
+				double len = sqrt(vec1[0]*vec1[0]+vec1[1]*vec1[1]);
+
+				vec1[0]/=len;
+				vec1[1]/=len;
+				c_vec_1[0] = vec1[0];
+				c_vec_1[1] = vec1[1];
+				
+				*c_val_2 = c2;
+				
+				double vec2[2] = {  (a-d+fac)/(2*c),1.0};
+				
+				len = sqrt(vec2[0]*vec2[0]+vec2[1]*vec2[1]);
+				vec2[0]/=len;
+				vec2[1]/=len;
+				c_vec_2[0] = vec2[0];
+				c_vec_2[1] = vec2[1];
+						
+		
+
+			}
 			csum = c1+c2;
 		}
-
+	
 
 		return csum;
 	}
@@ -2715,6 +2749,12 @@ double surface::c( int f, double u, double v, double *r )
       
 			c1 = tSuu[2] * dudx * dudx + tSuv[2] * dudx * dvdx + tSuv[2] * dvdx * dudx + tSvv[2] * dvdx * dvdx;
 			c2 = tSuu[2] * dudy * dudy + tSuv[2] * dudy * dvdy + tSuv[2] * dvdy * dudy + tSvv[2] * dvdy * dvdy; 
+			
+			if( c_vec_1 && c_vec_2 && c_val_1 && c_val_2 )
+			{
+				printf("Monge full c vecs NYI and probably never will be.\n");
+				exit(1);	
+			}
 		}
 		else
 		{
@@ -2733,8 +2773,35 @@ double surface::c( int f, double u, double v, double *r )
 			double d = Sop[3];
 	
 			double c0 = theFormulas[frm].c0;
-			c1 = -0.5*(a+d-sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d));
-			c2 = -0.5*(a+d+sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d));
+			
+			double fac = sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d);
+			c1 = -0.5*(a+d-fac);
+			c2 = -0.5*(a+d+fac);
+			
+			if( c_vec_1 && c_vec_2 && c_val_1 && c_val_2 )
+			{
+				*c_val_1 = c1;
+
+				double vec1[2] = { -(a+d+fac)/(2*c),1.0};
+
+				double len = sqrt(vec1[0]*vec1[0]+vec1[1]*vec1[1]);
+
+				vec1[0]/=len;
+				vec1[1]/=len;
+				c_vec_1[0] = vec1[0];
+				c_vec_1[1] = vec1[1];
+				
+				*c_val_2 = c2;
+				
+				double vec2[2] = {  (a-d+fac)/(2*c),1.0};
+				
+				len = sqrt(vec2[0]*vec2[0]+vec2[1]*vec2[1]);
+				vec2[0]/=len;
+				vec2[1]/=len;
+				c_vec_2[0] = vec2[0];
+				c_vec_2[1] = vec2[1];
+
+			}
 		}
 		return c1 + c2;
 	}

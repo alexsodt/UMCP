@@ -1,0 +1,12 @@
+time_step 		1e-12
+jobname			pore_dynamics
+mesh 			pore.mesh
+#mode_min 		2
+#mode_max 		2
+do_ld 			yes
+o_lim 			100
+nsteps			20
+seed 			2
+movie			yes	
+gamma_langevin 		100
+#load			hot.save

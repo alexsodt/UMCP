@@ -1,7 +1,7 @@
 #define __parallelc__
 
 //#define USE_DGEMV
-//#define PRINT_REGIONS
+#define PRINT_REGIONS
 
 #include <stdio.h>
 #include <stdlib.h>

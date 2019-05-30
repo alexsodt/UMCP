@@ -12,7 +12,6 @@
 #include "config.h"
 #include "vpass.h"
 
-#ifdef PARALLEL
 void surface::getRegions( int *region_for_tri, int nregions )
 {
 	int edge_dim = 2;
@@ -44,4 +43,3 @@ void surface::getRegions( int *region_for_tri, int nregions )
 	memcpy( region_for_tri, states, sizeof(int) * ntri );
 
 }
-#endif
