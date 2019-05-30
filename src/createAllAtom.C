@@ -402,7 +402,14 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 	
 				double spot_u = 1.0/3.0;
 				double spot_v = 1.0/3.0;
-				int fout = evaluate_at( eval_cen, use_r, f, &spot_u, &spot_v, rsurf );
+
+
+				int main_f_eval = f;
+				double main_u_cen = spot_u;
+				double main_v_cen = spot_v;
+
+				// everything must be evaluated at this spot to retain the x,y to u/v mapping.
+				int fout = evaluate_at( eval_cen, use_r, f, &spot_u, &spot_v, rsurf, leaflet[l] );
 	
 	
 				if( regions_for_face[fout] == r )
@@ -419,15 +426,15 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 						int at_save = at[xa].bead;
 						int res_save = at[xa].res;
 	
-						double dx = xsave-lipid_xyz[3*l+0];//+shift[0]
-						double dy = ysave-lipid_xyz[3*l+1];//+shift[1]
+						double dx = xsave-upper_cen[0]+shift[0];
+						double dy = ysave-upper_cen[1]+shift[1];
 		
 						double use_r[3] = { dx, dy, zsave };
 						double eval[3];
 	
-						double transp_u = u_cen;
-						double transp_v = v_cen;
-						evaluate_at( eval, use_r, fout, &transp_u, &transp_v, rsurf );
+						double transp_u = main_u_cen;
+						double transp_v = main_v_cen;
+						evaluate_at( eval, use_r, main_f_eval, &transp_u, &transp_v, rsurf, leaflet[l] );
 	
 						at[xa].x = eval[0];
 						at[xa].y = eval[1];
@@ -452,7 +459,7 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 	
 						at[xa].bead = cur_atom;
 						at[xa].res  = cur_res;
-						at[xa].segRes = 0;
+						at[xa].segRes = cur_res;
 	
 						printSingleCRD( tempFile, at+xa ); 
 						at[xa].bead = at_save;
@@ -490,7 +497,7 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 }
 
 
-int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf )
+int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf, int leaflet )
 {
 	double r_cen[3];	
 	double r_nrm[3];
@@ -538,6 +545,22 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 
 	double ctot = c(f,u_cen,v_cen,rsurf,cvec1,cvec2,&c1,&c2);
 
+	// use the cvec1 and cvec2 as the x/y coordinate system.
+
+	double vec_c1[3] = { cvec1[0] * drdu[0] + cvec1[1] * drdv[0],
+			     cvec1[0] * drdu[1] + cvec1[1] * drdv[1],
+			     cvec1[0] * drdu[2] + cvec1[1] * drdv[2] };
+	double vec_c2[3] = { cvec2[0] * drdu[0] + cvec2[1] * drdv[0],
+			     cvec2[0] * drdu[1] + cvec2[1] * drdv[1],
+			     cvec2[0] * drdu[2] + cvec2[1] * drdv[2] };
+	
+	
+
+	double vdp  = vec_c1[0] * vec_c2[0] + vec_c1[1] * vec_c2[1] + vec_c1[2] * vec_c2[2];
+	double lv1 = normalize(vec_c1);
+	double lv2 = normalize(vec_c2);
+
+/*
 	// this is u-prime and v-prime:	
 
 	double up = dr[0];
@@ -545,10 +568,61 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 
 	// up uvec = uvec up 
 
-
 	double du = up * transform[0] + vp * transform[1];
 	double dv = up * transform[2] + vp * transform[3];
+*/
 
+	double dc1 = dr[0] / lv1;
+	double dc2 = dr[1] / lv2;
+	double du,dv;
+	double z_scaled = dr[2];	
+
+	if( leaflet == 1 )
+	{
+//		double scale1 =  (1 + c1 * (PP-dr[2]));
+//		double scale2 =  (1 + c2 * (PP-dr[2]));
+
+		// these are scalings needed for displacement at the bilayer midplane to get the proper distances at the neutral surface (PP)
+		double scale1 = (1- c1 * (PP-dr[2]))/(1-c1*PP);
+		double scale2 = (1- c2 * (PP-dr[2]))/(1-c2*PP);
+
+		// if scale1 is less than 1, it means that the z length has shrunk (the x dimension is larger at the midplane and so the particle's midplane displacement must be scaled down).
+
+
+
+		double lat_scale = scale1*scale2;
+
+		dc1 *= scale1;
+		dc2 *= scale2;
+
+		double z =dr[2];
+		double scale = (1+c1*PP) * (1+c2*PP);
+		z_scaled = scale * PP - (PP -z) * (1+(PP-z)*c1)*(1+(PP-z)*c2);
+	
+		du = cvec1[0] * dc1 + cvec2[0] * dc2; 
+		dv = cvec1[1] * dc1 + cvec2[1] * dc2; 
+	}
+	else
+	{
+		//double scale1= (1 - c1 * (-PP-dr[2]));
+		//double scale2= (1 - c2 * (-PP-dr[2]));
+		double scale1 = (1+ c1 * (-PP-dr[2]))/(1-c1*(-PP));
+		double scale2 = (1+ c2 * (-PP-dr[2]))/(1-c2*(-PP));
+		
+
+		double lat_scale = scale1*scale2;
+		dc1 *= scale1;
+		dc2 *= scale2;
+		//z_scaled = dr[2] * (1+c1*dr[2]) * (1+c2*dr[2]);
+		double z =dr[2];
+		double scale = (1+c1*PP) * (1+c2*PP);
+		//z_scaled = -scale * PP - (-PP -z) * scale1 * scale2;
+		z_scaled = -scale * PP - (-PP -z) * (1-(-PP-z)*c1)*(1-(-PP-z)*c2);
+	
+		du = cvec1[0] * dc1 + cvec2[0] * dc2; 
+		dv = cvec1[1] * dc1 + cvec2[1] * dc2; 
+
+	}
 	int fp = f;
 	int done = 0;
 
@@ -567,12 +641,9 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 	evaluateRNRM( fp, u_cen, v_cen, rp, np, rsurf ); 
 					
 
-	// squish lipid based on curvature
-
-
-	eval[0] = rp[0] + np[0] * dr[2]; 
-	eval[1] = rp[1] + np[1] * dr[2]; 
-	eval[2] = rp[2] + np[2] * dr[2]; 
+	eval[0] = rp[0] + np[0] * z_scaled; 
+	eval[1] = rp[1] + np[1] * z_scaled; 
+	eval[2] = rp[2] + np[2] * z_scaled; 
 
 	*u = u_cen;
 	*v = v_cen;

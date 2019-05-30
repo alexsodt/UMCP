@@ -2546,7 +2546,7 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 			{
 				*c_val_1 = c1;
 
-				double vec1[2] = { -(a+d+fac)/(2*c),1.0};
+				double vec1[2] = { -(-a+d+fac)/(2*c),1.0};
 
 				double len = sqrt(vec1[0]*vec1[0]+vec1[1]*vec1[1]);
 
@@ -2557,7 +2557,7 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 				
 				*c_val_2 = c2;
 				
-				double vec2[2] = {  (a-d+fac)/(2*c),1.0};
+				double vec2[2] = {  -(-a+d-fac)/(2*c),1.0};
 				
 				len = sqrt(vec2[0]*vec2[0]+vec2[1]*vec2[1]);
 				vec2[0]/=len;
@@ -2781,8 +2781,8 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 			if( c_vec_1 && c_vec_2 && c_val_1 && c_val_2 )
 			{
 				*c_val_1 = c1;
-
-				double vec1[2] = { -(a+d+fac)/(2*c),1.0};
+				
+				double vec1[2] = { -(-a+d+fac)/(2*c),1.0};
 
 				double len = sqrt(vec1[0]*vec1[0]+vec1[1]*vec1[1]);
 
@@ -2793,7 +2793,8 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 				
 				*c_val_2 = c2;
 				
-				double vec2[2] = {  (a-d+fac)/(2*c),1.0};
+				double vec2[2] = {  -(-a+d-fac)/(2*c),1.0};
+
 				
 				len = sqrt(vec2[0]*vec2[0]+vec2[1]*vec2[1]);
 				vec2[0]/=len;
