@@ -338,7 +338,7 @@ int main( int argc, char **argv )
 		// which direction to go.
 	
 		int next3 = startcyl[layer]+3;
-		if( next3 > cpl ) next3 -= cpl;
+		if( next3 >= cpl ) next3 -= cpl;
 		int prev3 = startcyl[layer]-3;
 		if( prev3 < 0 ) prev3 += cpl;
 
@@ -974,9 +974,9 @@ void getCylinderMesh( double **rvals, int **edges, int **nedges, int *nv, int gr
 	double *rn_vec = (double *)malloc( sizeof(double) * npoints * 3 );
 	for( int x = 0; x < npoints; x++ )
 	{
-		rn_vec[3*x+0] = (1e-4) * rand() / (double)RAND_MAX;
-		rn_vec[3*x+1] = (1e-4) * rand() / (double)RAND_MAX;
-		rn_vec[3*x+2] = (1e-4) * rand() / (double)RAND_MAX;
+		rn_vec[3*x+0] = (1e-2) * rand() / (double)RAND_MAX;
+		rn_vec[3*x+1] = (1e-2) * rand() / (double)RAND_MAX;
+		rn_vec[3*x+2] = (1e-2) * rand() / (double)RAND_MAX;
 
 		r[3*x+0] += rn_vec[3*x+0];
 		r[3*x+1] += rn_vec[3*x+1];
