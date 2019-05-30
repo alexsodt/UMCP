@@ -533,7 +533,7 @@ int checkLinearCollision( double *r1, int nv1, double *pt1, double *pt2, double 
 	return 0;
 } 
 
-double surface::returnRadius (double *pt, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, double distance, double currentR, double L, double defaultR, double *vertex_data, int *ptr_to_data, int *nump, int inside_outside, int disable_PBC_z ) {
+double surface::returnRadius (double *pt, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, double distance, double currentR, double L, double defaultR, double *vertex_data, int *ptr_to_data, int *nump, int inside_outside, int disable_PBC_z, double reflecting_surface ) {
 
 	// distance: the distance the particle moved since we last checked.	
 	// currentR: the last particle/membrane distance
@@ -549,7 +549,7 @@ double surface::returnRadius (double *pt, int *col_f, double *col_u, double *col
 	}
 	
 	// if it moved farther than the current distance to the membrane, this is the distance from the membrane it could be.
-	double checkClose = distance - currentR + check_fudge;
+	double checkClose = distance - currentR + check_fudge + reflecting_surface;
 
 	if (checkR <= checkClose) {
 		if (!withinRadius(pt, col_f, col_u, col_v, M, mlow, mhigh, L, checkClose, vertex_data, ptr_to_data, nump, disable_PBC_z )) {
@@ -560,7 +560,7 @@ double surface::returnRadius (double *pt, int *col_f, double *col_u, double *col
 			int f;
 			double u, v, radius;
 			// this checks to see which side we are on: checks the particles displacement from the surface relative to the surface normal.
-			bool check = withinBoxedSurface( pt, &f, &u, &v, M, mlow, mhigh, &radius, L, inside_outside, disable_PBC_z );
+			bool check = withinBoxedSurface( pt, &f, &u, &v, M, mlow, mhigh, &radius, L, inside_outside, disable_PBC_z, reflecting_surface );
 
 			if (!check) {
 				// not within the surface, outside it.
@@ -589,6 +589,9 @@ double surface::returnRadius (double *pt, int *col_f, double *col_u, double *col
                         	return trial_R;
 			} else if ((trial_R > checkClose) && withinRadius(pt, col_f, col_u, col_v, M, mlow, mhigh, L, trial_R, vertex_data, ptr_to_data, nump, disable_PBC_z )) {
 				//printf("check2\n");
+				if( trial_R < reflecting_surface )
+					return -1;
+
 				upperR = trial_R;
 				trial_R = (lowerR + upperR)/2;
 			} else if ((trial_R < checkClose) && !withinRadius(pt, col_f, col_u, col_v, M, mlow, mhigh, L, trial_R, vertex_data, ptr_to_data, nump, disable_PBC_z )) {
@@ -601,10 +604,13 @@ double surface::returnRadius (double *pt, int *col_f, double *col_u, double *col
 				trial_R = (lowerR + upperR)/2;
 
 			} else if ((trial_R < checkClose) && withinRadius(pt, col_f, col_u, col_v, M, mlow, mhigh, L, trial_R, vertex_data, ptr_to_data, nump, disable_PBC_z )) {
+				
+				if( trial_R < reflecting_surface )
+					return -1;
 				//printf("check4\n");
 	        		int f;
 				double u, v, radius;
-		                bool check = withinBoxedSurface( pt, &f, &u, &v, M, mlow, mhigh, &radius, L, inside_outside, disable_PBC_z );
+		                bool check = withinBoxedSurface( pt, &f, &u, &v, M, mlow, mhigh, &radius, L, inside_outside, disable_PBC_z, reflecting_surface );
         	                if (!check) {
 //					printf("Verifying, within boxed surface collision.\n");
                 	                return -1;
@@ -621,7 +627,7 @@ double surface::returnRadius (double *pt, int *col_f, double *col_u, double *col
 	return -1;
 }
 bool surface::withinRadius( double *pt_in, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, double L, double radius,	
-		double *vertex_data, int *ptr_to_data, int *nump, int disable_PBC_z )
+		double *vertex_data, int *ptr_to_data, int *nump, int disable_PBC_z  )
 {
 	 //for now, brute force comparison of all triangular pairs 
 
@@ -1212,7 +1218,7 @@ void surface::box_system( double edge_length ) {
 	delete [] averageTris;
 }
 	
-bool surface::withinBoxedSurface(double* pt, int *f, double *u, double *v, double **M, int mlow, int mhigh, double *distance, double L, int inside_outside, int disable_PBC_z ) {
+bool surface::withinBoxedSurface(double* pt, int *f, double *u, double *v, double **M, int mlow, int mhigh, double *distance, double L, int inside_outside, int disable_PBC_z, double reflecting_surface ) {
 
  	if( inside_outside == 0 )
 		return false;
@@ -1247,8 +1253,11 @@ bool surface::withinBoxedSurface(double* pt, int *f, double *u, double *v, doubl
 			return false;
 		} else {
 		//	printf("%lf %lf %lf, %lf %lf %lf\n", pt_to_surface[0], pt_to_surface[1], pt_to_surface[2], nrm[0], nrm[1], nrm[2]);
-			
-			return true;
+
+			if( dist > reflecting_surface )
+				return true;
+			else
+				return false;
 		}
 }
 
@@ -1592,7 +1601,7 @@ void convexHullBounds(
 	}
 } 
 
-void surface::nearPointOnBoxedSurface( double *pt_in, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, double *distance, double initial_distance, int disable_PBC_z )
+void surface::nearPointOnBoxedSurface( double *pt_in, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, double *distance, double initial_distance, int disable_PBC_z)
 {
 	double pt[3] = { pt_in[0], pt_in[1], pt_in[2] };
 	double Lx = PBC_vec[0][0];

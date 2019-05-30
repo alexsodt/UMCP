@@ -462,17 +462,17 @@ struct surface
 //	void generateSubdivisionMatrices( double **M, int mlow, int mhigh);
 
 //	void nearPointOnBoxedSurface( double *pt, int *f, double *u, double *v, double **M, int mlow, int mhigh, double *distance, double L=-1 ); 
-	void nearPointOnBoxedSurface( double *pt, int *f, double *u, double *v, double **M, int mlow, int mhigh, double *distance, double initial_distance=-1, int disable_PBC_z=0); 
+	void nearPointOnBoxedSurface( double *pt, int *f, double *u, double *v, double **M, int mlow, int mhigh, double *distance, double initial_distance=-1, int disable_PBC_z=0 ); 
 	int linearCollisionPoint( double *pt1_in, double *pt2_in, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, int disable_PBC_z=0 );
 	void assembleNearList( double *pt, int **f_list_io, double **puv_list_io, double **areas_io, int *npts, double **M, int mlow, int mhigh, double Rmax, int sub_limit, int disable_PBC_z=0 );
 	void buildFaceData( double **, int *, int *);
 	bool withinRadius( double *pt, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, double L, double radius, double *vertex_data, int *ptr_to_data, int *nump, int disable_PBC_z=0 );
 	bool withinSurface( double *pt, int *f, double *u, double *v, double **M, int mlow, int mhigh, double *distance ); 
-	bool withinBoxedSurface( double *pt, int *f, double *u, double *v, double **M, int mlow, int mhigh, double *distance, double L=-1, int inside_outside=-1, int disable_PBC_z=0); 
+	bool withinBoxedSurface( double *pt, int *f, double *u, double *v, double **M, int mlow, int mhigh, double *distance, double L=-1, int inside_outside=-1, int disable_PBC_z=0, double reflecting_surface=0); 
 	void rebox_system(void);
 	void box_system( double edge_length=-1);
 	void findBox(double* pt, int *f, double *u, double *v, double **M, int mlow, int mhigh, double *distance, double L);
-	double returnRadius (double *pt, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, double distance, double currentR, double L, double defaultR, double *vertex_data, int *ptr_to_data, int *nump, int inside_outside=-1, int disable_PBC_z=0, double reflecting_surface);
+	double returnRadius (double *pt, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, double distance, double currentR, double L, double defaultR, double *vertex_data, int *ptr_to_data, int *nump, int inside_outside=-1, int disable_PBC_z=0, double reflecting_surface=0);
 	void returnSizeofBox(int* x, int* y, int* z);
 	void moveParticleonSurface(int *f, double *u, double *v, double *p);	
 	void checkCurvature(FILE* file);

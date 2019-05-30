@@ -16,10 +16,10 @@
 #include "fpr_subroutines/Faddeeva.hh"
 
 double r_fudge = 5.0;
+double reflecting_surface = 0;
 
 //#define XY_DIFFUSION
 
-//#define DEBUG_DIFFC
 
 #define NUMERICAL_INTEGRATION
 #define DO_HISTOGRAM
@@ -28,6 +28,7 @@ double r_fudge = 5.0;
 int do_planar_global = 0;
 
 double rtol = 1E-10;
+double kr_on_use = 2e11;
 double kr_on = 1e11; //AKMA units
 double kr_off = 1e4; //AKMA units
 double binding_radius = 0;
@@ -95,28 +96,17 @@ int main( int argc, const char **argv )
 
 	sp_ap_displacement = block.sigma;
 
-	// units: nm^3 per microsecond.
+	double time_step = block.time_step; // seconds
+	// units: nm^3 per microsecond
 	double unit_conv = (1e3) * (1e6); // nm^3 to A^3, per microsecond to per second.
 	kr_on = block.k_on * unit_conv;
+	kr_on_use = 2*kr_on;
 	// off rates are in per-second.
 	kr_off = block.k_off;
 	double Dtot = ( (2.0/3.0) * block.diffc + block.aqueous_diffc);
 	binding_radius = sp_ap_displacement;
 
-	if( block.mean_field && !block.correlated )
-	{
-		double KEQ = kr_on / kr_off / 2;
-		double kr_phenom = 0.5 / ( 1 / kr_on + 1.0/(4*M_PI * binding_radius * Dtot ) );
-		double mf_off = kr_phenom / KEQ;
-
-
-		printf("For (completely uncorrelated) mean-field, setting the off-rate from %le to %le per second.\n", kr_off, mf_off );
-		kr_off = mf_off;
-	}
-	else if( block.mean_field && block.correlated )
-		printf("Partially correlating mean-field in time following dissociation.\n");
 	
-	printf("On-rate: %le Off-rate: %le\n", kr_on, kr_off );
 
 	srand(block.random_seed);
 
@@ -289,6 +279,130 @@ int main( int argc, const char **argv )
 			nrm_sign_factor *= -1; 
 
 	}
+
+	printf("V0: %le conc %le\n", V0, block.concentration );
+	int aqueous_np = lround( block.concentration * V0 );
+	printf("area0: %le particle_density: %le\n", area0, particle_density );
+	int surface_np = lround( particle_density * area0 );
+	double Rmax = binding_radius + 3 * sqrt( 6 * block.aqueous_diffc * time_step); 
+	if( Rmax < 15 )
+		Rmax = 15;
+
+	double kdiff = 4 * M_PI * Dtot * binding_radius;
+	double kact = kr_on_use;
+	double fact = 1.0 + kact / kdiff;
+	double alpha = fact * sqrt(Dtot) / binding_radius;
+	
+
+	if( block.mean_field && !block.correlated )
+	{
+		// compute reflecting surface.
+	
+		double KEQ = kr_on / kr_off;
+		
+		double kr_phenom = 0.5 / ( 1 / (2*kr_on) + 1.0/(4*M_PI * binding_radius * Dtot ) );
+		double mf_off = kr_phenom / KEQ;
+		double Pd = 1 - exp( -mf_off * time_step );
+	
+		double eq_NB = (KEQ*(aqueous_np+surface_np)+V0 - sqrt( pow(KEQ*(aqueous_np+surface_np)+V0,2.0) - 4 * KEQ*KEQ*surface_np*aqueous_np)) / (2*KEQ);	
+		double aqueous_np_eq = aqueous_np - eq_NB; 
+	//0.5 * ( aqueous_np - surface_np - V0/KEQ + sqrt( pow(aqueous_np-surface_np-V0/KEQ,2.) + 4 * V0/KEQ * aqueous_np)); 
+		printf("Target equilibrium bound: %lf\n", eq_NB );
+
+		// search for reflecting surface using bisection.
+		
+		double lower_b = 0;
+		double upper_b = binding_radius;
+
+		int done = 0;
+
+		double equilibrium_lipid_density = (surface_np-eq_NB)/area0;
+
+		double trial = lower_b;
+		while( !done )
+		{
+
+			double p_sum = 0;
+			int tbins = 10000;
+			double dr = (Rmax-trial)/(tbins);
+
+			for( int ir = 0; ir < tbins; ir++ )
+			{
+				double dz = trial + (ir+0.5) * dr;
+			
+				double p_mean_field = 0;
+#define EXPR_2
+#ifdef EXPR_2
+				// the upper indefinite limit.
+				p_mean_field = binding_radius - sqrt(Dtot)/alpha;
+		
+//#define EXPR_1
+		
+				if( dz < binding_radius )
+				{
+					p_mean_field += 2 * sqrt(Dtot * time_step) / sqrt(M_PI);	
+					p_mean_field -= binding_radius;
+					p_mean_field += sqrt(Dtot) * Faddeeva::erfcx( sqrt(time_step) * alpha ) / alpha;
+				}
+				else
+				{ // use zero as lower limit.
+					p_mean_field += 2 * exp( -(dz-binding_radius) * (dz-binding_radius) / (4*Dtot*time_step)) * sqrt(Dtot*time_step) / sqrt(M_PI);
+					p_mean_field -= dz;
+					p_mean_field += (sqrt(Dtot) + alpha * (dz-binding_radius)) * erf((dz-binding_radius)/(2*sqrt(Dtot*time_step)) ) / alpha;
+					double erfc_arg =  (dz+2*sqrt(Dtot) * time_step * alpha-binding_radius)/(2*sqrt(Dtot*time_step));
+					p_mean_field    += sqrt(Dtot)*exp(alpha*(dz+sqrt(Dtot)*time_step*alpha-binding_radius)/sqrt(Dtot) - erfc_arg * erfc_arg) * Faddeeva::erfcx( erfc_arg ) / alpha;
+				}
+				// outer scaling.
+				p_mean_field *= 2*M_PI*equilibrium_lipid_density * (kr_on_use) * binding_radius / ( (kr_on_use) + kdiff);
+#else
+				if( dz < binding_radius )
+					dz = binding_radius;
+
+				double outer_factor = (2*M_PI*equilibrium_lipid_density*binding_radius*kr_on_use * (sqrt(Dtot) / alpha))/(kr_on_use + 4*M_PI*binding_radius*Dtot);
+				double p1 = exp( alpha*alpha*time_step + alpha*(dz-binding_radius)/sqrt(Dtot)) * erfc(alpha*sqrt(time_step)+(dz-binding_radius)/(sqrt(4*Dtot*time_step)));
+				double p2 = (alpha/sqrt(Dtot) * (binding_radius-dz)-1) * erfc( (dz-binding_radius)/sqrt(4*Dtot*time_step));
+				double p3 = 2*alpha*sqrt(time_step)/sqrt(M_PI) * exp(-pow(dz-binding_radius,2.0) / (4*Dtot*time_step) );
+
+				p_mean_field = outer_factor * (p1+p2+p3); 
+
+#endif
+
+
+				p_sum += p_mean_field * dr * aqueous_np_eq * area0 / V0;
+			}
+
+			double LHS = (aqueous_np - aqueous_np_eq) * Pd;
+			double RHS = p_sum;
+
+			if( RHS > LHS )
+				lower_b = trial;	
+			else
+				upper_b = trial;
+
+			printf("TRIAL %le LHS: %le RHS: %le\n", trial, LHS, RHS );
+
+			if( fabs(upper_b-lower_b) < 1e-7 )
+				done = 1;
+
+			trial = (upper_b+lower_b)/2;
+		}
+		reflecting_surface = (upper_b+lower_b)/2;
+		printf("Reflecting surface: %le\n", reflecting_surface );
+	}	
+
+	if( block.mean_field && !block.correlated )
+	{
+		double KEQ = kr_on / kr_off;
+		double kr_phenom = 0.5 / ( 1 / (2*kr_on) + 1.0/(4*M_PI * binding_radius * Dtot ) );
+		double mf_off = kr_phenom / KEQ;
+
+
+		printf("For (completely uncorrelated) mean-field, setting the off-rate from %le to %le per second.\n", kr_off, mf_off );
+		kr_off = mf_off;
+	}
+	else if( block.mean_field && block.correlated )
+		printf("Partially correlating mean-field in time following dissociation.\n");
+	printf("On-rate: %le Off-rate: %le\n", kr_on, kr_off );
 	
 	b = particle_radius / pow(2., 1.0/6.0);
 
@@ -310,35 +424,15 @@ int main( int argc, const char **argv )
 
 	if( !rng_x ) init_random(block.random_seed);
 
-	double time_step = block.time_step; // one nanosecond.
 
 	// n / cubic angstrom
 	double fix_alpha = 1.0;
 	
 
-	printf("V0: %le conc %le\n", V0, block.concentration );
-	int aqueous_np = lround( block.concentration * V0 );
-	printf("area0: %le particle_density: %le\n", area0, particle_density );
-	int surface_np = lround( particle_density * area0 );
 	int surface_np_meanfield = surface_np;
 	int *mean_field_activated = NULL;
 
 	int do_diffc = 0;
-#ifdef DEBUG_DIFFC
-	do_diffc=1;
-	int MAX_HIST = 200;
-
-	double *s_r_hist  = (double *)malloc( sizeof(double) * surface_np * 3 * MAX_HIST );
-	double *aq_r_hist = (double *)malloc( sizeof(double) * aqueous_np * 3 * MAX_HIST );
-	int nhist = 0;
-	double dt_per_hist = 1e-7;
-
-	// go for approximately 1 microsecond per click.
-
-	int steps_per_click = ceil(time_step / dt_per_hist);
-	dt_per_hist = steps_per_click * time_step; 
-
-#endif
 	if( block.mean_field )
 	{
 		printf("Mean field surface np: %d Explicit aqueous particles: %d\n", surface_np, aqueous_np  );
@@ -360,9 +454,6 @@ int main( int argc, const char **argv )
 	if( particle_radius > min_box )
 		min_box = particle_radius;
 	
-	double Rmax = binding_radius + 3 * sqrt( 6 * block.aqueous_diffc * time_step); 
-	if( Rmax < 15 )
-		Rmax = 15;
 
 	sub_surface->setupBoxing( NULL, NULL, surface_np+aqueous_np , Rmax, 1 );
 
@@ -830,10 +921,6 @@ int main( int argc, const char **argv )
 				for( int ap = 0; ap < aqueous_np; ap++ )
 					aqueous_status[ap] -= (aqueous_status[ap] & REACTED_BIT);
 
-				double kdiff = 4 * M_PI * Dtot * binding_radius;
-				double kact = kr_on;
-				double fact = 1.0 + kact / kdiff;
-				double alpha = fact * sqrt(Dtot) / binding_radius;
 
 				if( block.mean_field )
 				{
@@ -855,7 +942,8 @@ int main( int argc, const char **argv )
 								distance[ap] = binding_radius;
 								aqueous_status[ap] = STATE_REACTING + REACTED_BIT;	
 								mean_field_activated[ap] = 0;
-								correlated[ap] = 1;
+								if( block.correlated )
+									correlated[ap] = 1;
 								tot_off += 1;
 							}		
 						}
@@ -991,7 +1079,7 @@ int main( int argc, const char **argv )
 							//double rn = rand() / (double)RAND_MAX;
 							double rn = gsl_rng_uniform(rng_x);	
 
-							if( block.correlated && correlated[ap] )
+							if( correlated[ap] )
 							{
 								// reduce particle density by a single particle.
 #ifdef NUMERICAL_INTEGRATION
@@ -1000,6 +1088,7 @@ int main( int argc, const char **argv )
 								probvec1 *= (surface_np-1)/(surface_np);
 #endif
 							}
+
 
 
 #ifdef NUMERICAL_INTEGRATION
@@ -1533,7 +1622,7 @@ int main( int argc, const char **argv )
 			
 
 
-								double rad = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar /* disables pbc z */ );
+								double rad = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar, reflecting_surface /* disables pbc z */ );
 
 								if( rad < 0 ) // but may not be a problem??
 								{
@@ -1600,46 +1689,6 @@ int main( int argc, const char **argv )
 											}
 										}
 									}
-/*
-									else
-									{
-										int collide = sub_surface->linearCollisionPoint( startp, aqueous_r+3*p, &col_f, &col_u, &col_v, M, mlow, mhigh, do_planar );
-						
-										if( !collide )
-										{
-											int sf;
-											double su,sv;
-											sub_surface->nearPointOnBoxedSurface(startp, &sf,&su,&sv, M, mlow, mhigh, &dist, -1, 0 ); 
-											double rpt[3],rnrm[3];
-											sub_surface->evaluateRNRM( sf, su, sv, rpt, rnrm, r);
-											double dr1[3] = { 	
-													startp[0]-rpt[0],
-													startp[1]-rpt[1],
-													startp[2]-rpt[2] };	
-											double r1 = sqrt(dr1[0]*dr1[0]+dr1[1]*dr1[1]+dr1[2]*dr1[2]);
-											double drp1 = (dr1[0]*rnrm[0] + dr1[1]*rnrm[1] + dr1[2]*rnrm[2])/r1;
-											int af;
-											double au,av;
-											sub_surface->nearPointOnBoxedSurface(aqueous_r+3*p, &af,&au,&av, M, mlow, mhigh, &dist, -1, 0 );
-											sub_surface->evaluateRNRM( af, au, av, rpt, rnrm, r);
-											double dr2[3] = { 	
-													aqueous_r[3*p+0]-rpt[0],
-													aqueous_r[3*p+1]-rpt[1],
-													aqueous_r[3*p+2]-rpt[2] };	
-											double r2 = sqrt(dr2[0]*dr2[0]+dr2[1]*dr2[1]+dr2[2]*dr2[2]);
-											double drp2 = (dr2[0]*rnrm[0] + dr2[1]*rnrm[1] + dr2[2]*rnrm[2])/r2;
-											 
-											int f;
-											double u,v;
-											double rad1 = sub_surface->returnRadius( startp, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar  );
-											double rad2 = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar );
-
-											double rad_check = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  2*r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar  );
-											printf("ERROR. ap: %d r1: %.14le dr.p: %le r2: %.14le dr.p %.14le\n", p, r1, drp1, r2, drp2 );
-											exit(1);
-										}
-									}
-			*/
 								}
 						
 								else
@@ -1734,7 +1783,7 @@ int main( int argc, const char **argv )
 								double dist;
 			
 
-								double rad = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  2*r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar /* disables pbc z */ );
+								double rad = sub_surface->returnRadius( aqueous_r+3*p, &f, &u, &v,  M, mlow, mhigh,  2*r_move, distance[p],  -1,  defaultR, vertex_data, ptr_to_data, nump, -nrm_sign_factor, do_planar, reflecting_surface /* disables pbc z */ );
 
 								printf("MAJOR ERROR p %d o %d t %d.\n", p, o, t);
 								exit(1);
@@ -2062,128 +2111,6 @@ int main( int argc, const char **argv )
 					run_done = 1;
 			}
 		
-#ifdef DEBUG_DIFFC
-			if( do_diffc && o % steps_per_click == 0 )
-			{
-				for( int ap = 0; ap < aqueous_np; ap++ )
-				{
-					aq_r_hist[nhist*3*aqueous_np+3*ap+0] = aqueous_r[3*ap+0]; 
-					aq_r_hist[nhist*3*aqueous_np+3*ap+1] = aqueous_r[3*ap+1]; 
-					aq_r_hist[nhist*3*aqueous_np+3*ap+2] = aqueous_r[3*ap+2]; 
-				}
-				
-				if( ! block.mean_field )
-				{
-					for( int ap = 0; ap < surface_np; ap++ )
-					{
-						s_r_hist[nhist*3*surface_np+3*ap+0] = surface_p_r_m[3*ap+0]; 
-						s_r_hist[nhist*3*surface_np+3*ap+1] = surface_p_r_m[3*ap+1]; 
-						s_r_hist[nhist*3*surface_np+3*ap+2] = surface_p_r_m[3*ap+2]; 
-					}
-				}
-
-				nhist++;
-
-	
-				if( nhist == MAX_HIST )
-				{
-					// unwrap trajectories.
-					
-					for( int aq = 0; aq < aqueous_np; aq++ )
-					{
-						double runner[3] = {0,0,0};
-
-						for( int h = 1; h < nhist; h++ )
-						{
-							double dr[3] = { 
-								aq_r_hist[h*3*aqueous_np+aq*3+0] - aq_r_hist[(h-1)*3*aqueous_np+aq*3+0],
-								aq_r_hist[h*3*aqueous_np+aq*3+1] - aq_r_hist[(h-1)*3*aqueous_np+aq*3+1],
-								aq_r_hist[h*3*aqueous_np+aq*3+2] - aq_r_hist[(h-1)*3*aqueous_np+aq*3+2] };
-
-							while( runner[0] + dr[0] > Lx/2 ) runner[0] -= Lx;
-							while( runner[0] + dr[0] < -Lx/2 ) runner[0] += Lx;
-							while( runner[1] + dr[1] > Ly/2 ) runner[1] -= Ly;
-							while( runner[1] + dr[1] < -Ly/2 ) runner[1] += Ly;
-							while( runner[2] + dr[2] > Lz/2 ) runner[2] -= Lz;
-							while( runner[2] + dr[2] < -Lz/2 ) runner[2] += Lz;
-
-							aq_r_hist[h*3*aqueous_np+aq*3+0] += runner[0];
-							aq_r_hist[h*3*aqueous_np+aq*3+1] += runner[1];
-							aq_r_hist[h*3*aqueous_np+aq*3+2] += runner[2];
-						}		
-					}
-					
-					for( int s = 0; s < surface_np; s++ )
-					{
-						double runner[3] = {0,0,0};
-
-						for( int h = 1; h < nhist; h++ )
-						{
-							double dr[3] = { 
-								s_r_hist[h*3*surface_np+s*3+0] - s_r_hist[(h-1)*3*surface_np+s*3+0],
-								s_r_hist[h*3*surface_np+s*3+1] - s_r_hist[(h-1)*3*surface_np+s*3+1],
-								s_r_hist[h*3*surface_np+s*3+2] - s_r_hist[(h-1)*3*surface_np+s*3+2] };
-
-							while(  runner[0] + dr[0] > Lx/2 ) runner[0] -= Lx;
-							while(  runner[0] + dr[0] < -Lx/2 ) runner[0] += Lx;
-							while(  runner[1] + dr[1] > Ly/2 ) runner[1] -= Ly;
-							while(  runner[1] + dr[1] < -Ly/2 ) runner[1] += Ly;
-							while(  runner[2] + dr[2] > Lz/2 ) runner[2] -= Lz;
-							while(  runner[2] + dr[2] < -Lz/2 ) runner[2] += Lz;
-
-							s_r_hist[h*3*surface_np+s*3+0] += runner[0];
-							s_r_hist[h*3*surface_np+s*3+1] += runner[1];
-							s_r_hist[h*3*surface_np+s*3+2] += runner[2];
-						}		
-					}
-				
-					double aq_r2[MAX_HIST];
-					memset( aq_r2, 0, sizeof(double) * MAX_HIST );
-					double s_r2[MAX_HIST];
-					memset( s_r2, 0, sizeof(double) * MAX_HIST );
-
-					double cnt_hist[MAX_HIST];
-					memset( cnt_hist, 0, sizeof(double) * MAX_HIST );
-
-					for( int h = 0; h < nhist; h++ )
-					{
-						for( int dt = 0; dt < nhist-h-1; dt++ )
-						{
-							int h2 = h + dt;
-
-							for( int aq = 0; aq < aqueous_np; aq++ )
-							{
-								double dr[3] = { 
-									aq_r_hist[h2*3*aqueous_np+aq*3+0] - aq_r_hist[h*3*aqueous_np+aq*3+0],
-									aq_r_hist[h2*3*aqueous_np+aq*3+1] - aq_r_hist[h*3*aqueous_np+aq*3+1],
-									aq_r_hist[h2*3*aqueous_np+aq*3+2] - aq_r_hist[h*3*aqueous_np+aq*3+2] };
-								double r2 = dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2];
-			
-								aq_r2[dt] += r2;
-							}
-							
-							for( int s = 0; s < surface_np; s++ )
-							{
-								double dr[3] = { 
-									s_r_hist[h2*3*surface_np+s*3+0] - s_r_hist[h*3*surface_np+s*3+0],
-									s_r_hist[h2*3*surface_np+s*3+1] - s_r_hist[h*3*surface_np+s*3+1],
-									s_r_hist[h2*3*surface_np+s*3+2] - s_r_hist[h*3*surface_np+s*3+2] };
-								double r2 = dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2];
-			
-								s_r2[dt] += r2;
-							}
-
-							cnt_hist[dt]+=1;
-						}
-					}
-
-					for( int h = 0; h < nhist; h++ )
-						printf("%le %lf %lf\n", h * dt_per_hist, aq_r2[h] / cnt_hist[h] / aqueous_np, s_r2[h] / cnt_hist[h]/surface_np );
-
-					do_diffc=0;
-				}
-			}
-#endif
 
 	
 	//		printf("membrane fudge: %le\n", membrane_fudge / nmembrane_fudge );

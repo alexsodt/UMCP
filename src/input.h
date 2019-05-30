@@ -50,7 +50,6 @@ class parameterBlock
 	int npt_mc_period; // period which to do monte-carlo lipid movement
 	int cyl_tension_mc_period;
 
-	int create_all_atom;
 
 	double alpha_restraint_x;
 	double alpha_restraint_y;

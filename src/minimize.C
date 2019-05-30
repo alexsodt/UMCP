@@ -262,26 +262,26 @@ void full_fd_test( double *p )
 	printf("Finite difference test.\n");
 	
 	memcpy( tp, p, sizeof(double) * min_nparams );
-	for( int p = 0; p < min_nparams; p++ )
+	for( int ttp = 0; ttp < min_nparams; ttp++ )
 	{
 		double use_eps[2] = { -1e-6, 1e-6 };
 		double ens[2];
 		for( int ieps = 0; ieps < 2; ieps++ )
 		{
-			tp[p] += use_eps[ieps];
+			tp[ttp] += use_eps[ieps];
 			ens[ieps] = surface_f(tp);
-			tp[p] -= use_eps[ieps];
+			tp[ttp] -= use_eps[ieps];
 		}
 
 		double de = (ens[1]-ens[0])/(use_eps[1]-use_eps[0]);
 	
-		if( p == (3 * min_surface->nv+3) )
+		if( ttp == (3 * min_surface->nv+3) )
 			printf("FINISHED MESH FD\n");
 
-		if( fabs(de-g[p])/(fabs(1e-20)+fabs(de)+fabs(g[p])) < 1e-3 )
-			printf("P %d FD %.14le G %.14le OK\n", p, de, g[p] );
+		if( fabs(de-g[ttp])/(fabs(1e-20)+fabs(de)+fabs(g[ttp])) < 1e-3 )
+			printf("P %d FD %.14le G %.14le OK\n", ttp, de, g[ttp] );
 		else
-			printf("P %d FD %.14le G %.14le CHECK\n", p, de, g[p] );
+			printf("P %d FD %.14le G %.14le CHECK\n", ttp, de, g[ttp] );
 	}
 
 	for( double eps = 0; eps < 20 * deps; eps += deps)

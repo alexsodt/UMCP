@@ -16,11 +16,49 @@ static double MINZ = -75;
 static double MAXZ =  75;
 double Ap = 1.0; // square angstroms
 
-void surface::processSANS( parameterBlock *block )
+void surface::processSANS( parameterBlock *block, double **qvals, int *nq )
 {
 	if( block->s_q )
 	{
 		loadBetaZ( block->betazFile, SANS_SPLINE );
+		*qvals = NULL;
+
+		if( block->qvals )
+		{
+			FILE *qvalsFile = fopen(block->qvals, "r" );
+
+			if( !qvalsFile )
+			{
+				printf("Failed to open q value file \"$s\".\n", block->qvals );
+				exit(1);
+			}
+
+			char *buffer = (char *)malloc( sizeof(char)*100000 );
+			int qvalSP = 10;
+			int nq_local = 0;
+			*qvals = (double *)malloc( sizeof(double) * qvalSP );
+			while( !feof(qvalsFile) )
+			{
+				getLine(qvalsFile, buffer );
+				if( feof(qvalsFile) ) break;
+				double qv;
+				int nr = sscanf(buffer, "%lf", & qv );
+				if( nr == 1 )
+				{
+					if( qvalSP == nq_local )
+					{
+						qvalSP *= 2;
+						*qvals = (double *)realloc( *qvals, sizeof(double) * qvalSP );
+					}
+					(*qvals)[nq_local] = qv;
+					nq_local++;
+				} 
+			}
+			*nq = nq_local;
+			free(buffer);
+		}
+		else
+			*nq = block->nq;
 	}
 }
 
@@ -314,7 +352,7 @@ void loadBetaZ( const char *fileName, int load_to_spline )
 	
 }
 
-void writeSq( char *fileName, double *B_hist, double A2dz2_sampled, double sans_max_r, int nsans_bins, double qmin, double qmax, int nq )
+void writeSq( char *fileName, double *B_hist, double A2dz2_sampled, double sans_max_r, int nsans_bins, double qmin, double qmax, int nq, double *qvals )
 {
 #ifdef PARALLEL
 	if( par_info.my_id != BASE_TASK ) return;
@@ -328,41 +366,35 @@ void writeSq( char *fileName, double *B_hist, double A2dz2_sampled, double sans_
 	}
 
 	double dr = sans_max_r/nsans_bins;
-	for( int ir = 0; ir < nsans_bins; ir++ )
-		fprintf(theFile, "%le %le\n", (ir+0.5)*dr, B_hist[ir] );
-
+//	for( int ir = 0; ir < nsans_bins; ir++ )
+//		fprintf(theFile, "%le %le\n", (ir+0.5)*dr, B_hist[ir] );
 
 
 	// update histogram B0.
 
 	double B0 = 0;
 
-/*		this was misguided. I thought there was something I had to do to get it to be positive definite.
- *	
- *		double dz = (MAXZ-MINZ)/N_Z_BINS;
-
-	double approx_pts_sampled = sqrt( A2dz2_sampled);
-
-	for( int iz = 0; iz < N_Z_BINS; iz++ )
-	{
-		double z = MINZ + (iz+0.5)*(MAXZ-MINZ)/N_Z_BINS;
-
-		double b = evaluateSpline( z, SANS_SPLINE );
-
-		double vol_pt = Ap * dz;
-
-		// integral now depends on the number of bins.
-		B0 += b*b * (vol_pt) * (vol_pt) * dz * approx_pts_sampled;
-	}
-*/
+	
 
 	double eps = 1e-3;
 	for( int iq = -1; iq < nq; iq++ )
 	{
-		double q = (qmin+qmax)/2; 
+		double q;
 
-		if( nq > 1 )
-			q = qmin + iq * (qmax-qmin)/(nq-1);
+		if( qvals )
+		{
+			if( iq == -1 ) 
+				q = 0;
+			else
+				q = qvals[iq];
+		}
+		else
+		{
+			q = (qmin+qmax)/2; 
+	
+			if( nq > 1 )
+				q = qmin + iq * (qmax-qmin)/(nq-1);
+		}
 
 		double val = B0;
 
