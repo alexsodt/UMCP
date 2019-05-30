@@ -12,9 +12,9 @@ With {\bf Langevin dynamics}, a frictional drag and stochastic force are introdu
 This is frequently justified as arising from implied collisions with solvent, itself in thermal equilibrium with a bath.
 The modified equations are
 \begin{equation}
-m \dot{\vek{v}} = -\frac{\vek{v}}{B} + \vek{f} + \vek{\tilde{f}}
+m \dot{\vek{v}} = -\frac{\vek{v}}{\mu} + \vek{f} + \vek{\tilde{f}}
 \end{equation}
-or often with a friction coefficient $\gamma$ replacing the mobility $B$:
+or often with a friction coefficient $\gamma$ replacing the mobility $\mu$:
 \begin{equation}
 \label{eq:langevind}
 m \dot{\vek{v}} = -\gamma \vek{v} + \vek{f} + \vek{\tilde{f}}
@@ -24,10 +24,10 @@ where $\vek{\tilde{f}}$ is the stochastic force.
 Consider modeling a particle diffusing with Langevin dynamics.
 In the absence of any forces, $\vek{f}$, the diffusion constant is
 \begin{equation}
-D = B \kT
+D = \mu \kT
 \end{equation}
-To simulate a lipidic diffusion constant, e.g., $10^{-6} \textrm{cm}^2/\textrm{s}$, requires specifying $B$ appropriately.
-Note that in Eq.~\ref{eq:langevind} the velocity is reduced by a fraction equal to $\frac{-\Delta t}{m B}$,
+To simulate a lipidic diffusion constant, e.g., $10^{-6} \textrm{cm}^2/\textrm{s}$, requires specifying $\mu$ appropriately.
+Note that in Eq.~\ref{eq:langevind} the velocity is reduced by a fraction equal to $\frac{-\Delta t}{m \mu}$,
 where $\Delta t$ is the simulation timestep.
 This fraction must be much less than one or the particle will experience uncontrolled feedback and therefore improper integration.
 
@@ -48,9 +48,32 @@ Rather, consider an approximate dynamics that is displacement-based, that is, th
 This is {\bf Brownian dynamics}. 
 Here the equation of motion is 
 \begin{equation}
-\dot{\vek{r}} = -\frac{D}{\kT} \vek{f} + \sqrt{2 D} R(t)
+\dot{\vek{r}} = \frac{D}{\kT} \vek{f} + \sqrt{2 D} R(t)
 \end{equation}
 where $R(t)$ is a so-called ``Gaussian process'', a mathematical object equivalent to selecting {\it uncorrelated} random numbers from a Gaussian distribution with zero mean and standard deviation one.
+
+Because the momentum is dissipated in less than a time step in Brownian dynamics, it is not a relevant quantity for propagation.
+For a basic particle simulation, this is handled simply; the particle has a diffusion constant $D$ and moves independently from the other particles, subject to its own noise, $R(t)$.
+In a continuum membrane simulation, the particles of the membrane are interconnected through the generlalized coordinates: the mesh control points.
+The Langevin equations can thus be transformed to be compatible with extracting the momentum.
+From:
+\begin{equation}
+\dot{p}_i = \frac{\diff H}{\diff q_i} - \dot{p}_i \lambda_i + \eta_i(t) \nonumber \\
+\dot{q}_i = \sum_j M_{ij}^{-1} p_j
+\end{equation}
+to
+\begin{equation}
+\dot{q}_i = -\gamma M_{ij}^{-1} \frac{\diff H}{\diff q_j} + \sum_{ij} M^{-1} \sqrt{2} 
+\end{equation}
+
+
+
+
+
+
+
+
+
 
 \subsection{Membrane relaxation timescales}
 

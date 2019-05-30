@@ -454,12 +454,7 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 						at[xa].res  = cur_res;
 						at[xa].segRes = 0;
 	
-						char tseg[256];
-						sprintf(tseg, "S%d", r );
-						char *csave = at[xa].segid;
-						at[xa].segid = tseg;
 						printSingleCRD( tempFile, at+xa ); 
-						at[xa].segid =csave;
 						at[xa].bead = at_save;
 						at[xa].res = res_save;
 	

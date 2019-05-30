@@ -1370,11 +1370,11 @@ void vpass_inner(
 #ifdef DEBUG
 					if( fabs(dF_expected-(abs_F-abs_F_p)) > 1e-4 )
 					{
-						printf("PROBLEM_dF_expected: %lf got: %lf ABSF %lf F0: %le F1: %le F2: %le\n", dF_expected, abs_F-abs_F_p,abs_F,F0, F1, F2  ); 
+//						printf("PROBLEM_dF_expected: %lf got: %lf ABSF %lf F0: %le F1: %le F2: %le\n", dF_expected, abs_F-abs_F_p,abs_F,F0, F1, F2  ); 
 						//printf("PROBLEM_dF_expected: %lf got: %lf FCUR %lf FNEW %lf ABSF %lf dABS: %le F0: %le F1: %le F2: %le\n", dF_expected, FNEW-FCUR, FCUR, FNEW, abs_F, abs_F-abs_F_p,F0, F1, F2  ); 
 					}
-					else
-						printf("GREAT dF_expected: %lf got: %lf ABSF %lf F0: %le F1: %le F2: %le\n", dF_expected, abs_F-abs_F_p, abs_F, F0, F1, F2  ); 
+//					else
+//						printf("GREAT dF_expected: %lf got: %lf ABSF %lf F0: %le F1: %le F2: %le\n", dF_expected, abs_F-abs_F_p, abs_F, F0, F1, F2  ); 
 #endif
 				}
 			}
