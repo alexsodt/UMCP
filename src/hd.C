@@ -1706,13 +1706,7 @@ int temp_main( int argc, char **argv )
 	}
 
 	if( block.create_all_atom )
-	{
-		char fileName[256];
-		sprintf(fileName, "%s.crd", block.jobName );
-		FILE *crdOut = fopen( fileName, "w" );
-		sub_surface->createAllAtom(  crdOut, &block );
-		fclose(crdOut);
-	}
+		sub_surface->createAllAtom(  &block );
 
 /*	FILE *saveFile = fopen("file.save", "w");
 

@@ -530,7 +530,7 @@ struct surface
 	void getRegions( int *regions, int nregions );
 	void readLipidComposition( FILE *inputFile );
 	void debugDeformation( double *r);
-	void createAllAtom( FILE *outputFile, parameterBlock *block );
+	void createAllAtom( parameterBlock *block );
 	int evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf, int leaflet );
 };
 

@@ -29,6 +29,7 @@ void loadCRD( FILE *theFile, struct atom_rec *at);
 void loadPDB( FILE *theFile, struct atom_rec *at);
 void printCRD( FILE *theFile, struct atom_rec *at, int nat);
 void printSingleCRD( FILE *theFile, struct atom_rec *at );
+void printSingleCRD( char *theString, struct atom_rec *at );
 void printCRDHeader( FILE *theFile, int nat);
 double getXTLABC( double SMOUT[9] );
 void copyNAMDBinary( FILE *theFile, struct atom_rec *at);

@@ -19,13 +19,7 @@ const char *charmm_header =
 "\n"
 "! Read topology and parameter files\n"
 "stream toppar.str\n"
-"\n"
-"! Read Lipids\n"
-"open read card unit 10 name %s.crd\n"
-"read sequence coor card unit 10\n"
-"generate MEMB setup warn first none last none\n"
-"open read unit 10 card name %s.crd\n"
-"read coor unit 10 card resid\n";
+"\n";
 
 const char *charmm_footer = 
 "!\n"
@@ -43,7 +37,15 @@ const char *charmm_footer =
 "\n"
 "stop\n";
 
-void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
+
+struct crd_psf_pair
+{
+	char CRDfileName[256];
+	char PSFfileName[256];
+};
+
+
+void surface::createAllAtom( parameterBlock *block )
 {
 	double *rsurf = (double *)malloc( sizeof(double) * 3 * (1 + nv) );
 	
@@ -275,6 +277,7 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 
 	int *lipid_oppo = (int *)malloc( sizeof(int) * nlipids );
 
+
 	for( int l = 0; l < nlipids; l++ )
 	{
 		double best = 1e10;
@@ -335,6 +338,7 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 
 	int *tri_list = (int *)malloc( sizeof(int) * nt );
 
+	int cur_natoms = 0;
 	int cur_atom = 1;
 	int cur_res  = 1;
 
@@ -358,6 +362,22 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 	};
 
 	int natom_names = sizeof(atom_name)/sizeof(const char*);
+	
+	int cur_size = 0;
+	int cur_space = 1024;
+	char *cur_segment = (char *)malloc( sizeof(char) * cur_size );
+	cur_segment[0] = '\0';
+	char *cur_filename = (char *)malloc( sizeof(char) * 1024 );
+	char *cur_segname = (char *)malloc( sizeof(char) * 1024 );	
+
+	int seg_cntr = 1;
+
+	sprintf(cur_filename, "segment_SEG%d.crd", seg_cntr );
+	sprintf(cur_segname, "SEG%d", seg_cntr ); 
+
+	int npairs = 0;
+	int npair_space = 10;
+	crd_psf_pair *pairs = (crd_psf_pair *)malloc( sizeof(crd_psf_pair) * npair_space );
 
 	for( int r = 0; r < nregions; r++ )
 	{
@@ -488,15 +508,56 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 	
 				if( regions_for_face[fout] == r )
 				{
+					int base_res = cur_res; 
+
 					if( !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) )
 					{	
-						int base_res = cur_res; 
+						// ALWAYS terminate the current segment, regardless.
+						
+						if( cur_size > 0 )
+						{
+							fprintf(charmmFile, 
+							"\n"
+							"open read card unit 10 name %s\n"
+							"read sequence coor card unit 10\n"
+							"generate %s setup warn first none last none\n"
+							"open read unit 10 card name %s.crd\n"
+							"read coor unit 10 card resid\n"						
+							"\n"
+							"open write unit 10 card name %s.psf\n"
+							"write psf  unit 10 card\n"
+							"delete atom sele atom * * * end\n"
+							, cur_filename, cur_segname, cur_filename, cur_segname );
 
-						fprintf(charmmFile, "patch CERB MEMB %d MEMB %d setup warn\n", cur_res+1, cur_res );
-						fprintf(charmmFile, "patch 14BB MEMB %d MEMB %d setup warn\n", cur_res+1, cur_res+2 );
-						fprintf(charmmFile, "patch 14BA MEMB %d MEMB %d setup warn\n", cur_res+2, cur_res+3 );
-						fprintf(charmmFile, "patch 13BB MEMB %d MEMB %d setup warn\n", cur_res+3, cur_res+4 );
-						fprintf(charmmFile, "patch SA23AB MEMB %d MEMB %d setup warn\n", cur_res+2, cur_res+5 );
+							FILE *crdFile = fopen( cur_filename, "w");
+							printCRDHeader( crdFile, cur_natoms );
+							fprintf(crdFile, "%s", cur_segment );
+							fclose(crdFile);
+
+							if( npairs == npair_space )
+							{
+								npair_space *= 2;
+
+								pairs = (crd_psf_pair *)realloc( pairs, sizeof(crd_psf_pair) * npair_space );
+							}
+
+							strcpy( pairs[npairs].CRDfileName, cur_filename );
+							char psf_file[256];
+							sprintf(psf_file, "%s.psf", cur_segname );
+							strcpy( pairs[npairs].PSFfileName, psf_file ); 
+
+							npairs++;
+						
+							seg_cntr++;		
+							sprintf(cur_filename, "segment_SEG%d.crd", seg_cntr );
+							sprintf(cur_segname, "SEG%d", seg_cntr ); 
+						}					
+					
+						cur_size = 0;
+						cur_natoms = 0;
+						cur_segment[0] = '\0';
+						cur_atom = 1;
+						cur_res  = 1;
 					}
 
 					double u_cen = spot_u;
@@ -557,7 +618,16 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 						char *tmp = at[xa].segid;
 						at[xa].segid = temp_segid;
 	
-						printSingleCRD( tempFile, at+xa ); 
+						if( cur_size + 1024 > cur_space )
+						{	
+							cur_space += 1024;
+							cur_segment = (char *)realloc( cur_segment, sizeof(char) * cur_space );
+						}
+
+						printSingleCRD( cur_segment+cur_size, at+xa );
+						cur_size += strlen(cur_segment+cur_size);
+						cur_natoms++;
+//						printSingleCRD( tempFile, at+xa ); 
 						at[xa].segid = tmp;
 						at[xa].bead = at_save;
 						at[xa].res = res_save;
@@ -571,26 +641,118 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 					}
 				
 					cur_res++;
+					
+					if( !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) )
+					{
+						fprintf(charmmFile, 
+						"\n"
+						"open read card unit 10 name %s\n"
+						"read sequence coor card unit 10\n"
+						"generate %s setup warn first none last none\n"
+						"open read unit 10 card name %s.crd\n"
+						"read coor unit 10 card resid\n"						
+						"\n", cur_filename, cur_segname, cur_filename );
+
+						fprintf(charmmFile, "patch CERB %s %d %s %d setup warn\n", cur_segname, 2, cur_segname, 1 );
+						fprintf(charmmFile, "patch 14BB %s %d %s %d setup warn\n",  cur_segname,2,  cur_segname,3 );
+						fprintf(charmmFile, "patch 14BA %s %d %s %d setup warn\n",  cur_segname,3,  cur_segname,4 );
+						fprintf(charmmFile, "patch 13BB %s %d %s %d setup warn\n",  cur_segname,4,  cur_segname,5 );
+						fprintf(charmmFile, "patch SA23AB %s %d %s %d setup warn\n",  cur_segname,3,  cur_segname,6 );
+
+						fprintf(charmmFile, 
+						"open write unit 10 card name %s.psf\n"
+						"write psf  unit 10 card\n"
+						"delete atom sele atom * * * end\n"
+						, cur_segname );
+						
+						FILE *crdFile = fopen( cur_filename, "w");
+						printCRDHeader( crdFile, cur_natoms );
+						fprintf(crdFile, "%s", cur_segment );
+						fclose(crdFile);
+						
+
+						if( npairs == npair_space )
+						{
+							npair_space *= 2;
+
+							pairs = (crd_psf_pair *)realloc( pairs, sizeof(crd_psf_pair) * npair_space );
+						}
+
+						strcpy( pairs[npairs].CRDfileName, cur_filename );
+						char psf_file[256];
+						sprintf(psf_file, "%s.psf", cur_segname );
+						strcpy( pairs[npairs].PSFfileName, psf_file ); 
+
+						npairs++;
+						cur_natoms = 0;
+						cur_size = 0;
+						cur_segment[0] = '\0';	
+						cur_atom = 1;
+						cur_res  = 1;
+						seg_cntr++;		
+						sprintf(cur_filename, "segment_SEG%d.crd", seg_cntr );
+						sprintf(cur_segname, "SEG%d", seg_cntr ); 
+					}	
 				}
 	
 			}
 		}
 	}
 
+	if( cur_size > 0 )
+	{
+		fprintf(charmmFile, 
+		"\n"
+		"open read card unit 10 name %s\n"
+		"read sequence coor card unit 10\n"
+		"generate %s setup warn first none last none\n"
+		"open read unit 10 card name %s.crd\n"
+		"read coor unit 10 card resid\n"						
+		"\n", cur_filename, cur_segname, cur_filename );
+
+		fprintf(charmmFile, 
+		"open write unit 10 card name %s.psf\n"
+		"write psf  unit 10 card\n"
+		"delete atom sele atom * * * end\n"
+		, cur_segname );
+		
+		FILE *crdFile = fopen( cur_filename, "w");
+		printCRDHeader( crdFile, cur_natoms );
+		fprintf(crdFile, "%s", cur_segment );
+		fclose(crdFile);
+
+		if( npairs == npair_space )
+		{
+			npair_space *= 2;
+
+			pairs = (crd_psf_pair *)realloc( pairs, sizeof(crd_psf_pair) * npair_space );
+		}
+
+		strcpy( pairs[npairs].CRDfileName, cur_filename );
+		char psf_file[256];
+		sprintf(psf_file, "%s.psf", cur_segname );
+		strcpy( pairs[npairs].PSFfileName, psf_file ); 
+
+		npairs++;
+	}
+
+	for( int p = 0; p < npairs; p++ )
+	{
+		fprintf(charmmFile, "open unit 10 card read name %s\n", pairs[p].PSFfileName );
+		if( p == 0 )
+			fprintf(charmmFile, "read psf card unit 10\n" );	
+		else
+			fprintf(charmmFile, "read psf card append unit 10\n" );	
+		fprintf(charmmFile, "close unit 10\n" );	
+		fprintf(charmmFile, "open unit 10 card read name %s\n", pairs[p].CRDfileName );	
+		fprintf(charmmFile, "read coor card unit 10 resid\n" );	
+		fprintf(charmmFile, "close unit 10\n" );
+		fprintf(charmmFile, "\n");	
+		
+	}
+
 	fprintf(charmmFile, charmm_footer );
 
-	char *buffer = (char *)malloc( sizeof(char) * 100000 );
-	printCRDHeader( outputFile, cur_atom-1 );
-	fclose(tempFile);
-	tempFile = fopen("temp.crd","r");
-	while( !feof(tempFile) )
-	{
-		getLine(tempFile,buffer);
-		if( feof(tempFile) ) break;
-		fprintf(outputFile, "%s\n", buffer );
-	}	
-
-	free(buffer);
 	free(regions_for_face);
 	free(tri_list);
 	free(rsurf);
