@@ -26,14 +26,11 @@ const char *charmm_footer =
 "! Write PSF, coordinates, and information of the assembled system\n"
 "!\n"
 "\n"
-"open write unit 10 card name ready.psf\n"
+"open write unit 10 card name system.psf\n"
 "write psf  unit 10 card\n"
 "\n"
-"!open write unit 10 card name step5_assembly.pdb\n"
-"!write coor unit 10 pdb\n"
-"!\n"
-"!open write unit 10 card name step5_assembly.crd\n"
-"!write coor unit 10 card\n"
+"open write unit 10 card name system.crd\n"
+"write coor  unit 10 card\n"
 "\n"
 "stop\n";
 
@@ -64,11 +61,11 @@ void surface::createAllAtom( parameterBlock *block )
 
 	if( !charmmFile )
 	{
-		printf("Couldn't open file '%s' for writing.\n", fileName );
+		printf("Couldn't open file \"%s\" for writing.\n", fileName );
 		exit(1);
 	}
 	
-	fprintf(charmmFile, charmm_header, block->jobName, block->jobName );
+	fprintf(charmmFile, charmm_header );
 
 	FILE *pdbFile;	
 
@@ -365,7 +362,7 @@ void surface::createAllAtom( parameterBlock *block )
 	
 	int cur_size = 0;
 	int cur_space = 1024;
-	char *cur_segment = (char *)malloc( sizeof(char) * cur_size );
+	char *cur_segment = (char *)malloc( sizeof(char) * cur_space );
 	cur_segment[0] = '\0';
 	char *cur_filename = (char *)malloc( sizeof(char) * 1024 );
 	char *cur_segname = (char *)malloc( sizeof(char) * 1024 );	
@@ -518,13 +515,13 @@ void surface::createAllAtom( parameterBlock *block )
 						{
 							fprintf(charmmFile, 
 							"\n"
-							"open read card unit 10 name %s\n"
+							"open read card unit 10 name \"%s\"\n"
 							"read sequence coor card unit 10\n"
 							"generate %s setup warn first none last none\n"
-							"open read unit 10 card name %s.crd\n"
+							"open read unit 10 card name \"%s\"\n"
 							"read coor unit 10 card resid\n"						
 							"\n"
-							"open write unit 10 card name %s.psf\n"
+							"open write unit 10 card name \"%s.psf\"\n"
 							"write psf  unit 10 card\n"
 							"delete atom sele atom * * * end\n"
 							, cur_filename, cur_segname, cur_filename, cur_segname );
@@ -616,7 +613,7 @@ void surface::createAllAtom( parameterBlock *block )
 						char temp_segid[256];
 						sprintf(temp_segid, "MEMB");
 						char *tmp = at[xa].segid;
-						at[xa].segid = temp_segid;
+						at[xa].segid = cur_segname;
 	
 						if( cur_size + 1024 > cur_space )
 						{	
@@ -646,10 +643,10 @@ void surface::createAllAtom( parameterBlock *block )
 					{
 						fprintf(charmmFile, 
 						"\n"
-						"open read card unit 10 name %s\n"
+						"open read card unit 10 name \"%s\"\n"
 						"read sequence coor card unit 10\n"
 						"generate %s setup warn first none last none\n"
-						"open read unit 10 card name %s.crd\n"
+						"open read unit 10 card name \"%s\"\n"
 						"read coor unit 10 card resid\n"						
 						"\n", cur_filename, cur_segname, cur_filename );
 
@@ -660,7 +657,7 @@ void surface::createAllAtom( parameterBlock *block )
 						fprintf(charmmFile, "patch SA23AB %s %d %s %d setup warn\n",  cur_segname,3,  cur_segname,6 );
 
 						fprintf(charmmFile, 
-						"open write unit 10 card name %s.psf\n"
+						"open write unit 10 card name \"%s.psf\"\n"
 						"write psf  unit 10 card\n"
 						"delete atom sele atom * * * end\n"
 						, cur_segname );
@@ -703,15 +700,15 @@ void surface::createAllAtom( parameterBlock *block )
 	{
 		fprintf(charmmFile, 
 		"\n"
-		"open read card unit 10 name %s\n"
+		"open read card unit 10 name \"%s\"\n"
 		"read sequence coor card unit 10\n"
 		"generate %s setup warn first none last none\n"
-		"open read unit 10 card name %s.crd\n"
+		"open read unit 10 card name \"%s\"\n"
 		"read coor unit 10 card resid\n"						
 		"\n", cur_filename, cur_segname, cur_filename );
 
 		fprintf(charmmFile, 
-		"open write unit 10 card name %s.psf\n"
+		"open write unit 10 card name \"%s.psf\"\n"
 		"write psf  unit 10 card\n"
 		"delete atom sele atom * * * end\n"
 		, cur_segname );
@@ -738,13 +735,13 @@ void surface::createAllAtom( parameterBlock *block )
 
 	for( int p = 0; p < npairs; p++ )
 	{
-		fprintf(charmmFile, "open unit 10 card read name %s\n", pairs[p].PSFfileName );
+		fprintf(charmmFile, "open unit 10 card read name \"%s\"\n", pairs[p].PSFfileName );
 		if( p == 0 )
 			fprintf(charmmFile, "read psf card unit 10\n" );	
 		else
 			fprintf(charmmFile, "read psf card append unit 10\n" );	
 		fprintf(charmmFile, "close unit 10\n" );	
-		fprintf(charmmFile, "open unit 10 card read name %s\n", pairs[p].CRDfileName );	
+		fprintf(charmmFile, "open unit 10 card read name \"%s\"\n", pairs[p].CRDfileName );	
 		fprintf(charmmFile, "read coor card unit 10 resid\n" );	
 		fprintf(charmmFile, "close unit 10\n" );
 		fprintf(charmmFile, "\n");	

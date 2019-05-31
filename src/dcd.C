@@ -147,7 +147,7 @@ void printSingleCRD( char *theString, struct atom_rec *at )
 	strcat(theString, printBuffer);
 
 //	fprintf(theFile, " ");	
-	strcat(theString, " ");
+	strcat(theString, "  ");
 	sprintf(printBuffer, "%s", at[x].resname );
 
 	//fprintf(theFile, "%s", printBuffer );
