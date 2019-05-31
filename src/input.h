@@ -179,6 +179,7 @@ class parameterBlock
 	// BEGIN section for creating all-atom structures
 
 	char *patchPDB;
+	char *patchPSF;
 	int create_all_atom;
 
 	// END section for creating all-atom structures
