@@ -66,8 +66,7 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 		exit(1);
 	}
 	
-	sprintf(fileName, "%s.crd", block->jobName );
-	fprintf(charmmFile, charmm_header, fileName, fileName );
+	fprintf(charmmFile, charmm_header, block->jobName, block->jobName );
 
 	FILE *pdbFile;	
 
