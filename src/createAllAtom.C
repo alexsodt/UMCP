@@ -78,6 +78,7 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 
 	char p_segid[256];
 	int pres = -1;
+	int seg_continuity_mode = 0;
 	p_segid[0] = '\0';
 	// fill the index
 
@@ -89,7 +90,13 @@ void surface::createAllAtom( FILE *outputFile, parameterBlock *block )
 		if( !strcasecmp( at[a].resname, "POT") ) continue;
 		if( !strcasecmp( at[a].resname, "CLA") ) continue;
 
-		if( at[a].res != pres || strcasecmp( at[a].segid, p_segid) )
+		if( !strncasecmp( at[a].segid, "GLPA", 4) ||
+	  	    !strncasecmp( at[a].segid, "PRO", 3) )
+			seg_continuity_mode = 1;
+		else
+			seg_continuity_mode = 0;
+
+		if( (!seg_continuity_mode && (at[a].res != pres)) || strcasecmp( at[a].segid, p_segid) )
 		{  
 			nlipids++;
 			// a new residue. is it a lipid, or protein?
