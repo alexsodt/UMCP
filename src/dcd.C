@@ -104,199 +104,232 @@ int DCDsuccess(void)
 {
 	return success;
 }
-
 void printSingleCRD( FILE *theFile, struct atom_rec *at )
+{
+}
+
+void printSingleCRD( char *theString, struct atom_rec *at )
 {
 	int x = 0;
 
-		char printBuffer[1024];
+	char printBuffer[1024];
 
-		sprintf(printBuffer, "%d", at[x].bead );
+	sprintf(printBuffer, "%d", at[x].bead );
 
-		int field1 = 10;
-		int field2 = 10;
+	int field1 = 10;
+	int field2 = 10;
 
-		if( strlen(printBuffer) < field1 ) 
-		{
+	if( strlen(printBuffer) < field1 ) 
+	{
                 	for( int p = 0; p < field1- strlen(printBuffer); p++ )
-				fprintf(theFile, " ");
-		}
+				strcat( theString, " " );
+//				fprintf(theFile, " ");
+	}
 
-		if( strlen(printBuffer) >= field1 )
-			printf(" ");
+//	if( strlen(printBuffer) >= field1 )
+//		printf(" ");
 
-		fprintf(theFile, "%s", printBuffer );
-		
-		sprintf(printBuffer, "%d", at[x].res );
-
-		if( strlen(printBuffer) < field2 ) 
-		{
-                	for( int p = 0; p < field2- strlen(printBuffer); p++ )
-				fprintf(theFile, " ");
-		}
-		if( strlen(printBuffer) >= field2 )
-			printf(" ");
-
-		fprintf(theFile, "%s ", printBuffer );
-
-		fprintf(theFile, " ");	
-		sprintf(printBuffer, "%s", at[x].resname );
-
-		fprintf(theFile, "%s", printBuffer );
-
-		if( strlen(printBuffer) < 10 ) 
-		{
-                	for( int p = 0; p < 10 - strlen(printBuffer); p++ )
-				fprintf(theFile, " ");
-		}
-		
-		sprintf(printBuffer, "%s", at[x].atname );
-//		fprintf(theFile,"      ");
-		fprintf(theFile, "%s", printBuffer );
-
-		if( strlen(printBuffer) < 8 ) 
-		{
-                	for( int p = 0; p < 8 - strlen(printBuffer); p++ )
-				fprintf(theFile, " ");
-		}
-
-		{
-			sprintf(printBuffer, "%.10lf", at[x].x );
-
-			char tbuf[12];
-			int t = 0;
-			while( printBuffer[t] != '.' && printBuffer[t] )
-			{
-				tbuf[t] = printBuffer[t];
-				t++;
-				tbuf[t] = '\0';
-			}
-			t++;
-			int s = 0;
-			char pbuf[24];
-			while( printBuffer[t] )
-			{
-				pbuf[s] = printBuffer[t];
-				s++;
-				t++;
-				pbuf[s] = '\0';
-			}
-
-			if( strlen(tbuf) < 9 )
-			{
-				for( int s = 0; s < 9-strlen(tbuf);s++ )
-					fprintf(theFile, " ");
-			} 
-
-			fprintf(theFile, "%s.", tbuf );
-			fprintf(theFile,"%s", pbuf );
-
-			if( strlen(pbuf) < 10 )
-			{
-				for( int s = 0; s < 10-strlen(pbuf);s++ )
-					fprintf(theFile, " ");
-			} 
-		}
-		
-		{
-			sprintf(printBuffer, "%.10lf", at[x].y );
-
-			char tbuf[12];
-			int t = 0;
-			while( printBuffer[t] != '.' && printBuffer[t] )
-			{
-				tbuf[t] = printBuffer[t];
-				t++;
-				tbuf[t] = '\0';
-			}
-			t++;
-			int s = 0;
-			char pbuf[24];
-			while( printBuffer[t] )
-			{
-				pbuf[s] = printBuffer[t];
-				s++;
-				t++;
-				pbuf[s] = '\0';
-			}
-
-			if( strlen(tbuf) < 9 )
-			{
-				for( int s = 0; s < 9-strlen(tbuf);s++ )
-					fprintf(theFile, " ");
-			} 
-
-			fprintf(theFile, "%s.", tbuf );
-			fprintf(theFile,"%s", pbuf );
-
-			if( strlen(pbuf) < 10 )
-			{
-				for( int s = 0; s < 10-strlen(pbuf);s++ )
-					fprintf(theFile, " ");
-			} 
-		}
-		
-		{
-			sprintf(printBuffer, "%.10lf", at[x].z );
-
-			char tbuf[12];
-			int t = 0;
-			while( printBuffer[t] != '.' && printBuffer[t] )
-			{
-				tbuf[t] = printBuffer[t];
-				t++;
-				tbuf[t] = '\0';
-			}
-			t++;
-			int s = 0;
-			char pbuf[24];
-			while( printBuffer[t] )
-			{
-				pbuf[s] = printBuffer[t];
-				s++;
-				t++;
-				pbuf[s] = '\0';
-			}
-
-			if( strlen(tbuf) < 9 )
-			{
-				for( int s = 0; s < 9-strlen(tbuf);s++ )
-					fprintf(theFile, " ");
-			} 
-
-			fprintf(theFile, "%s.", tbuf );
-			fprintf(theFile,"%s", pbuf );
-
-			if( strlen(pbuf) < 10 )
-			{
-				for( int s = 0; s < 10-strlen(pbuf);s++ )
-					fprintf(theFile, " ");
-			} 
-		}
+	strcat(theString, printBuffer );
+//	fprintf(theFile, "%s", printBuffer );
 	
-		fprintf(theFile, " ");	
-		
-		sprintf(printBuffer, " %s", at[x].segid );
+	sprintf(printBuffer, "%d", at[x].res );
 
-		fprintf(theFile, "%s", printBuffer );
+	if( strlen(printBuffer) < field2 ) 
+	{
+                	for( int p = 0; p < field2- strlen(printBuffer); p++ )
+				strcat(theString, " " );
+			//fprintf(theFile, " ");
+	}
+	if( strlen(printBuffer) >= field2 )
+		printf(" ");
 
-		if( strlen(printBuffer) < 11 ) 
+//	fprintf(theFile, "%s ", printBuffer );
+	strcat(theString, printBuffer);
+
+//	fprintf(theFile, " ");	
+	strcat(theString, " ");
+	sprintf(printBuffer, "%s", at[x].resname );
+
+	//fprintf(theFile, "%s", printBuffer );
+	strcat(theString, printBuffer);
+
+	if( strlen(printBuffer) < 10 ) 
+	{
+                	for( int p = 0; p < 10 - strlen(printBuffer); p++ )
+				strcat(theString, " ");
+			//fprintf(theFile, " ");
+	}
+	
+	sprintf(printBuffer, "%s", at[x].atname );
+//		fprintf(theFile,"      ");
+	//fprintf(theFile, "%s", printBuffer );
+	strcat(theString, printBuffer);
+
+	if( strlen(printBuffer) < 8 ) 
+	{
+                	for( int p = 0; p < 8 - strlen(printBuffer); p++ )
+				strcat(theString, " ");
+//			fprintf(theFile, " ");
+	}
+
+	{
+		sprintf(printBuffer, "%.10lf", at[x].x );
+
+		char tbuf[12];
+		int t = 0;
+		while( printBuffer[t] != '.' && printBuffer[t] )
 		{
+			tbuf[t] = printBuffer[t];
+			t++;
+			tbuf[t] = '\0';
+		}
+		t++;
+		int s = 0;
+		char pbuf[24];
+		while( printBuffer[t] )
+		{
+			pbuf[s] = printBuffer[t];
+			s++;
+			t++;
+			pbuf[s] = '\0';
+		}
+
+		if( strlen(tbuf) < 9 )
+		{
+			for( int s = 0; s < 9-strlen(tbuf);s++ )
+				strcat(theString, " ");
+//				fprintf(theFile, " ");
+		} 
+
+		strcat(theString, tbuf);
+		strcat(theString, ".");
+		strcat(theString, pbuf);
+//		fprintf(theFile, "%s.", tbuf );
+//		fprintf(theFile,"%s", pbuf );
+
+		if( strlen(pbuf) < 10 )
+		{
+			for( int s = 0; s < 10-strlen(pbuf);s++ )
+				strcat(theString, " ");
+//				fprintf(theFile, " ");
+		} 
+	}
+	
+	{
+		sprintf(printBuffer, "%.10lf", at[x].y );
+
+		char tbuf[12];
+		int t = 0;
+		while( printBuffer[t] != '.' && printBuffer[t] )
+		{
+			tbuf[t] = printBuffer[t];
+			t++;
+			tbuf[t] = '\0';
+		}
+		t++;
+		int s = 0;
+		char pbuf[24];
+		while( printBuffer[t] )
+		{
+			pbuf[s] = printBuffer[t];
+			s++;
+			t++;
+			pbuf[s] = '\0';
+		}
+
+		if( strlen(tbuf) < 9 )
+		{
+			for( int s = 0; s < 9-strlen(tbuf);s++ )
+				strcat(theString, " ");
+//				fprintf(theFile, " ");
+		} 
+
+		strcat(theString, tbuf);
+		strcat(theString, ".");
+		strcat(theString, pbuf);
+		//fprintf(theFile, "%s.", tbuf );
+		//fprintf(theFile,"%s", pbuf );
+
+		if( strlen(pbuf) < 10 )
+		{
+			for( int s = 0; s < 10-strlen(pbuf);s++ )
+				strcat(theString, " ");
+				//fprintf(theFile, " ");
+		} 
+	}
+	
+	{
+		sprintf(printBuffer, "%.10lf", at[x].z );
+
+		char tbuf[12];
+		int t = 0;
+		while( printBuffer[t] != '.' && printBuffer[t] )
+		{
+			tbuf[t] = printBuffer[t];
+			t++;
+			tbuf[t] = '\0';
+		}
+		t++;
+		int s = 0;
+		char pbuf[24];
+		while( printBuffer[t] )
+		{
+			pbuf[s] = printBuffer[t];
+			s++;
+			t++;
+			pbuf[s] = '\0';
+		}
+
+		if( strlen(tbuf) < 9 )
+		{
+			for( int s = 0; s < 9-strlen(tbuf);s++ )
+				strcat( theString, " ");
+//				fprintf(theFile, " ");
+		} 
+
+//		fprintf(theFile, "%s.", tbuf );
+//		fprintf(theFile,"%s", pbuf );
+		strcat(theString, tbuf);
+		strcat(theString, ".");
+		strcat(theString, pbuf);
+
+		if( strlen(pbuf) < 10 )
+		{
+			for( int s = 0; s < 10-strlen(pbuf);s++ )
+				strcat( theString, " ");
+//				fprintf(theFile, " ");
+		} 
+	}
+
+	strcat( theString, " ");
+//	fprintf(theFile, " ");	
+	
+	sprintf(printBuffer, " %s", at[x].segid );
+
+//	fprintf(theFile, "%s", printBuffer );
+	strcat( theString, printBuffer );
+
+	if( strlen(printBuffer) < 11 ) 
+	{
                 	for( int p = 0; p < 11- strlen(printBuffer); p++ )
-				fprintf(theFile, " ");
-		}
-		
-		sprintf(printBuffer, "%d", at[x].segRes );
+				strcat( theString, " ");
+		//	fprintf(theFile, " ");
+	}
+	
+	sprintf(printBuffer, "%d", at[x].segRes );
 
-		fprintf(theFile, "%s", printBuffer );
+	//fprintf(theFile, "%s", printBuffer );
+	strcat( theString, printBuffer );
 
-		if( strlen(printBuffer) < 16) 
-		{
+	if( strlen(printBuffer) < 16) 
+	{
                 	for( int p = 0; p < 16- strlen(printBuffer); p++ )
-				fprintf(theFile, " ");
-		}
+				strcat( theString, " ");
+//			fprintf(theFile, " ");
+	}
 
-		fprintf(theFile, "0.0000000000\n");
+//	fprintf(theFile, "0.0000000000\n");
+	strcat(theString, "0.0000000000\n");
 }
 
 void printCRDHeader( FILE *theFile, int nat)
