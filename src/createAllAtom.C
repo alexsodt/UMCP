@@ -473,7 +473,7 @@ void surface::createAllAtom( parameterBlock *block )
 			for( int l = 0; l < nlipids; l++ )
 			{
 				if( leaflet[l] != leaflet[l_cen] ) continue;
-
+//				if( l != l_cen ) continue;
 				// if the segment is a protein or glycosphingolipid we'll try to help the user with patch commands.
 
 	
@@ -770,6 +770,12 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 	double transp_cen[3], transp_nrm[3];
 
 	evaluateRNRM( f, u_cen, v_cen, transp_cen, transp_nrm, rsurf ); 
+
+	double eval_in[3] = { 
+		transp_cen[0] + transp_nrm[0] * dr[2], 
+		transp_cen[1] + transp_nrm[1] * dr[2], 
+		transp_cen[2] + transp_nrm[2] * dr[2] 
+		};
 	ru( f, u_cen, v_cen,  rsurf, drdu ); 
 	rv( f, u_cen, v_cen,  rsurf, drdv ); 
 	double lru = sqrt(drdu[0]*drdu[0]+drdu[1]*drdu[1]+drdu[2]*drdu[2]);
@@ -836,14 +842,18 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 	double du,dv;
 	double z_scaled = dr[2];	
 
+	if( leaflet == 1 && fabs(dr[2]-PP) < 1 )
+	{
+	}
+
 	if( leaflet == 1 )
 	{
 //		double scale1 =  (1 + c1 * (PP-dr[2]));
 //		double scale2 =  (1 + c2 * (PP-dr[2]));
 
 		// these are scalings needed for displacement at the bilayer midplane to get the proper distances at the neutral surface (PP)
-		double scale1 = (1- c1 * (PP-dr[2]))/(1-c1*PP);
-		double scale2 = (1- c2 * (PP-dr[2]))/(1-c2*PP);
+		double scale1 = (1- c1 * (PP-dr[2]))/(1+c1*PP);
+		double scale2 = (1- c2 * (PP-dr[2]))/(1+c2*PP);
 
 		// if scale1 is less than 1, it means that the z length has shrunk (the x dimension is larger at the midplane and so the particle's midplane displacement must be scaled down).
 
@@ -882,6 +892,9 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 		dv = cvec1[1] * dc1 + cvec2[1] * dc2; 
 
 	}
+
+
+
 	int fp = f;
 	int done = 0;
 
@@ -898,11 +911,19 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 	double rp[3];
 	double np[3];
 	evaluateRNRM( fp, u_cen, v_cen, rp, np, rsurf ); 
-					
+
+	
+
 
 	eval[0] = rp[0] + np[0] * z_scaled; 
 	eval[1] = rp[1] + np[1] * z_scaled; 
 	eval[2] = rp[2] + np[2] * z_scaled; 
+	
+	double dr_out[3] = { eval[0] - eval_in[0], eval[1] - eval_in[1], eval[2] - eval_in[2] };
+	double rout = normalize(dr_out);
+	double rin = sqrt(dr[0]*dr[0]+dr[1]*dr[1]);
+
+//	printf("%lf c1: %lf c2: %lf out_len %lf orig len %lf\n", dr[2], c1, c2, rout, rin); 					
 
 	*u = u_cen;
 	*v = v_cen;
