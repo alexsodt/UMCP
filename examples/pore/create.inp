@@ -9,7 +9,8 @@ nequil			0
 nsteps			0
 movie			yes	
 gamma_langevin 		100
-patchPDB		inner.pdb
+patchPDB		outer.pdb
+patchPSF		outer.psf
 create_all_atom		yes
 seed			265484
 #load			hot.save
