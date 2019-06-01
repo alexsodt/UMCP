@@ -7,7 +7,7 @@
 #include <math.h>
 
 static double PP = 12.0;
-
+static int debug_on = 0;
 
 const char *charmm_header =
 
@@ -432,6 +432,9 @@ void surface::createAllAtom( parameterBlock *block )
 
 			double r = normalize(dr);
 
+			if( f >= nf_faces )
+				r += 1e8;
+
 			if( r < best_chi2 )
 			{
 				best_chi2 = r;
@@ -583,8 +586,51 @@ void surface::createAllAtom( parameterBlock *block )
 	
 						double transp_u = main_u_cen;
 						double transp_v = main_v_cen;
+						
+						/*
+						if( !strcasecmp( cur_segname, "SEG16") && cur_res == 2 && !strcasecmp( at[xa].atname, "C4F" ) )
+						{ 
+							printf("target C4F f: %d u: %lf v: %lf use_r: %lf %lf %lf\n",
+									main_f_eval, transp_u, transp_v, use_r[0], use_r[1], use_r[2] );
+							debug_on = 1;
+							int nbins = 10000;
+
+							double cstart[3] = { use_r[0], use_r[1], use_r[2] };
+							double cstop[3] = { -7.721910, 3.841090, -13.352065 };
+							for( int b = 0; b < nbins; b++ )
+							{
+								if( b == 2807 )
+								{
+									printf("debug here.\n");
+								}
+								double ceval[3] = { 	
+								cstart[0] + (cstop[0]-cstart[0])*(b+0.5)/(double)nbins,
+								cstart[1] + (cstop[1]-cstart[1])*(b+0.5)/(double)nbins,
+								cstart[2] + (cstop[2]-cstart[2])*(b+0.5)/(double)nbins };
+								
+								double t_transp_u = main_u_cen;
+								double t_transp_v = main_v_cen;
+								double teval[3];
+								evaluate_at( teval, ceval, main_f_eval, &t_transp_u, &t_transp_v, rsurf, leaflet[l] );
+								printf("%d %lf %lf %lf to %lf %lf %lf\n", b, ceval[0],ceval[1],ceval[2], teval[0], teval[1], teval[2] );
+							}
+							exit(1);
+
+						}
+						if( !strcasecmp( cur_segname, "SEG16") && cur_res == 2 && !strcasecmp( at[xa].atname, "C5F" ) )
+						{ 
+							printf("target C5F f: %d u: %lf v: %lf use_r: %lf %lf %lf\n",
+									main_f_eval, transp_u, transp_v, use_r[0], use_r[1], use_r[2] );
+							debug_on = 1;
+						}*/
 						evaluate_at( eval, use_r, main_f_eval, &transp_u, &transp_v, rsurf, leaflet[l] );
-	
+						debug_on = 0;
+/*
+						if( !strcasecmp( cur_segname, "SEG16") && cur_res == 2 && !strcasecmp( at[xa].atname, "C4F" ) ) 
+							printf("eval: %lf %lf %lf\n", eval[0], eval[1], eval[2] );
+						if( !strcasecmp( cur_segname, "SEG16") && cur_res == 2 && !strcasecmp( at[xa].atname, "C5F" ) ) 
+							printf("eval: %lf %lf %lf\n", eval[0], eval[1], eval[2] );
+					*/
 						at[xa].x = eval[0];
 						at[xa].y = eval[1];
 						at[xa].z = eval[2];
@@ -605,6 +651,7 @@ void surface::createAllAtom( parameterBlock *block )
 							wrap_to[2] = at[xa].z;
 						}
 	
+
 	
 						at[xa].bead = cur_atom;
 						at[xa].res  = cur_res;
@@ -769,6 +816,11 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 
 	double transp_cen[3], transp_nrm[3];
 
+	if( f >= nf_faces )	
+	{
+		printf("Using irregular vertex.\n");
+	}
+
 	evaluateRNRM( f, u_cen, v_cen, transp_cen, transp_nrm, rsurf ); 
 
 	double eval_in[3] = { 
@@ -893,25 +945,58 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 
 	}
 
-
+	int f_orig = f;
+	double du_orig = du;
+	double dv_orig =dv;
+	double ucen_orig = u_cen;
+	double vcen_orig = v_cen;
 
 	int fp = f;
 	int done = 0;
 
+	double rp[3];
+	double np[3];
+	int eval_trip = 0;
+
 	while( ! done )
 	{
-		int f2 = nextFace( fp, &u_cen, &v_cen, &du, &dv, rsurf );
+		int f_pre = fp;
+		double upre = u_cen;
+		double vpre = v_cen;
+		double du_pre = du;
+		double dv_pre = dv;
+
+		int f2 = nextFace( fp, &u_cen, &v_cen, &du, &dv, rsurf );	
+
+		if( f2 >= nf_faces && !eval_trip )
+		{
+			//we moved onto an irregular vertex, use the approximation.
+			
+			double app_ru[3], app_rv[3];
+			ru( f_pre, upre, vpre,  rsurf, app_ru ); 
+			rv( f_pre, upre, vpre,  rsurf, app_rv );
+			evaluateRNRM( f_pre, upre, vpre, rp, np, rsurf );
+
+			rp[0] += app_ru[0] * du_pre + app_rv[0] * dv_pre; 
+			rp[1] += app_ru[1] * du_pre + app_rv[1] * dv_pre; 
+			rp[2] += app_ru[2] * du_pre + app_rv[2] * dv_pre; 
+
+			eval_trip = 1;
+		}
 
 		if( f2 == fp ) 
+		{
+			if( ! eval_trip )
+				evaluateRNRM( fp, u_cen, v_cen, rp, np, rsurf ); 
 			done = 1;
+		}
 
 		fp = f2;
 	}	
 
-	double rp[3];
-	double np[3];
-	evaluateRNRM( fp, u_cen, v_cen, rp, np, rsurf ); 
 
+	if( debug_on )
+		printf("leaflet: %d dr: %le %le %le c: %le %le f_orig: %d uorig: %le vorig: %le du: %le dv: %le eval at %d %le %le\n", leaflet, dr[0], dr[1], dr[2], c1, c2, ucen_orig, vcen_orig, f_orig, du_orig, dv_orig, fp, u_cen, v_cen  );
 	
 
 
