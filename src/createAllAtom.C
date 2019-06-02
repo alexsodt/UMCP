@@ -320,7 +320,7 @@ void surface::createAllAtom( parameterBlock *block )
 	area(rsurf,-1, &cur_area,&area0);
 		
 	// target one fourth of the area?
-	int nregions = area0 / (Lx*Ly/4);
+	int nregions = 3*area0 / (Lx*Ly/4);
 
 	printf("Using %d regions.\n", nregions );
 
@@ -587,13 +587,13 @@ void surface::createAllAtom( parameterBlock *block )
 						double transp_u = main_u_cen;
 						double transp_v = main_v_cen;
 						
-						/*
-						if( !strcasecmp( cur_segname, "SEG16") && cur_res == 2 && !strcasecmp( at[xa].atname, "C4F" ) )
+					
+						if( !strcasecmp( cur_segname, "SEG165") && cur_res == 4 && !strcasecmp( at[xa].atname, "C21" ) )
 						{ 
-							printf("target C4F f: %d u: %lf v: %lf use_r: %lf %lf %lf\n",
+							printf("target C21 f: %d u: %lf v: %lf use_r: %lf %lf %lf\n",
 									main_f_eval, transp_u, transp_v, use_r[0], use_r[1], use_r[2] );
 							debug_on = 1;
-							int nbins = 10000;
+/*							int nbins = 10000;
 
 							double cstart[3] = { use_r[0], use_r[1], use_r[2] };
 							double cstop[3] = { -7.721910, 3.841090, -13.352065 };
@@ -615,22 +615,22 @@ void surface::createAllAtom( parameterBlock *block )
 								printf("%d %lf %lf %lf to %lf %lf %lf\n", b, ceval[0],ceval[1],ceval[2], teval[0], teval[1], teval[2] );
 							}
 							exit(1);
-
+*/
 						}
-						if( !strcasecmp( cur_segname, "SEG16") && cur_res == 2 && !strcasecmp( at[xa].atname, "C5F" ) )
+						if( !strcasecmp( cur_segname, "SEG165") && cur_res == 4 && !strcasecmp( at[xa].atname, "O21" ) )
 						{ 
-							printf("target C5F f: %d u: %lf v: %lf use_r: %lf %lf %lf\n",
+							printf("target O21 f: %d u: %lf v: %lf use_r: %lf %lf %lf\n",
 									main_f_eval, transp_u, transp_v, use_r[0], use_r[1], use_r[2] );
 							debug_on = 1;
-						}*/
+						}
 						evaluate_at( eval, use_r, main_f_eval, &transp_u, &transp_v, rsurf, leaflet[l] );
 						debug_on = 0;
-/*
-						if( !strcasecmp( cur_segname, "SEG16") && cur_res == 2 && !strcasecmp( at[xa].atname, "C4F" ) ) 
+
+						if( !strcasecmp( cur_segname, "SEG165") && cur_res == 4 && !strcasecmp( at[xa].atname, "C21" ) ) 
 							printf("eval: %lf %lf %lf\n", eval[0], eval[1], eval[2] );
-						if( !strcasecmp( cur_segname, "SEG16") && cur_res == 2 && !strcasecmp( at[xa].atname, "C5F" ) ) 
+						if( !strcasecmp( cur_segname, "SEG165") && cur_res == 4 && !strcasecmp( at[xa].atname, "O21" ) ) 
 							printf("eval: %lf %lf %lf\n", eval[0], eval[1], eval[2] );
-					*/
+				
 						at[xa].x = eval[0];
 						at[xa].y = eval[1];
 						at[xa].z = eval[2];
