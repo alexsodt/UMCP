@@ -320,7 +320,7 @@ void surface::createAllAtom( parameterBlock *block )
 	area(rsurf,-1, &cur_area,&area0);
 		
 	// target one fourth of the area?
-	int nregions = area0 / (Lx*Ly/4);
+	int nregions = 3*area0 / (Lx*Ly/4);
 
 	printf("Using %d regions.\n", nregions );
 

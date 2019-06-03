@@ -275,7 +275,7 @@ int main( int argc, const char **argv )
 		
 		sub_surface->evaluateRNRM(0,1.0/3.0,1.0/3.0, pt, nrm, r );
 		
-		if( nrm[2] < 0 ) // points down.
+		if( nrm[2] < 0 ) // points up? not sure about this
 			nrm_sign_factor *= -1; 
 
 	}
