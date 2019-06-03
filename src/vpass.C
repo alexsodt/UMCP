@@ -1115,7 +1115,7 @@ void vpass_inner(
 		int niter = 0;
 		while( !v_done )
 		{
-			printf("Border iteration.\n");
+//			printf("Border iteration.\n");
 			v_done = 1;
 			niter++;
 			if( niter > 50 )
