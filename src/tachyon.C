@@ -435,6 +435,10 @@ int surface::writeTachyon( const char *name,
 		center[2] -= view[2];
 	}
 
+	bg[0] = 1.;
+	bg[1] = 1.;
+	bg[2] = 1.;
+
 	forced_light_dir[0] = -updir[0];
 	forced_light_dir[1] = -updir[1];
 	forced_light_dir[2] = -updir[2];
@@ -462,14 +466,18 @@ int surface::writeTachyon( const char *name,
 "  Viewdir %lf %lf %lf \n"
 "  Updir   %lf %lf %lf \n"
 "End_Camera\n"
-"Directional_Light Direction %lf %lf %lf Color 1.0 1.0 1.0\n"
+"Directional_Light Direction %lf %lf %lf Color 0.7 0.7 0.7\n"
+"Directional_Light Direction %lf %lf %lf Color 0.7 0.7 0.7\n"
+"Directional_Light Direction %lf %lf %lf Color 0.7 0.7 0.7\n"
 "Directional_Light Direction %lf %lf %lf Color 0.2 0.2 0.2\n"
 "Directional_Light Direction 0.1 -0.1 %lf Color 1.0 1.0 1.0\n"
 "Directional_Light Direction -1 -2 %lf Color 0.2 0.2 0.2\n"
 "Background %lf %lf %lf\n",
 	resolution, resolutiony, zoom, center[0], center[1], center[2], view[0], view[1], view[2], 
 updir[0], updir[1], updir[2], 
+forced_light_dir[0]+updir[0]*0.3, forced_light_dir[1]+updir[1]*0.3, forced_light_dir[2]+updir[2]*0.3, 
 forced_light_dir[0], forced_light_dir[1], forced_light_dir[2], 
+forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light_dir[2]-updir[2]*0.3, 
 -updir[0], -updir[1], -updir[2], 
 (do_planar ? -1.0 : 1.0), (do_planar ? -0.5 : 0.5), bg[0], bg[1], bg[2] );
 	
@@ -628,6 +636,9 @@ forced_light_dir[0], forced_light_dir[1], forced_light_dir[2],
 						double cd1[2],cd2[2],c1,c2;
 						double ctot = c( f, 1.0/3, 1.0/3, use_frame, cd1, cd2, &c1, &c2 );
 						double f_use =0;
+						if( params->tachyon_flip_sense )
+							ctot *= -1;
+
 						if( params->tachyon_gauss )
 							f_use = c1*c2 / gauss_mag;
 						else
@@ -637,14 +648,20 @@ forced_light_dir[0], forced_light_dir[1], forced_light_dir[2],
 						if( f_use > 1 ) f_use = 1;
 						if( f_use < -1 ) f_use = -1;
 
-						use_color[0]=0;
-						use_color[1]=0;
-						use_color[2]=0;
+						double mix_color[3] = {0,0,0};
 
 						if( f_use > 0 )	
-							use_color[0] = f_use;
+						{
+							use_color[0] = mix_color[0] * (1-f_use) + f_use;
+							use_color[1] = mix_color[1] * (1-f_use);
+							use_color[2] = mix_color[2] * (1-f_use);
+						}
 						else
-							use_color[2] = -f_use;
+						{
+							use_color[0] = mix_color[0] * (1+f_use);
+							use_color[1] = mix_color[1] * (1+f_use);
+							use_color[2] = mix_color[2] * (1+f_use) - f_use;
+						}
 					}
 	
 

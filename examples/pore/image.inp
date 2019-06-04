@@ -12,9 +12,11 @@ gamma_langevin 		100
 tachyon		 	yes
 tachyon_overlay_mesh	no
 tachyon_dull		no	
-tachyon_view_x		1
-tachyon_view_z		-0.2
+#tachyon_view_x		1
+tachyon_view_z		-1
 tachyon_curvature	yes	
 tachyon_gauss		no
 tachyon_res		3
 tachyon_pbc_y		yes	
+tachyon_pbc_x		yes	
+tachyon_flip_sense	yes	

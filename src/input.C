@@ -83,6 +83,7 @@ void setDefaults( parameterBlock *block )
 	block->disable_mesh = 0;
 
 	block->tachyon_dull = 0;
+	block->tachyon_flip_sense = 0;
 	block->tachyon_curvature = 0;
 	block->tachyon_gauss = 0;
 	block->tachyon_view_x = 0;
@@ -957,6 +958,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				block->tachyon_dull = 1;
 			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
 				block->tachyon_dull = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
+		else if( !strcasecmp( word1, "tachyon_flip_sense" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->tachyon_flip_sense = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->tachyon_flip_sense = 0;
 			else
 			{
 				printf("Could not interpret input line '%s'.\n", tbuf );
