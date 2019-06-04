@@ -11,7 +11,7 @@ movie			no
 gamma_langevin 		100
 tachyon		 	yes
 tachyon_overlay_mesh	no
-tachyon_dull		yes
+tachyon_dull		no	
 tachyon_view_x		1
 tachyon_view_z		-0.2
 tachyon_curvature	yes	

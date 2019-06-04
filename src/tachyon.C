@@ -457,7 +457,7 @@ int surface::writeTachyon( const char *name,
 "  Zoom %lf\n"
 "  Aspectratio 1\n"
 "  Antialiasing 4\n"
-"  Raydepth 10\n"
+"  Raydepth 2\n"
 "  Center  %lf %lf %lf \n"
 "  Viewdir %lf %lf %lf \n"
 "  Updir   %lf %lf %lf \n"
