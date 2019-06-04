@@ -73,11 +73,21 @@ class parameterBlock
 
 	int record_curvature; // record average curvature experienced.
 
+	int tachyon_pbc_x;
+	int tachyon_pbc_y;
+	int tachyon_pbc_z;
+	
+	double tachyon_view_x;
+	double tachyon_view_y;
+	double tachyon_view_z;
 	int tachyon_overlay_mesh;
 	int tachyon_interp;
 	int tachyon_tri_center;
 	int tachyon_res;
 	int tachyon;
+	int tachyon_curvature;
+	int tachyon_gauss;
+	int tachyon_dull;
 	int movie;
 	int random_seed;
 	int debug;
@@ -181,6 +191,7 @@ class parameterBlock
 	char *patchPDB;
 	char *patchPSF;
 	int create_all_atom;
+	int create_flip;
 
 	// END section for creating all-atom structures
 

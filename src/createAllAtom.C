@@ -7,7 +7,7 @@
 #include <math.h>
 
 static double PP = 12.0;
-
+static int debug_on = 0;
 
 const char *charmm_header =
 
@@ -31,6 +31,9 @@ const char *charmm_footer =
 "\n"
 "open write unit 10 card name system.crd\n"
 "write coor  unit 10 card\n"
+"\n"
+"open write unit 10 card name system.pdb\n"
+"write coor  pdb unit 10\n"
 "\n"
 "stop\n";
 
@@ -162,6 +165,15 @@ void surface::createAllAtom( parameterBlock *block )
 
 	// the last "lipid" doesn't get incremented.
 	nlipids++;
+	
+	if( block->create_flip )
+	{
+		for( int a = 0; a < curNAtoms(); a++ )
+		{
+			at[a].x = -at[a].x;
+			at[a].z = -at[a].z;
+		}
+	}
 
 	// get the bilayer center.
 
@@ -215,6 +227,7 @@ void surface::createAllAtom( parameterBlock *block )
                           wrapto = zv;
                   }
          }
+
 
 
 	// wrap around z periodic dimension
@@ -318,7 +331,31 @@ void surface::createAllAtom( parameterBlock *block )
 
 	double cur_area,area0;
 	area(rsurf,-1, &cur_area,&area0);
+
+	// Expected TOTAL neutral surface area.		
+	// A0*(1 + K * PP * PP ) 
+	
+	double KZ =0;
+	double Z = 0;
+	for( int f = 0; f < nt; f++ )
+	{
+		double u_cen=1.0/3.0;
+		double v_cen=1.0/3.0;
+
+		double cvec1[2] = {0,0}, cvec2[2]={0,0};
+		double gv = g(f, 1.0/3.0, 1.0/3.0, rsurf );
+		double c1=0,c2=0;
+		double ctot = c(f,u_cen,v_cen,rsurf,cvec1,cvec2,&c1,&c2);
 		
+		KZ += c1*c2 * gv;
+	        Z  += gv;
+	}
+
+	KZ /= Z;
+
+	double area_target = area0 * (1 + KZ * PP * PP );
+	printf("Area-midplane: %le Area_NS/PP: %le\n", area0, area_target );
+
 	// target one fourth of the area?
 	int nregions = 3*area0 / (Lx*Ly/4);
 
@@ -376,142 +413,334 @@ void surface::createAllAtom( parameterBlock *block )
 	int npair_space = 10;
 	crd_psf_pair *pairs = (crd_psf_pair *)malloc( sizeof(crd_psf_pair) * npair_space );
 
-	for( int r = 0; r < nregions; r++ )
+
+	double area_fraction = 1.0;
+
+	int seed = rand();
+	for( int pass = 0; pass < 2; pass++ )
 	{
-		int N = 0;
+		srand(seed); // generate the same random numbers.
 
-		double tri_cen[3] = {0,0,0};
+		double alpha = 1;
 
-		for( int t = 0; t < nt; t++ )
+		if( pass == 1 )
+			alpha = sqrt(area_fraction);
+
+		int nlipids_placed = 0;
+		for( int r = 0; r < nregions; r++ )
 		{
-			if( regions_for_face[t] == r )
+			int N = 0;
+	
+			double tri_cen[3] = {0,0,0};
+	
+			for( int t = 0; t < nt; t++ )
 			{
-				double rc[3],nc[3];
-				evaluateRNRM( t, 1.0/3.0, 1.0/3.0, rc, nc, rsurf );
-			
-//				if( r < natom_names )
-//				printf("%s %lf %lf %lf\n", atom_name[r], rc[0], rc[1], rc[2] );
-
-				if( N == 0 )
+				if( regions_for_face[t] == r )
 				{
-					tri_cen[0] += rc[0];
-					tri_cen[1] += rc[1];
-					tri_cen[2] += rc[2];
-				}	
-				else
-				{
-					double dr[3] = { rc[0] - tri_cen[0]/N, rc[1] - tri_cen[1]/N, rc[2] - tri_cen[2]/N };
-					wrapPBC( dr, rsurf+3*nv );
-
-					tri_cen[0] += tri_cen[0]/N + dr[0];	
-					tri_cen[1] += tri_cen[1]/N + dr[1];	
-					tri_cen[2] += tri_cen[2]/N + dr[2];	
+					double rc[3],nc[3];
+					evaluateRNRM( t, 1.0/3.0, 1.0/3.0, rc, nc, rsurf );
+				
+	//				if( r < natom_names )
+	//				printf("%s %lf %lf %lf\n", atom_name[r], rc[0], rc[1], rc[2] );
+	
+					if( N == 0 )
+					{
+						tri_cen[0] += rc[0];
+						tri_cen[1] += rc[1];
+						tri_cen[2] += rc[2];
+					}	
+					else
+					{
+						double dr[3] = { rc[0] - tri_cen[0]/N, rc[1] - tri_cen[1]/N, rc[2] - tri_cen[2]/N };
+						wrapPBC( dr, rsurf+3*nv );
+	
+						tri_cen[0] += tri_cen[0]/N + dr[0];	
+						tri_cen[1] += tri_cen[1]/N + dr[1];	
+						tri_cen[2] += tri_cen[2]/N + dr[2];	
+					}
+	
+					tri_list[N] = t; 
+					N++; 
 				}
-
-				tri_list[N] = t; 
-				N++; 
 			}
-		}
-
-		tri_cen[0] /= N;
-		tri_cen[1] /= N;
-		tri_cen[2] /= N;
-
-		double best_chi2 = 1e10;
-		int best_x = 0;
-		for( int xt = 0; xt < N; xt++ )
-		{
-			int f = tri_list[xt];
-
-			double rc[3],nc[3];
-			evaluateRNRM( f, 1.0/3.0, 1.0/3.0, rc, nc, rsurf );
-
-			double dr[3] = { rc[0] - tri_cen[0], rc[1] - tri_cen[1], rc[2] - tri_cen[2] };
 	
-			wrapPBC( dr, rsurf+3*nv );
-
-			double r = normalize(dr);
-
-			if( r < best_chi2 )
+			tri_cen[0] /= N;
+			tri_cen[1] /= N;
+			tri_cen[2] /= N;
+	
+			double best_chi2 = 1e10;
+			int best_x = 0;
+			for( int xt = 0; xt < N; xt++ )
 			{
-				best_chi2 = r;
-				best_x = xt;
-			}
-		}
-
-		int f = tri_list[best_x]; 
-
-		for( int x_leaflet = 0; x_leaflet < 2; x_leaflet++ )
-		{
-			// pick a lipid on the upper leaflet to put in the center of the face.
-		
-			int l_cen = rand() % nlipids;
-
-			while( leaflet[l_cen] != (x_leaflet ? 1 : -1 ) )
-				l_cen = rand() % nlipids; 
-
-			int l_opp = lipid_oppo[l_cen];
-		
-			// loop over all lipids. if they are in the face, place them into the coord structure.
-		
-			double upper_cen[3] = { lipid_xyz[3*l_cen+0], lipid_xyz[3*l_cen+1], lipid_xyz[3*l_cen+2] };
-			double lower_shift[3] = { 
-					lipid_xyz[3*l_cen+0] - lipid_xyz[3*l_opp+0],
-					lipid_xyz[3*l_cen+1] - lipid_xyz[3*l_opp+1],
-					lipid_xyz[3*l_cen+2] - lipid_xyz[3*l_opp+2] };
-		
-			while( lower_shift[0] >   Lx/2 ) lower_shift[0] -= Lx;
-			while( lower_shift[0] <  -Lx/2 ) lower_shift[0] += Lx;
-			while( lower_shift[1] >   Ly/2 ) lower_shift[1] -= Ly;
-			while( lower_shift[1] <  -Ly/2 ) lower_shift[1] += Ly;
-			while( lower_shift[2] >   Lz/2 ) lower_shift[2] -= Lz;
-			while( lower_shift[2] <  -Lz/2 ) lower_shift[2] += Lz;
-			
-		
-			// x, y to u, v'
-		
-			for( int l = 0; l < nlipids; l++ )
-			{
-				if( leaflet[l] != leaflet[l_cen] ) continue;
-//				if( l != l_cen ) continue;
-				// if the segment is a protein or glycosphingolipid we'll try to help the user with patch commands.
-
+				int f = tri_list[xt];
 	
-				// map the r coords to u/v
+				double rc[3],nc[3];
+				evaluateRNRM( f, 1.0/3.0, 1.0/3.0, rc, nc, rsurf );
+	
+				double dr[3] = { rc[0] - tri_cen[0], rc[1] - tri_cen[1], rc[2] - tri_cen[2] };
 		
-				double dx = lipid_xyz[3*l+0]-upper_cen[0];
-				double dy = lipid_xyz[3*l+1]-upper_cen[1];
+				wrapPBC( dr, rsurf+3*nv );
 	
-				double shift[2] = {0,0};
-				while( dx < -Lx/2 ) {dx += Lx; shift[0] += Lx; }
-				while( dx >  Lx/2 ) {dx -= Lx; shift[0] -= Lx; }
-				while( dy < -Ly/2 ) {dy += Ly; shift[1] += Ly; }
-				while( dy >  Ly/2 ) {dy -= Ly; shift[1] -= Ly; }
-			
-				double use_r[3] = { dx, dy, lipid_xyz[3*l+2] };
-				double eval_cen[3];
+				double r = normalize(dr);
 	
-				double spot_u = 1.0/3.0;
-				double spot_v = 1.0/3.0;
-
-
-				int main_f_eval = f;
-				double main_u_cen = spot_u;
-				double main_v_cen = spot_v;
-
-				// everything must be evaluated at this spot to retain the x,y to u/v mapping.
-				int fout = evaluate_at( eval_cen, use_r, f, &spot_u, &spot_v, rsurf, leaflet[l] );
+				if( f >= nf_faces )
+					r += 1e8;
 	
-	
-				if( regions_for_face[fout] == r )
+				if( r < best_chi2 )
 				{
-					int base_res = cur_res; 
+					best_chi2 = r;
+					best_x = xt;
+				}
+			}
+	
+			int f = tri_list[best_x]; 
+	
+			for( int x_leaflet = 0; x_leaflet < 2; x_leaflet++ )
+			{
+				// pick a lipid on the upper leaflet to put in the center of the face.
+			
+				int l_cen = rand() % nlipids;
+	
+				while( leaflet[l_cen] != (x_leaflet ? 1 : -1 ) )
+					l_cen = rand() % nlipids; 
+	
+				int l_opp = lipid_oppo[l_cen];
+			
+				// loop over all lipids. if they are in the face, place them into the coord structure.
+			
+				double upper_cen[3] = { lipid_xyz[3*l_cen+0], lipid_xyz[3*l_cen+1], lipid_xyz[3*l_cen+2] };
+				double lower_shift[3] = { 
+						lipid_xyz[3*l_cen+0] - lipid_xyz[3*l_opp+0],
+						lipid_xyz[3*l_cen+1] - lipid_xyz[3*l_opp+1],
+						lipid_xyz[3*l_cen+2] - lipid_xyz[3*l_opp+2] };
+			
+				while( lower_shift[0] >   Lx/2 ) lower_shift[0] -= Lx;
+				while( lower_shift[0] <  -Lx/2 ) lower_shift[0] += Lx;
+				while( lower_shift[1] >   Ly/2 ) lower_shift[1] -= Ly;
+				while( lower_shift[1] <  -Ly/2 ) lower_shift[1] += Ly;
+				while( lower_shift[2] >   Lz/2 ) lower_shift[2] -= Lz;
+				while( lower_shift[2] <  -Lz/2 ) lower_shift[2] += Lz;
+				
+			
+				// x, y to u, v'
+			
+				for( int l = 0; l < nlipids; l++ )
+				{
+					if( leaflet[l] != leaflet[l_cen] ) continue;
+	//				if( l != l_cen ) continue;
+					// if the segment is a protein or glycosphingolipid we'll try to help the user with patch commands.
+	
+		
+					// map the r coords to u/v
+			
+					double dx = lipid_xyz[3*l+0]-upper_cen[0];
+					double dy = lipid_xyz[3*l+1]-upper_cen[1];
+		
+					double shift[2] = {0,0};
+					while( dx < -Lx/2 ) {dx += Lx; shift[0] += Lx; }
+					while( dx >  Lx/2 ) {dx -= Lx; shift[0] -= Lx; }
+					while( dy < -Ly/2 ) {dy += Ly; shift[1] += Ly; }
+					while( dy >  Ly/2 ) {dy -= Ly; shift[1] -= Ly; }
+				
+					double use_r[3] = { alpha * dx, alpha * dy, lipid_xyz[3*l+2] };
+					double eval_cen[3];
+		
+					double spot_u = 1.0/3.0;
+					double spot_v = 1.0/3.0;
+	
+	
+					int main_f_eval = f;
+					double main_u_cen = spot_u;
+					double main_v_cen = spot_v;
+	
+					// everything must be evaluated at this spot to retain the x,y to u/v mapping.
+					int fout = evaluate_at( eval_cen, use_r, f, &spot_u, &spot_v, rsurf, leaflet[l] );
+		
+		
+					if( regions_for_face[fout] == r )
+					{
+						nlipids_placed += 1;
+						if( pass == 0 ) continue;	
 
-					if( !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) )
-					{	
-						// ALWAYS terminate the current segment, regardless.
+						int base_res = cur_res; 
+	
+						if( !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) )
+						{	
+							// ALWAYS terminate the current segment, regardless.
+							
+							if( cur_size > 0 )
+							{
+								fprintf(charmmFile, 
+								"\n"
+								"open read card unit 10 name \"%s\"\n"
+								"read sequence coor card unit 10\n"
+								"generate %s setup warn first none last none\n"
+								"open read unit 10 card name \"%s\"\n"
+								"read coor unit 10 card resid\n"						
+								"\n"
+								"open write unit 10 card name \"%s.psf\"\n"
+								"write psf  unit 10 card\n"
+								"delete atom sele atom * * * end\n"
+								, cur_filename, cur_segname, cur_filename, cur_segname );
+	
+								FILE *crdFile = fopen( cur_filename, "w");
+								printCRDHeader( crdFile, cur_natoms );
+								fprintf(crdFile, "%s", cur_segment );
+								fclose(crdFile);
+	
+								if( npairs == npair_space )
+								{
+									npair_space *= 2;
+	
+									pairs = (crd_psf_pair *)realloc( pairs, sizeof(crd_psf_pair) * npair_space );
+								}
+	
+								strcpy( pairs[npairs].CRDfileName, cur_filename );
+								char psf_file[256];
+								sprintf(psf_file, "%s.psf", cur_segname );
+								strcpy( pairs[npairs].PSFfileName, psf_file ); 
+	
+								npairs++;
+							
+								seg_cntr++;		
+								sprintf(cur_filename, "segment_SEG%d.crd", seg_cntr );
+								sprintf(cur_segname, "SEG%d", seg_cntr ); 
+							}					
 						
-						if( cur_size > 0 )
+							cur_size = 0;
+							cur_natoms = 0;
+							cur_segment[0] = '\0';
+							cur_atom = 1;
+							cur_res  = 1;
+						}
+	
+						double u_cen = spot_u;
+						double v_cen = spot_v;
+						double wrap_to[3] = { 0,0,0};
+		
+						int pres = at[lipid_start[l]].res;
+		
+						for( int xa = lipid_start[l]; xa <= lipid_stop[l]; xa++ )
+						{
+							if( at[xa].res != pres )
+								cur_res++; 
+							pres = at[xa].res;
+	
+							double xsave = at[xa].x;
+							double ysave = at[xa].y;
+							double zsave = at[xa].z;
+							int at_save = at[xa].bead;
+							int res_save = at[xa].res;
+		
+							double dx = alpha*(xsave-upper_cen[0]+shift[0]);
+							double dy = alpha*(ysave-upper_cen[1]+shift[1]);
+			
+							double use_r[3] = { dx, dy, zsave };
+							double eval[3];
+		
+							double transp_u = main_u_cen;
+							double transp_v = main_v_cen;
+							
+						
+							if( !strcasecmp( cur_segname, "SEG165") && cur_res == 4 && !strcasecmp( at[xa].atname, "C21" ) )
+							{ 
+								printf("target C21 f: %d u: %lf v: %lf use_r: %lf %lf %lf\n",
+										main_f_eval, transp_u, transp_v, use_r[0], use_r[1], use_r[2] );
+								debug_on = 1;
+	/*							int nbins = 10000;
+	
+								double cstart[3] = { use_r[0], use_r[1], use_r[2] };
+								double cstop[3] = { -7.721910, 3.841090, -13.352065 };
+								for( int b = 0; b < nbins; b++ )
+								{
+									if( b == 2807 )
+									{
+										printf("debug here.\n");
+									}
+									double ceval[3] = { 	
+									cstart[0] + (cstop[0]-cstart[0])*(b+0.5)/(double)nbins,
+									cstart[1] + (cstop[1]-cstart[1])*(b+0.5)/(double)nbins,
+									cstart[2] + (cstop[2]-cstart[2])*(b+0.5)/(double)nbins };
+									
+									double t_transp_u = main_u_cen;
+									double t_transp_v = main_v_cen;
+									double teval[3];
+									evaluate_at( teval, ceval, main_f_eval, &t_transp_u, &t_transp_v, rsurf, leaflet[l] );
+									printf("%d %lf %lf %lf to %lf %lf %lf\n", b, ceval[0],ceval[1],ceval[2], teval[0], teval[1], teval[2] );
+								}
+								exit(1);
+	*/
+							}
+							if( !strcasecmp( cur_segname, "SEG165") && cur_res == 4 && !strcasecmp( at[xa].atname, "O21" ) )
+							{ 
+								printf("target O21 f: %d u: %lf v: %lf use_r: %lf %lf %lf\n",
+										main_f_eval, transp_u, transp_v, use_r[0], use_r[1], use_r[2] );
+								debug_on = 1;
+							}
+							evaluate_at( eval, use_r, main_f_eval, &transp_u, &transp_v, rsurf, leaflet[l] );
+							debug_on = 0;
+	
+							if( !strcasecmp( cur_segname, "SEG165") && cur_res == 4 && !strcasecmp( at[xa].atname, "C21" ) ) 
+								printf("eval: %lf %lf %lf\n", eval[0], eval[1], eval[2] );
+							if( !strcasecmp( cur_segname, "SEG165") && cur_res == 4 && !strcasecmp( at[xa].atname, "O21" ) ) 
+								printf("eval: %lf %lf %lf\n", eval[0], eval[1], eval[2] );
+					
+							at[xa].x = eval[0];
+							at[xa].y = eval[1];
+							at[xa].z = eval[2];
+						
+							if( xa > lipid_start[l] )
+							{
+								double dr[3] = { at[xa].x - wrap_to[0], at[xa].y - wrap_to[1], at[xa].z - wrap_to[2] };
+								wrapPBC( dr, rsurf+3*nv );
+		
+								at[xa].x = wrap_to[0] + dr[0];
+								at[xa].y = wrap_to[1] + dr[1];
+								at[xa].z = wrap_to[2] + dr[2];
+							}
+							else
+							{
+								wrap_to[0] = at[xa].x;
+								wrap_to[1] = at[xa].y;
+								wrap_to[2] = at[xa].z;
+							}
+		
+	
+		
+							at[xa].bead = cur_atom;
+							at[xa].res  = cur_res;
+							at[xa].segRes = cur_res;
+	
+							char temp_segid[256];
+							sprintf(temp_segid, "MEMB");
+							char *tmp = at[xa].segid;
+							at[xa].segid = cur_segname;
+		
+							if( cur_size + 1024 > cur_space )
+							{	
+								cur_space += 1024;
+								cur_segment = (char *)realloc( cur_segment, sizeof(char) * cur_space );
+							}
+	
+							printSingleCRD( cur_segment+cur_size, at+xa );
+							cur_size += strlen(cur_segment+cur_size);
+							cur_natoms++;
+	//						printSingleCRD( tempFile, at+xa ); 
+							at[xa].segid = tmp;
+							at[xa].bead = at_save;
+							at[xa].res = res_save;
+		
+							at[xa].x = xsave;
+							at[xa].y = ysave;
+							at[xa].z = zsave;
+		
+							cur_atom++;
+	
+						}
+					
+						cur_res++;
+						
+						if( !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) )
 						{
 							fprintf(charmmFile, 
 							"\n"
@@ -520,181 +749,61 @@ void surface::createAllAtom( parameterBlock *block )
 							"generate %s setup warn first none last none\n"
 							"open read unit 10 card name \"%s\"\n"
 							"read coor unit 10 card resid\n"						
-							"\n"
+							"\n", cur_filename, cur_segname, cur_filename );
+	
+							fprintf(charmmFile, "patch CERB %s %d %s %d setup warn\n", cur_segname, 2, cur_segname, 1 );
+							fprintf(charmmFile, "patch 14BB %s %d %s %d setup warn\n",  cur_segname,2,  cur_segname,3 );
+							fprintf(charmmFile, "patch 14BA %s %d %s %d setup warn\n",  cur_segname,3,  cur_segname,4 );
+							fprintf(charmmFile, "patch 13BB %s %d %s %d setup warn\n",  cur_segname,4,  cur_segname,5 );
+							fprintf(charmmFile, "patch SA23AB %s %d %s %d setup warn\n",  cur_segname,3,  cur_segname,6 );
+	
+							fprintf(charmmFile, 
 							"open write unit 10 card name \"%s.psf\"\n"
 							"write psf  unit 10 card\n"
 							"delete atom sele atom * * * end\n"
-							, cur_filename, cur_segname, cur_filename, cur_segname );
-
+							, cur_segname );
+							
 							FILE *crdFile = fopen( cur_filename, "w");
 							printCRDHeader( crdFile, cur_natoms );
 							fprintf(crdFile, "%s", cur_segment );
 							fclose(crdFile);
-
+							
+	
 							if( npairs == npair_space )
 							{
 								npair_space *= 2;
-
+	
 								pairs = (crd_psf_pair *)realloc( pairs, sizeof(crd_psf_pair) * npair_space );
 							}
-
+	
 							strcpy( pairs[npairs].CRDfileName, cur_filename );
 							char psf_file[256];
 							sprintf(psf_file, "%s.psf", cur_segname );
 							strcpy( pairs[npairs].PSFfileName, psf_file ); 
-
+	
 							npairs++;
-						
+							cur_natoms = 0;
+							cur_size = 0;
+							cur_segment[0] = '\0';	
+							cur_atom = 1;
+							cur_res  = 1;
 							seg_cntr++;		
 							sprintf(cur_filename, "segment_SEG%d.crd", seg_cntr );
 							sprintf(cur_segname, "SEG%d", seg_cntr ); 
-						}					
-					
-						cur_size = 0;
-						cur_natoms = 0;
-						cur_segment[0] = '\0';
-						cur_atom = 1;
-						cur_res  = 1;
+						}	
 					}
-
-					double u_cen = spot_u;
-					double v_cen = spot_v;
-					double wrap_to[3] = { 0,0,0};
-	
-					int pres = at[lipid_start[l]].res;
-	
-					for( int xa = lipid_start[l]; xa <= lipid_stop[l]; xa++ )
-					{
-						if( at[xa].res != pres )
-							cur_res++; 
-						pres = at[xa].res;
-
-						double xsave = at[xa].x;
-						double ysave = at[xa].y;
-						double zsave = at[xa].z;
-						int at_save = at[xa].bead;
-						int res_save = at[xa].res;
-	
-						double dx = xsave-upper_cen[0]+shift[0];
-						double dy = ysave-upper_cen[1]+shift[1];
 		
-						double use_r[3] = { dx, dy, zsave };
-						double eval[3];
-	
-						double transp_u = main_u_cen;
-						double transp_v = main_v_cen;
-						evaluate_at( eval, use_r, main_f_eval, &transp_u, &transp_v, rsurf, leaflet[l] );
-	
-						at[xa].x = eval[0];
-						at[xa].y = eval[1];
-						at[xa].z = eval[2];
-					
-						if( xa > lipid_start[l] )
-						{
-							double dr[3] = { at[xa].x - wrap_to[0], at[xa].y - wrap_to[1], at[xa].z - wrap_to[2] };
-							wrapPBC( dr, rsurf+3*nv );
-	
-							at[xa].x = wrap_to[0] + dr[0];
-							at[xa].y = wrap_to[1] + dr[1];
-							at[xa].z = wrap_to[2] + dr[2];
-						}
-						else
-						{
-							wrap_to[0] = at[xa].x;
-							wrap_to[1] = at[xa].y;
-							wrap_to[2] = at[xa].z;
-						}
-	
-	
-						at[xa].bead = cur_atom;
-						at[xa].res  = cur_res;
-						at[xa].segRes = cur_res;
-
-						char temp_segid[256];
-						sprintf(temp_segid, "MEMB");
-						char *tmp = at[xa].segid;
-						at[xa].segid = cur_segname;
-	
-						if( cur_size + 1024 > cur_space )
-						{	
-							cur_space += 1024;
-							cur_segment = (char *)realloc( cur_segment, sizeof(char) * cur_space );
-						}
-
-						printSingleCRD( cur_segment+cur_size, at+xa );
-						cur_size += strlen(cur_segment+cur_size);
-						cur_natoms++;
-//						printSingleCRD( tempFile, at+xa ); 
-						at[xa].segid = tmp;
-						at[xa].bead = at_save;
-						at[xa].res = res_save;
-	
-						at[xa].x = xsave;
-						at[xa].y = ysave;
-						at[xa].z = zsave;
-	
-						cur_atom++;
-
-					}
-				
-					cur_res++;
-					
-					if( !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) )
-					{
-						fprintf(charmmFile, 
-						"\n"
-						"open read card unit 10 name \"%s\"\n"
-						"read sequence coor card unit 10\n"
-						"generate %s setup warn first none last none\n"
-						"open read unit 10 card name \"%s\"\n"
-						"read coor unit 10 card resid\n"						
-						"\n", cur_filename, cur_segname, cur_filename );
-
-						fprintf(charmmFile, "patch CERB %s %d %s %d setup warn\n", cur_segname, 2, cur_segname, 1 );
-						fprintf(charmmFile, "patch 14BB %s %d %s %d setup warn\n",  cur_segname,2,  cur_segname,3 );
-						fprintf(charmmFile, "patch 14BA %s %d %s %d setup warn\n",  cur_segname,3,  cur_segname,4 );
-						fprintf(charmmFile, "patch 13BB %s %d %s %d setup warn\n",  cur_segname,4,  cur_segname,5 );
-						fprintf(charmmFile, "patch SA23AB %s %d %s %d setup warn\n",  cur_segname,3,  cur_segname,6 );
-
-						fprintf(charmmFile, 
-						"open write unit 10 card name \"%s.psf\"\n"
-						"write psf  unit 10 card\n"
-						"delete atom sele atom * * * end\n"
-						, cur_segname );
-						
-						FILE *crdFile = fopen( cur_filename, "w");
-						printCRDHeader( crdFile, cur_natoms );
-						fprintf(crdFile, "%s", cur_segment );
-						fclose(crdFile);
-						
-
-						if( npairs == npair_space )
-						{
-							npair_space *= 2;
-
-							pairs = (crd_psf_pair *)realloc( pairs, sizeof(crd_psf_pair) * npair_space );
-						}
-
-						strcpy( pairs[npairs].CRDfileName, cur_filename );
-						char psf_file[256];
-						sprintf(psf_file, "%s.psf", cur_segname );
-						strcpy( pairs[npairs].PSFfileName, psf_file ); 
-
-						npairs++;
-						cur_natoms = 0;
-						cur_size = 0;
-						cur_segment[0] = '\0';	
-						cur_atom = 1;
-						cur_res  = 1;
-						seg_cntr++;		
-						sprintf(cur_filename, "segment_SEG%d.crd", seg_cntr );
-						sprintf(cur_segname, "SEG%d", seg_cntr ); 
-					}	
 				}
-	
 			}
 		}
+		
+		double likely_area_covered = nlipids_placed * Lx * Ly / nlipids;
+
+		area_fraction = likely_area_covered / area_target;
+
+		printf("PASS %d area percentage: %lf%%.\n", pass, area_fraction );
 	}
+
 
 	if( cur_size > 0 )
 	{
@@ -768,6 +877,11 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 	double v_cen = *v;
 
 	double transp_cen[3], transp_nrm[3];
+
+	if( f >= nf_faces )	
+	{
+		printf("Using irregular vertex.\n");
+	}
 
 	evaluateRNRM( f, u_cen, v_cen, transp_cen, transp_nrm, rsurf ); 
 
@@ -893,25 +1007,58 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 
 	}
 
-
+	int f_orig = f;
+	double du_orig = du;
+	double dv_orig =dv;
+	double ucen_orig = u_cen;
+	double vcen_orig = v_cen;
 
 	int fp = f;
 	int done = 0;
 
+	double rp[3];
+	double np[3];
+	int eval_trip = 0;
+
 	while( ! done )
 	{
-		int f2 = nextFace( fp, &u_cen, &v_cen, &du, &dv, rsurf );
+		int f_pre = fp;
+		double upre = u_cen;
+		double vpre = v_cen;
+		double du_pre = du;
+		double dv_pre = dv;
+
+		int f2 = nextFace( fp, &u_cen, &v_cen, &du, &dv, rsurf );	
+
+		if( f2 >= nf_faces && !eval_trip )
+		{
+			//we moved onto an irregular vertex, use the approximation.
+			
+			double app_ru[3], app_rv[3];
+			ru( f_pre, upre, vpre,  rsurf, app_ru ); 
+			rv( f_pre, upre, vpre,  rsurf, app_rv );
+			evaluateRNRM( f_pre, upre, vpre, rp, np, rsurf );
+
+			rp[0] += app_ru[0] * du_pre + app_rv[0] * dv_pre; 
+			rp[1] += app_ru[1] * du_pre + app_rv[1] * dv_pre; 
+			rp[2] += app_ru[2] * du_pre + app_rv[2] * dv_pre; 
+
+			eval_trip = 1;
+		}
 
 		if( f2 == fp ) 
+		{
+			if( ! eval_trip )
+				evaluateRNRM( fp, u_cen, v_cen, rp, np, rsurf ); 
 			done = 1;
+		}
 
 		fp = f2;
 	}	
 
-	double rp[3];
-	double np[3];
-	evaluateRNRM( fp, u_cen, v_cen, rp, np, rsurf ); 
 
+	if( debug_on )
+		printf("leaflet: %d dr: %le %le %le c: %le %le f_orig: %d uorig: %le vorig: %le du: %le dv: %le eval at %d %le %le\n", leaflet, dr[0], dr[1], dr[2], c1, c2, ucen_orig, vcen_orig, f_orig, du_orig, dv_orig, fp, u_cen, v_cen  );
 	
 
 

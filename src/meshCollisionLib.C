@@ -25,7 +25,7 @@
 #define FRACTIONAL_TOLERANCE
 
 #ifdef FRACTIONAL_TOLERANCE
-#define FRAC_TOL      0.025
+#define FRAC_TOL      0.0025
 #define EXTREME_R	(1e-6)
 #else
 //#define RADIUS_TOL    (1)
@@ -539,7 +539,7 @@ double surface::returnRadius (double *pt, int *col_f, double *col_u, double *col
 	// currentR: the last particle/membrane distance
 	// defaultR: the largest radius we care about.
 
-	double check_fudge = 0.3;
+	double check_fudge = 0.6;
 	double alpha = 0.75;
 	// checkR: currentR + alpha*distance, where we are *likely* to find the particle
 	double checkR = currentR + alpha*distance;
@@ -550,6 +550,9 @@ double surface::returnRadius (double *pt, int *col_f, double *col_u, double *col
 	
 	// if it moved farther than the current distance to the membrane, this is the distance from the membrane it could be.
 	double checkClose = distance - currentR + check_fudge + reflecting_surface;
+
+	if( checkClose < reflecting_surface + check_fudge )
+		checkClose = reflecting_surface + check_fudge;
 
 	if (checkR <= checkClose) {
 		if (!withinRadius(pt, col_f, col_u, col_v, M, mlow, mhigh, L, checkClose, vertex_data, ptr_to_data, nump, disable_PBC_z )) {
@@ -1237,8 +1240,9 @@ bool surface::withinBoxedSurface(double* pt, int *f, double *u, double *v, doubl
                 evaluateRNRM( *f, *u, *v, rp, nrm, r_surface );
 
                 double pt_to_surface[3] = { pt[0] - rp[0], pt[1] - rp[1], pt[2] - rp[2] };
-
-		wrapPBC( pt_to_surface, r_surface + 3 * nv  );
+	
+		if( !disable_PBC_z )
+			wrapPBC( pt_to_surface, r_surface + 3 * nv  );
 
                 //double rl = normalize(pt_to_surface);
                 free(r_surface);
@@ -1255,7 +1259,12 @@ bool surface::withinBoxedSurface(double* pt, int *f, double *u, double *v, doubl
 		//	printf("%lf %lf %lf, %lf %lf %lf\n", pt_to_surface[0], pt_to_surface[1], pt_to_surface[2], nrm[0], nrm[1], nrm[2]);
 
 			if( dist > reflecting_surface )
+			{
+				if( *distance < reflecting_surface )
+					return false;
+
 				return true;
+			}
 			else
 				return false;
 		}
