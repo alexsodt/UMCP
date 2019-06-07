@@ -28,7 +28,6 @@
 
 #define OLD_LANGEVIN
 
-//#define FIX_MEMBRANE
 //#define MONTE_CARLO_HACK
 
 //#define SAVE_RESTARTS
@@ -902,7 +901,8 @@ int temp_main( int argc, char **argv )
 		double last_mesh_time = 0;
 		double last_wait_time = 0;
 		double last_complex_time = 0;
-			
+		
+#if 0	
 		if( debug && par_info.my_id == BASE_TASK )
 		{
 			char fileName[256];
@@ -920,7 +920,7 @@ int temp_main( int argc, char **argv )
 			my_gsl_reseed(new_seed);
 			fclose(debugSave);
 		}
-
+#endif
 		for( int t = 0; t < block.o_lim; t++, cur_t += time_step, global_cntr++ )
 		{
 #ifdef SAVE_RESTARTS
@@ -1204,7 +1204,7 @@ int temp_main( int argc, char **argv )
 
 			// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t), report properties for this state (perform Monte Carlo?)
 
-			if( !block.disable_mesh )
+			if( !block.disable_mesh && (!debug || o < nequil) )
 			{
 
 				if( do_gen_q )
@@ -1278,7 +1278,7 @@ int temp_main( int argc, char **argv )
  * 			 *****************************/
 
 
-			if( !block.disable_mesh )
+			if( !block.disable_mesh && (!debug || o < nequil) )
 			{
 				if( do_bd_membrane || do_ld || o < nequil )
 				{
@@ -1340,13 +1340,16 @@ int temp_main( int argc, char **argv )
 				AltSparseCartMatVecIncrScale( qdot, qdot_temp, EFFM, 1.0, r+3*nv  );
 
 			// LEAPFROG: increment q by eps, we have q(t+eps), p(t+eps/2)
-			for( int v1 = 0; v1 < nv; v1++ )
+
+			if( ! debug || o < nequil )
 			{
-				r[3*v1+0] += qdot[3*v1+0] * AKMA_TIME * time_step;
-				r[3*v1+1] += qdot[3*v1+1] * AKMA_TIME * time_step;
-				r[3*v1+2] += qdot[3*v1+2] * AKMA_TIME * time_step;
-			}
-				
+				for( int v1 = 0; v1 < nv; v1++ )
+				{
+					r[3*v1+0] += qdot[3*v1+0] * AKMA_TIME * time_step;
+					r[3*v1+1] += qdot[3*v1+1] * AKMA_TIME * time_step;
+					r[3*v1+2] += qdot[3*v1+2] * AKMA_TIME * time_step;
+				}
+			}	
 
 			if( do_gen_q )
 			{
@@ -1425,7 +1428,7 @@ int temp_main( int argc, char **argv )
 			if( block.s_q && global_cntr % block.s_q_period == 0 && o >= nequil)
 			{
 				// Update SANS B-histogram.
-				sub_surface->sample_B_hist( r, B_hist, &A2dz2_sampled, SANS_SAMPLE_NRM, 50000, sans_max_r, nsans_bins, block.shape_correction );  
+				sub_surface->sample_B_hist( r, B_hist, &A2dz2_sampled, SANS_SAMPLE_NRM, 100000, sans_max_r, nsans_bins, block.shape_correction );  
 			}
 
 		}

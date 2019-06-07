@@ -22,7 +22,7 @@ static int has_pbc = -1;
 static int do_cyl = 0;
 // Tachyon parameters
 static int resolution = 1024;
-static double color[3] = { 0, 1, 0 };
+static double color[3] = { 0.8, 0.8, 0.8 };
 static double fixed_updir[3] = {0,0,1};
 static double fixed_center[3] = {0,0,0};
 static double fixed_view[3] = {0,0,1};
@@ -560,6 +560,22 @@ int surface::writeTachyon( const char *name,
 
 					double p_rad = allComplexes[c]->sigma[p];
 					double pcolor[3] = { 1, 0, 1 };
+
+					if( allComplexes[c]->nsites == 1 )
+					{
+						if( allComplexes[c]->nattach == 1 )
+						{
+							pcolor[0] = 0;
+							pcolor[1] = 0;
+							pcolor[2] = 1;
+						}
+						else
+						{
+							pcolor[0] = 1;
+							pcolor[1] = 0;
+							pcolor[2] = 0;
+						}
+					}	
 
 					if( allComplexes[c]->att_sigma[p] > 0 )
 					{
