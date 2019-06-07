@@ -759,6 +759,14 @@ int temp_main( int argc, char **argv )
 
 	if( block.nsteps == 0 )
 	{
+		printf("Writing tachyon object file.\n");
+
+		if( block.tachyon && par_info.my_id == BASE_TASK )
+		{
+			sub_surface->writeTachyon( block.jobName, block.tachyon_res, 1, 
+				r, allComplexes, ncomplex, &block, srd_i, block.tachyon_tri_center ); 
+		}
+
 		printf("Requested no dynamics, exiting.\n");
 	}
 	else

@@ -29,9 +29,12 @@ double normalize( double *dr )
 {
 	double lr = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
 
-	dr[0] /= lr;
-	dr[1] /= lr;
-	dr[2] /= lr;
+	if( fabs(lr) > 0  )
+	{
+		dr[0] /= lr;
+		dr[1] /= lr;
+		dr[2] /= lr;
+	}
 
 	return lr;
 }

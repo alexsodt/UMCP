@@ -11,7 +11,7 @@
 #ifdef FFTW
 #include <fftw3.h>
 #endif
-#define SAFETY (1e-8)
+#define SAFETY (1e-12)
 #define MAX_VALENCE 15
 #define CURVE_DATA 6
 #define EDGE_DATA 11

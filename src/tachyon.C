@@ -39,7 +39,41 @@ int surface::writeTachyon( const char *name,
 				int face_center // put the origin on this face.
 			)
 {
+	double cur_area;
+	double area0;
+	double spec_mag = 0.2;
+	
+	double curve_mag = 0.03;
+	double gauss_mag = 0.03;
+	if( params->tachyon_curvature || params->tachyon_gauss )
+	{
+		curve_mag = 0;
+		gauss_mag = 0;
+		for( int f = 0; f < nt; f++ )
+		{
+			double cd1[2],cd2[2],c1,c2;
+			double ctot = c(f,1.0/3,1.0/3,r,cd1,cd2,&c1,&c2);
+		
+			if( fabs(ctot) > curve_mag )
+				curve_mag = fabs(ctot);		
+			if( fabs(c1*c2) > gauss_mag )
+				gauss_mag = fabs(c1*c2);
+		}
+
+		if( params->tachyon_curvature )
+			printf("Tachyon curvature color scale is from -%lf (full blue) to %lf (full red), inv Angstroms.\n", curve_mag, curve_mag );
+		if( params->tachyon_gauss )
+			printf("Tachyon Gauss curvature color scale is from -%lf (full blue) to %lf (full red), inv Angstroms^2.\n", gauss_mag, gauss_mag );
+	}
+
+
+	if( params->tachyon_dull )
+		spec_mag = 0;
+
+	area( r, -1, &cur_area, &area0 ); 
+	
 	int overlay_mesh = params->tachyon_overlay_mesh;
+	double mesh_overlay_radius = sqrt(area0/nt/20);
 	int np = nv;
 	int nsites_total = nv+1;
 	for( int c = 0; c < ncomplex; c++ )
@@ -226,6 +260,13 @@ int surface::writeTachyon( const char *name,
 
 	double zoom = 0.9;
 
+	double input_view_dir[3] = { 
+			params->tachyon_view_x,
+			params->tachyon_view_y,
+			params->tachyon_view_z };
+
+	double len = normalize(input_view_dir);
+
 	if( do_planar )
 	{
 	
@@ -283,8 +324,35 @@ int surface::writeTachyon( const char *name,
 		zoom = 0.5;
 #endif
 	}
+
+	if( len > 1e-10 )
+	{
+		view[0] = input_view_dir[0];
+		view[1] = input_view_dir[1];
+		view[2] = input_view_dir[2];
+
+		updir[0] = 0;
+		updir[1] = 0;
+		updir[2] = 1;
+		double dp = view[0]*updir[0] + view[1] * updir[1] + view[2]*updir[2];
+
+		if( fabs(dp) > 1 - 1e-8 )
+		{
+			updir[0] = 1;
+			updir[1] = 0;
+			updir[2] = 0;
+		}
+			
+		center[0] = -2*view[0];
+		center[1] = -2*view[1];
+		center[2] = -2*view[2];
+			
+		
+	}
 	
 	
+	double forced_light_dir[3];
+
 	if( face_center >= 0 )	                 
 	{
 		double rcen[3];
@@ -367,6 +435,21 @@ int surface::writeTachyon( const char *name,
 		center[2] -= view[2];
 	}
 
+	bg[0] = 1.;
+	bg[1] = 1.;
+	bg[2] = 1.;
+
+	forced_light_dir[0] = -updir[0];
+	forced_light_dir[1] = -updir[1];
+	forced_light_dir[2] = -updir[2];
+
+	if( params->tachyon_curvature || params->tachyon_gauss )
+	{
+		forced_light_dir[0] = view[0];
+		forced_light_dir[1] = view[1];
+		forced_light_dir[2] = view[2];
+	}
+
 	fprintf(theFile,
 "Begin_Scene\n"
 "Resolution %d %d\n"
@@ -378,16 +461,25 @@ int surface::writeTachyon( const char *name,
 "  Zoom %lf\n"
 "  Aspectratio 1\n"
 "  Antialiasing 4\n"
-"  Raydepth 10\n"
+"  Raydepth 2\n"
 "  Center  %lf %lf %lf \n"
 "  Viewdir %lf %lf %lf \n"
 "  Updir   %lf %lf %lf \n"
 "End_Camera\n"
-"Directional_Light Direction %lf %lf %lf Color 1.0 1.0 1.0\n"
+"Directional_Light Direction %lf %lf %lf Color 0.7 0.7 0.7\n"
+"Directional_Light Direction %lf %lf %lf Color 0.7 0.7 0.7\n"
+"Directional_Light Direction %lf %lf %lf Color 0.7 0.7 0.7\n"
+"Directional_Light Direction %lf %lf %lf Color 0.2 0.2 0.2\n"
 "Directional_Light Direction 0.1 -0.1 %lf Color 1.0 1.0 1.0\n"
 "Directional_Light Direction -1 -2 %lf Color 0.2 0.2 0.2\n"
 "Background %lf %lf %lf\n",
-	resolution, resolutiony, zoom, center[0], center[1], center[2], view[0], view[1], view[2], updir[0], updir[1], updir[2], -updir[0], -updir[1], -updir[2], (do_planar ? -1.0 : 1.0), (do_planar ? -0.5 : 0.5), bg[0], bg[1], bg[2] );
+	resolution, resolutiony, zoom, center[0], center[1], center[2], view[0], view[1], view[2], 
+updir[0], updir[1], updir[2], 
+forced_light_dir[0]+updir[0]*0.3, forced_light_dir[1]+updir[1]*0.3, forced_light_dir[2]+updir[2]*0.3, 
+forced_light_dir[0], forced_light_dir[1], forced_light_dir[2], 
+forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light_dir[2]-updir[2]*0.3, 
+-updir[0], -updir[1], -updir[2], 
+(do_planar ? -1.0 : 1.0), (do_planar ? -0.5 : 0.5), bg[0], bg[1], bg[2] );
 	
 		int num = grid_uv * (grid_uv+1)/2;
 
@@ -399,6 +491,19 @@ int surface::writeTachyon( const char *name,
 			dz_min_lim = -1;
 			dz_max_lim = 1;
 		}
+	
+		if( params->tachyon_pbc_x )
+		{
+			dx_min_lim = -1;
+			dx_max_lim = 1;
+		}
+		
+		if( params->tachyon_pbc_y )
+		{
+			dy_min_lim = -1;
+			dy_max_lim = 1;
+		}
+
 
 		for( int dx = dx_min_lim; dx <= dx_max_lim; dx++ )
 		for( int dy = dy_min_lim; dy <= dy_max_lim; dy++ )
@@ -408,7 +513,8 @@ int surface::writeTachyon( const char *name,
 			{	
 				double Rvals[3*num];
 				double Nvals[3*num];
-		
+				double curve[num];		
+
 				iseq = 0;
 
 /*
@@ -491,8 +597,26 @@ int surface::writeTachyon( const char *name,
 						Rvals[iseq*3+2] = lr[2];*/
 					} 	
 					else
-			
 		                        	evaluateRNRM( f, u, v, Rvals+iseq*3, Nvals+iseq*3, use_frame );
+
+					if( params->tachyon_curvature )
+					{
+						double ctot;
+
+						double use_u = u, use_v = v;
+						if( use_u <= 1e-4 )
+							use_u = 1e-4;
+						if( use_v <= 1e-4 )
+							use_v = 1e-4;
+						if( use_u + use_v >= 1.0 )
+						{
+							double scale = fabs(use_u+use_v);
+
+							use_u *= 0.999 / scale;
+							use_v *= 0.999 / scale;
+						}
+						curve[iseq] = c( f, use_u, use_v, use_frame );
+					}
 		                }
 
 				for( int x1 = 0; x1 < ntri; x1++ )
@@ -500,9 +624,47 @@ int surface::writeTachyon( const char *name,
 				        int ir1 = tris[x1*4+0];
 				        int ir2 = tris[x1*4+1];
 				        int ir3 = tris[x1*4+2];
+
 					double nfac = 1.0;
 					if( do_planar )
 						nfac = 1;
+
+					double use_color[3] = { color[0], color[1], color[2] };
+
+					if( params->tachyon_curvature || params->tachyon_gauss )
+					{
+						double cd1[2],cd2[2],c1,c2;
+						double ctot = c( f, 1.0/3, 1.0/3, use_frame, cd1, cd2, &c1, &c2 );
+						double f_use =0;
+						if( params->tachyon_flip_sense )
+							ctot *= -1;
+
+						if( params->tachyon_gauss )
+							f_use = c1*c2 / gauss_mag;
+						else
+							f_use = ctot / curve_mag;
+						
+
+						if( f_use > 1 ) f_use = 1;
+						if( f_use < -1 ) f_use = -1;
+
+						double mix_color[3] = {0,0,0};
+
+						if( f_use > 0 )	
+						{
+							use_color[0] = mix_color[0] * (1-f_use) + f_use;
+							use_color[1] = mix_color[1] * (1-f_use);
+							use_color[2] = mix_color[2] * (1-f_use);
+						}
+						else
+						{
+							use_color[0] = mix_color[0] * (1+f_use);
+							use_color[1] = mix_color[1] * (1+f_use);
+							use_color[2] = mix_color[2] * (1+f_use) - f_use;
+						}
+					}
+	
+
 #ifdef SMOOTH_TRIANGLES
 					fprintf(theFile, "STri\n");
 #else
@@ -517,8 +679,8 @@ int surface::writeTachyon( const char *name,
 					fprintf(theFile, "N2 %lf %lf %lf\n", nfac*Nvals[ir3*3+0]*scale, nfac*Nvals[ir3*3+1]*scale, nfac*Nvals[ir3*3+2]*scale );
 #endif
 					fprintf(theFile, "Texture\n"
-							"Ambient 0 Diffuse 0.45 Specular 0.2 Opacity 1.0\n"
-							 "Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", color[0], color[1], color[2] );
+							"Ambient 0 Diffuse 0.45 Specular %lf Opacity 1.0\n"
+							 "Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", spec_mag, use_color[0], use_color[1], use_color[2] );
 				}
 			} 	
 		
@@ -528,7 +690,7 @@ int surface::writeTachyon( const char *name,
 				{
 					fprintf(theFile, "Sphere\n");
 					fprintf(theFile, "Center %lf %lf %lf\n", alpha[0]*use_frame[3*i+0]*scale +dx*Lx*scale, alpha[1]*use_frame[3*i+1]*scale +dy*Ly*scale, alpha[2]*use_frame[3*i+2]*scale + dz * Lz*scale );
-					fprintf(theFile, "Rad %lf\n", 9.0 * scale );
+					fprintf(theFile, "Rad %lf\n", mesh_overlay_radius * scale );
 					fprintf(theFile, "Texture\n"
 							"Ambient 0.1 Diffuse 0.4 Specular 0.0 Opacity 1.0\n"
 							 "Phong Metal 0.5 Phong_size 40 Color 1.0 1.0 1.0 TexFunc 0\n");
@@ -543,7 +705,7 @@ int surface::writeTachyon( const char *name,
 						fprintf(theFile, "FCylinder\n");
 						fprintf(theFile, "Base %lf %lf %lf\n",  alpha[0]*(use_frame[3*i+0]*scale +dx*Lx*scale), alpha[1]*(use_frame[3*i+1]*scale +dy*Ly*scale), alpha[2]*(use_frame[3*i+2]*scale + dz * Lz *scale) );
 						fprintf(theFile, "Apex %lf %lf %lf\n", alpha[0]*rj[0], alpha[1]*rj[1], alpha[2]*rj[2] );
-						fprintf(theFile, "Rad %lf\n", 5.0 * scale ); // six angstroms
+						fprintf(theFile, "Rad %lf\n", mesh_overlay_radius * scale/2 ); 
 						fprintf(theFile, "Texture\n"
 							"Ambient 0.1 Diffuse 0.4 Specular 0.0 Opacity 1\n"
 							 "Phong Metal 0.5 Phong_size 40 Color 0 0 1.0 TexFunc 0\n");
@@ -988,8 +1150,8 @@ void drawBarDomain( FILE *theFile, double scale, double *r, double *n, double PB
 		fprintf(theFile, "Apex %lf %lf %lf\n", end2[0]*scale+dx*Lx*scale, end2[1]*scale+dy*Ly*scale, end2[2]*scale +dz*Lz*scale);
 		fprintf(theFile, "Rad %lf\n", 6.0 * scale ); // six angstroms
 		fprintf(theFile, "Texture\n"
-				"Ambient 0 Diffuse 0.45 Specular 0.4 Opacity 1\n"
-				 "Phong Metal 0.5 Phong_size 40 Color 1 0 0 TexFunc 0\n");
+				"Ambient 0 Diffuse 0.45 Specular %lf Opacity 1\n"
+				 "Phong Metal 0.5 Phong_size 40 Color 1 0 0 TexFunc 0\n", 2*spec_mag);
 		
 		fprintf(theFile, "Ring\n");
 		fprintf(theFile, "Center %lf %lf %lf\n", end1[0]*scale+dx*Lx*scale, end1[1]*scale+dy*Ly*scale, end1[2]*scale + dz*Lz*scale );
@@ -998,16 +1160,16 @@ void drawBarDomain( FILE *theFile, double scale, double *r, double *n, double PB
 		fprintf(theFile, "Normal %lf %lf %lf\n", dr[0],dr[1],dr[2] );
 		fprintf(theFile, "Inner 0.0 Outer %lf\n", 6.0 * scale ); // six angstroms
 		fprintf(theFile, "Texture\n"
-				"Ambient 0 Diffuse 0.45 Specular 0.4 Opacity 1\n"
-				 "Phong Metal 0.5 Phong_size 40 Color 1 0 0 TexFunc 0\n");
+				"Ambient 0 Diffuse 0.45 Specular %lf Opacity 1\n"
+				 "Phong Metal 0.5 Phong_size 40 Color 1 0 0 TexFunc 0\n", 2 * spec_mag );
 		
 		fprintf(theFile, "Ring\n");
 		fprintf(theFile, "Center %lf %lf %lf\n", end2[0]*scale+dx*Lx*scale, end2[1]*scale+dy*Ly*scale, end2[2]*scale + dz*Lz*scale );
 		fprintf(theFile, "Normal %lf %lf %lf\n", dr[0],dr[1],dr[2] );
 		fprintf(theFile, "Inner 0.0 Outer %lf\n", 6.0 * scale ); // six angstroms
 		fprintf(theFile, "Texture\n"
-				"Ambient 0 Diffuse 0.45 Specular 0.4 Opacity 1\n"
-				 "Phong Metal 0.5 Phong_size 40 Color 1 0 0 TexFunc 0\n");
+				"Ambient 0 Diffuse 0.45 Specular %lf Opacity 1\n"
+				 "Phong Metal 0.5 Phong_size 40 Color 1 0 0 TexFunc 0\n", 2 * spec_mag );
 		
 	}
 
