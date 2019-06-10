@@ -118,7 +118,7 @@ int main( int argc, char **argv )
 	fclose(tpsf);
 
 	minSurface = theSurface;
-	for( int o = 0; o < 5; o++ )
+	for( int o = 0; o < 100; o++ )
 	{
 		l_bfgs_setup( 20, 3*minSurface->nv+3, r, 0, f, fdf); 
 

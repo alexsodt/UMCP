@@ -359,8 +359,13 @@ void surface::generateVolumePlan( void )
 			int ej = theVertices[i].edge_rev[e];
 			int ek = theVertices[i].edge_rev[ep1];
 
+
 			if( val == 6 && ( valj != 6 || valk != 6 ) )
 			{
+			printf("%d valence %d, %d valence %d, %d valence %d.\n",
+				i, theVertices[i].valence,
+				j, theVertices[j].valence,
+				k, theVertices[k].valence );
 				printf("Illegal mesh: must be subdivided once isolating low index on irregular mesh.\n");
 				exit(1);
 			}
@@ -1353,6 +1358,8 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 	getLine( theFile, buffer );
 
 	printf("Read %d lattice points.\n", nv);
+	
+	writeVertexXYZandPSFPeriodic( "check" );
 
 	assignEdgePBC();
 
@@ -2633,11 +2640,14 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 		
 			double cp[3];
 			cross( dr2, dr1, cp );
-			double dp = cp[0] * r1[0] + cp[1] * r1[1] + cp[2] * r1[2];
 		
+			normalize(r1);
+			normalize(cp);
+
+			double dp = cp[0] * r1[0] + cp[1] * r1[1] + cp[2] * r1[2];
+
 	
-	
-			if( dp > 0 )
+			if( dp > 0 && dp > 0.7)
 			{
 				printf("FLIPPING\n");
 				flipOrientation();
@@ -5371,8 +5381,14 @@ void surface::generatePlan( void )
 			int ej = theVertices[i].edge_rev[e];
 			int ek = theVertices[i].edge_rev[ep1];
 
+
 			if( val == 6 && ( valj != 6 || valk != 6 ) )
 			{
+
+			printf("%d valence %d, %d valence %d, %d valence %d.\n",
+				i, theVertices[i].valence,
+				j, theVertices[j].valence,
+				k, theVertices[k].valence );
 				printf("Illegal mesh: must be subdivided once isolating low index on irregular mesh.\n");
 				exit(1);
 			}
@@ -8698,9 +8714,15 @@ void surface::constructIrregularKernels( void )
 				
 				int ej = theVertices[i].edge_rev[e];
 				int ek = theVertices[i].edge_rev[ep1];
+			
 	
 				if( val == 6 && ( valj != 6 || valk != 6 ) )
 				{
+				printf("%d valence %d, %d valence %d, %d valence %d.\n",
+				i, theVertices[i].valence,
+				j, theVertices[j].valence,
+				k, theVertices[k].valence );
+
 					printf("Illegal mesh: must be subdivided once isolating low index on irregular mesh.\n");
 					exit(1);
 				}
