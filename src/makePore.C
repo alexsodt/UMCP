@@ -897,7 +897,8 @@ void getPlanarMesh( double **rvals, int **edges, int **nedges, int *nv, double L
 	*nv = npt;	
 	printf("npt: %d\n", npt );
 } 
-	
+
+/*	
 void getCylinderMesh( double **rvals, int **edges, int **nedges, int *nv, int grain, double R, double LC)
 { 
 
@@ -1104,11 +1105,6 @@ void getCylinderMesh( double **rvals, int **edges, int **nedges, int *nv, int gr
 			pt_map[i] = npts_use;
 			npts_use++;
 		}
-/*		else
-		{
-			printf("Shouldn't happen now that we are reading points.\n");
-			exit(1);
-		}*/
 
 	}
 	
@@ -1184,35 +1180,7 @@ void getCylinderMesh( double **rvals, int **edges, int **nedges, int *nv, int gr
 	free(new_bonds);
 	free(n_new_bonds);
 	free(tri);
-/*
-	char fileName[256];
-	
-	sprintf(fileName,"cylindrical.mesh");
-
-	FILE *theLattice = fopen(fileName,"w");
-
-	fprintf(theLattice, "3d R = %lf\n", R );
-	fprintf(theLattice, "%lf 0.0 0.0\n", 4 * R );
-	fprintf(theLattice, "0.0 %lf 0.0\n", 4 * R );
-	fprintf(theLattice, "0.0 0.0 %lf\n", PeriodicLengthB );
-
-	int p = 0;
-	for( ; p < npoints; p++ )
-	{
-		if( pt_map[p] < 0 )
-			continue;
-
-		fprintf(theLattice, "%d %lf %lf %lf %d", pt_map[p], r[3*p+0], r[3*p+1], r[3*p+2] , n_new_bonds[p] );
-
-		for( int b = 0; b < n_new_bonds[p]; b++ )
-			fprintf(theLattice, " %d", pt_map[new_bonds[max_bonds*p+b]] );
-
-		fprintf(theLattice, "\n"); 
-	}
-
-	fprintf(theLattice, "ntri %d\n", ntri );
-*/
-}
+}*/
 	
 void getPath( int start, int *path, int *pl_out, int *ne_arr, int *e_arr, int *interior_tag, int nr  )
 {

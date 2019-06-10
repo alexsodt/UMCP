@@ -1288,3 +1288,55 @@ void surface::writeStructure( FILE *theFile )
 	}
 }
 
+
+void surface::writeVertexXYZandPSFPeriodic( const char *baseName )
+{
+	char fileName[256];
+
+	sprintf(fileName, "%s.psf", baseName );
+	FILE *thePSF = fopen(fileName, "w");
+	sprintf(fileName, "%s.xyz", baseName );
+	FILE *theXYZ = fopen(fileName, "w");
+
+	double totv = 0;
+	for( int x = 0; x < nv; x++ )
+		totv += theVertices[x].valence;
+	totv /= 2;
+
+	int *all_bonds = (int *)malloc( sizeof(int) * totv *3 );
+
+	int b = 0;
+
+	int nvSpace = nv;
+	double *coord_space = (double *)malloc( sizeof(double) * nvSpace * 3 );
+	int nv_write = nv;
+
+	for( int i = 0; i < nv; i++ )
+	{
+		coord_space[3*i+0] = theVertices[i].r[0];
+		coord_space[3*i+1] = theVertices[i].r[1];
+		coord_space[3*i+2] = theVertices[i].r[2];
+		
+		for( int e = 0; e < theVertices[i].valence; e++ )
+		{
+			int j = theVertices[i].edges[e];
+	//		if( j < i ) continue;
+			if( i < j ) continue;
+			all_bonds[2*b+0] = i;
+			all_bonds[2*b+1] = j;
+			b++;
+		}
+	} 
+
+	writePSF( thePSF, nv_write, NULL, all_bonds, b );
+
+	fprintf(theXYZ, "%d\n", nv_write );
+	fprintf(theXYZ, "PSF and XYZ, periodic\n");
+	for( int i = 0; i < nv_write; i++ )
+		fprintf(theXYZ, "C %lf %lf %lf\n", coord_space[3*i+0], coord_space[3*i+1], coord_space[3*i+2] );
+	fclose(theXYZ);
+	fclose(thePSF);
+
+	free(all_bonds);
+	free(coord_space);
+}

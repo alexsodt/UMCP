@@ -3,7 +3,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 EMAIL = alexander.sodt@nih.gov
 
 
-bin_PROGRAMS = hd.dbg makeHexSquare.dbg min.dbg subdivide.dbg scale.dbg icosahedron.dbg makeBud.dbg makeBump.dbg makeHexCylinder.dbg writeBiasPotential.dbg writeCylRTraj.dbg rd.dbg makePore.dbg
+bin_PROGRAMS = hd.dbg makeHexSquare.dbg min.dbg subdivide.dbg scale.dbg icosahedron.dbg makeBud.dbg makeBump.dbg makeHexCylinder.dbg writeBiasPotential.dbg writeCylRTraj.dbg rd.dbg makePore.dbg join.dbg
 
 AM_CPPFLAGS = -include ../config.h -include ../src/local_config.h $(AM_INCLUDE) 
 AM_CFLAGS = -g
@@ -30,8 +30,9 @@ min_dbg_SOURCES       = min.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
 subdivide_dbg_SOURCES = subdivide.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
 scale_dbg_SOURCES	  = scale.C  $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
 icosahedron_dbg_SOURCES = icosahedron.C $(util_SRCS)
+join_dbg_SOURCES	= join.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(hull_SRCS) getCylinderMesh.C
 makeBud_dbg_SOURCES   = makeBud.C $(hull_SRCS) $(util_SRCS)
-makePore_dbg_SOURCES   = makePore.C $(hull_SRCS) $(util_SRCS)
+makePore_dbg_SOURCES   = makePore.C $(hull_SRCS) $(util_SRCS) getCylinderMesh.C
 makeBump_dbg_SOURCES  = makeBump.C $(hull_SRCS) $(util_SRCS)
 makeHexCylinder_dbg_SOURCES = makeHexCylinder.C $(hull_SRCS) $(util_SRCS)
 makeHexSquare_dbg_SOURCES = makeHexSquare.C $(hull_SRCS) $(util_SRCS)
@@ -41,6 +42,7 @@ writeCylRTraj_dbg_SOURCES      = writeCylRTraj.C $(util_SRCS)
 
 rd_dbg_LDADD		  = $(AM_LDADD) -lstdc++ 
 hd_dbg_LDADD              = $(AM_LDADD) -lstdc++
+join_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) -lstdc++
 min_dbg_LDADD             = $(AM_LDADD) -lstdc++
 subdivide_dbg_LDADD       = $(AM_LDADD) -lstdc++
 scale_dbg_LDADD           = $(AM_LDADD) -lstdc++
