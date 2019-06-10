@@ -407,6 +407,7 @@ struct surface
 	void spatialConstraintGrad( double *r, double *g );
 	double spatialConstraintEnergy( double * r);	
 	void writeXYZandPSFPeriodic( const char *baseName );
+	void writeVertexXYZandPSFPeriodic( const char *baseName );
 	void getReport( double *r, double cmin, double cmax, int nbins, double *J_hist, double *K_hist, double *jtot, double *ktot);
 	void nearPt( double *p, double *lcoords, double cut, double alpha_x, double alpha_y, double alpha_z, int *bf, int *bp );
 	void storeDipoleOP( double *r, int f, int p, double *dr );
