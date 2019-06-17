@@ -23,6 +23,7 @@ class parameterBlock
 
 	char *loadName;
 	char *meshName;
+	char *meshName2;
 	char *jobName;
 	char *qvals;
 	char *lipid_lib;
@@ -80,6 +81,8 @@ class parameterBlock
 	double tachyon_view_x;
 	double tachyon_view_y;
 	double tachyon_view_z;
+	
+	int tachyon_clear;
 	int tachyon_flip_sense;
 	int tachyon_overlay_mesh;
 	int tachyon_interp;

@@ -16,7 +16,7 @@ static double MINZ = -75;
 static double MAXZ =  75;
 double Ap = 1.0; // square angstroms
 
-void surface::processSANS( parameterBlock *block, double **qvals, int *nq )
+void initSANS( parameterBlock *block, double **qvals, int *nq )
 {
 	if( block->s_q )
 	{
@@ -98,6 +98,8 @@ void surface::sample_B_hist( double *rmesh, double *B_hist, double *A2dz2_sample
 
 	double local_A2dz2_sampled = 0;
 
+	int draw_z = 20;
+
 	if( sample_type == SANS_SAMPLE_NRM )
 	{	
 		// this is sampling of the full scattering signal using a laterally averaged spline of beta(z)
@@ -149,7 +151,7 @@ void surface::sample_B_hist( double *rmesh, double *B_hist, double *A2dz2_sample
 				c1 = c(f1,u1,v1,rmesh);
                         	c2 = c(f2,u2,v2,rmesh);			
 			}
-			for( int nz = 0; nz < 20; nz++ )
+			for( int nz = 0; nz < draw_z; nz++ )
 			{
 				double z1 = MINZ + (MAXZ-MINZ) * rand() / (double)RAND_MAX;
 				double z2 = MINZ + (MAXZ-MINZ) * rand() / (double)RAND_MAX;
@@ -164,7 +166,7 @@ void surface::sample_B_hist( double *rmesh, double *B_hist, double *A2dz2_sample
 					else
 						alpha1 = exp( -(z1+PP)*c1);
 
-					if( z1 > 0 )
+					if( z2 > 0 )
 						alpha2 = exp( -(z2-PP)*c2);
 					else
 						alpha2 = exp( -(z2+PP)*c2);

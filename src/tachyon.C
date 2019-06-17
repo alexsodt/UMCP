@@ -10,7 +10,7 @@
 #include "pcomplex.h"
 #include "mutil.h"
 #include "input.h"
-
+#include "lapack_we_use.h"
 #define SMOOTH_TRIANGLES
 // routine to write the current structure to a tachyon input file, including the option to linearly interpolate frames for smoothing.
 
@@ -22,7 +22,7 @@ static int has_pbc = -1;
 static int do_cyl = 0;
 // Tachyon parameters
 static int resolution = 1024;
-static double color[3] = { 0.8, 0.8, 0.8 };
+static double color[3] = { 0.3, 0.3, 0.3 };
 static double fixed_updir[3] = {0,0,1};
 static double fixed_center[3] = {0,0,0};
 static double fixed_view[3] = {0,0,1};
@@ -42,7 +42,10 @@ int surface::writeTachyon( const char *name,
 	double cur_area;
 	double area0;
 	double spec_mag = 0.2;
+	double surface_opacity = 1.0;
 	
+	if(  params->tachyon_clear ) surface_opacity=0.7;
+
 	double curve_mag = 0.03;
 	double gauss_mag = 0.03;
 	if( params->tachyon_curvature || params->tachyon_gauss )
@@ -349,7 +352,58 @@ int surface::writeTachyon( const char *name,
 			
 		
 	}
-	
+	else
+	{
+		double I[9];
+		memset( I, 0, sizeof(double) * 9 );
+
+		double com[3] = {0,0,0};
+
+		for( int x = 0; x < nv; x++ )
+		{
+			com[0] += r[3*x+0];
+			com[1] += r[3*x+1];
+			com[2] += r[3*x+2];
+		}	
+
+		com[0] /= nv;
+		com[1] /= nv;
+		com[2] /= nv;
+		for( int x = 0; x < nv; x++ )
+		{
+			for( int c1 = 0; c1 < 3; c1++ )
+			for( int c2 = 0; c2 < 3; c2++ )
+				I[c1*3+c2] += ( r[3*x+c1] - com[c1]) * (r[3*x+c2] - com[c2]);
+		}
+
+
+		char uplo = 'U';
+		char jobz = 'V';
+		double ev[3];
+		double work[18];
+		int lwork = 18;
+		int info;
+		int ndim=3;
+
+		dsyev_(&jobz, &uplo, &ndim, I, &ndim, ev, work, &lwork, &info );	
+
+		updir[0] = I[0*3+2];
+		updir[1] = I[1*3+2];
+		updir[2] = I[2*3+2];
+
+		normalize(updir);
+
+		view[0] = I[0*3+1];
+		view[1] = I[1*3+1];
+		view[2] = I[2*3+1];
+		
+		normalize(view);
+
+		center[0] = com[0] - 2*view[0];
+		center[1] = com[1] - 2*view[1];
+		center[2] = com[2] - 2*view[2];
+
+	}	
 	
 	double forced_light_dir[3];
 
@@ -380,6 +434,7 @@ int surface::writeTachyon( const char *name,
 			cross(  xydir, ncen, t2 );
 			cross(  ncen, t2, t1 );
 
+
 			view[0] = t2[0];
 			view[1] = t2[1];
 			view[2] = t2[2];
@@ -391,12 +446,13 @@ int surface::writeTachyon( const char *name,
 			rotateArbitrary( view, ncen, origin, 1, M_PI/4 );   
 			// still side on
 
-/*	
+	
 			double angle = 85;
-			view[0] = cos(angle*M_PI/180.0) * view90[0] + sin(angle*M_PI/180.0) * ncen[0]; 
-			view[1] = cos(angle*M_PI/180.0) * view90[1] + sin(angle*M_PI/180.0) * ncen[1]; 
-			view[2] = cos(angle*M_PI/180.0) * view90[2] + sin(angle*M_PI/180.0) * ncen[2]; 
-*/	
+
+//			view[0] = cos(angle*M_PI/180.0) * view90[0] + sin(angle*M_PI/180.0) * ncen[0]; 
+//			view[1] = cos(angle*M_PI/180.0) * view90[1] + sin(angle*M_PI/180.0) * ncen[1]; 
+//			view[2] = cos(angle*M_PI/180.0) * view90[2] + sin(angle*M_PI/180.0) * ncen[2]; 
+
 			normalize(view);
 			normalize(updir);
 			
@@ -466,9 +522,9 @@ int surface::writeTachyon( const char *name,
 "  Viewdir %lf %lf %lf \n"
 "  Updir   %lf %lf %lf \n"
 "End_Camera\n"
-"Directional_Light Direction %lf %lf %lf Color 0.7 0.7 0.7\n"
-"Directional_Light Direction %lf %lf %lf Color 0.7 0.7 0.7\n"
-"Directional_Light Direction %lf %lf %lf Color 0.7 0.7 0.7\n"
+"Directional_Light Direction %lf %lf %lf Color 0.4 0.4 0.4\n"
+"Directional_Light Direction %lf %lf %lf Color 0.4 0.4 0.4\n"
+"Directional_Light Direction %lf %lf %lf Color 0.4 0.4 0.4\n"
 "Directional_Light Direction %lf %lf %lf Color 0.2 0.2 0.2\n"
 "Directional_Light Direction 0.1 -0.1 %lf Color 1.0 1.0 1.0\n"
 "Directional_Light Direction -1 -2 %lf Color 0.2 0.2 0.2\n"
@@ -679,8 +735,8 @@ forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light
 					fprintf(theFile, "N2 %lf %lf %lf\n", nfac*Nvals[ir3*3+0]*scale, nfac*Nvals[ir3*3+1]*scale, nfac*Nvals[ir3*3+2]*scale );
 #endif
 					fprintf(theFile, "Texture\n"
-							"Ambient 0 Diffuse 0.45 Specular %lf Opacity 1.0\n"
-							 "Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", spec_mag, use_color[0], use_color[1], use_color[2] );
+							"Ambient 0 Diffuse 0.45 Specular %lf Opacity %lf\n"
+							 "Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", spec_mag, surface_opacity, use_color[0], use_color[1], use_color[2] );
 				}
 			} 	
 		
@@ -759,8 +815,8 @@ forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light
 //						while( pbc_w[1] < 0 ) pbc_w[1] += Ly;						
 //						while( pbc_w[1] >  Ly ) pbc_w[1] -= Ly;						
 						
-						while( pbc_w[2] < 0 ) pbc_w[2] += Lz;						
-						while( pbc_w[2] >  Lz ) pbc_w[2] -= Lz;						
+//						while( pbc_w[2] < 0 ) pbc_w[2] += Lz;						
+//						while( pbc_w[2] >  Lz ) pbc_w[2] -= Lz;						
 
 						use_p[3*p+0] = pbc_w[0];
 						use_p[3*p+1] = pbc_w[1];

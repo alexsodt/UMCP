@@ -1727,3 +1727,9 @@ void uncacheDCDHeader( FILE *theFile1 )
 {
 	fwrite( cached_header, 1, cached_pt, theFile1 );
 }
+
+/*
+int fetchPSFCycles( cycle **outCycles )
+{
+
+} */

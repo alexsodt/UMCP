@@ -14,6 +14,7 @@
 #include "random_global.h"
 #include "fpr_subroutines/fpr.h"
 #include "fpr_subroutines/Faddeeva.hh"
+#include "pcomplex.h"
 
 double r_fudge = 5.0;
 double reflecting_surface = 0;
@@ -1619,6 +1620,16 @@ int main( int argc, const char **argv )
 
 							int is_bad = aqueous_r[3*p+2] < reflecting_surface && do_planar;
 
+#ifdef DEBUG_PARTICLE_ESCAPE
+							if( p == 4 )
+							{
+								printf("Debug on this p: %d dist: %lf r_last %lf %lf %lf r %lf %lf %lf.\n",
+									p, distance[p], 
+								aqueous_r_last[3*p+0], aqueous_r_last[3*p+1], aqueous_r_last[3*p+2],
+								aqueous_r[3*p+0], aqueous_r[3*p+1], aqueous_r[3*p+2]
+								 );
+							}
+#endif
 							if( r_move > distance[p] - r_fudge - reflecting_surface )
 							{
 								int f;
@@ -1631,6 +1642,41 @@ int main( int argc, const char **argv )
 								{
 									if( reflecting_surface > 0 )
 									{
+										int af;
+										double au,av;
+										double dist;
+										sub_surface->nearPointOnBoxedSurface(aqueous_r+3*p, &af,&au,&av, M, mlow, mhigh, &dist, -1, 0 );
+										double rpt[3], rnrm[3];
+										sub_surface->evaluateRNRM( af, au, av, rpt, rnrm, r);
+													
+										// closest point of reflecting particle. which side are we on?	
+										double dr[3] = { aqueous_r[3*p+0] - rpt[0],
+												 aqueous_r[3*p+1] - rpt[1],
+												 aqueous_r[3*p+2] - rpt[2] };
+										double dp = (dr[0] * rnrm[0] + dr[1] * rnrm[1] + dr[2] * rnrm[2])*nrm_sign_factor;
+
+										double len;
+										if( dp > 0 ) // we are on the other side of the real surface
+										{
+											len = normalize(dr) + reflecting_surface;
+											aqueous_r[3*p+0] -= 2*dr[0] * len;
+											aqueous_r[3*p+1] -= 2*dr[1] * len;
+											aqueous_r[3*p+2] -= 2*dr[2] * len;
+											distance[p] = len;
+										}
+										else
+										{
+											// we are between the reflecting surface and the real surface.
+											len = reflecting_surface - normalize(dr);
+											
+											aqueous_r[3*p+0] += 2*dr[0] * len;
+											aqueous_r[3*p+1] += 2*dr[1] * len;
+											aqueous_r[3*p+2] += 2*dr[2] * len;
+	
+											// we moved "len" off the reflecting surface. we are an additional "reflecting surface" from the real one
+											distance[p] = len + reflecting_surface;
+										}
+#if 0
 										int af;
 										double au,av;
 										double dist;
@@ -1664,6 +1710,7 @@ int main( int argc, const char **argv )
 										aqueous_r[3*p+0] -= 2 * rnrm[0] * pr;
 										aqueous_r[3*p+1] -= 2 * rnrm[1] * pr;
 										aqueous_r[3*p+2] -= 2 * rnrm[2] * pr;
+#endif
 									}
 									else
 									{
@@ -2195,7 +2242,35 @@ int main( int argc, const char **argv )
 					run_done = 1;
 			}
 		
+			if( block.tachyon)
+			{
+				pcomplex **temp_complexes = (pcomplex **)malloc( sizeof(pcomplex *) * aqueous_np );	
+				for( int i = 0; i < aqueous_np; i++ )
+				{
+					temp_complexes[i] = loadComplex( "simpleLipid" );
+					temp_complexes[i]->loadParams(&block);
+					if( (aqueous_status[i] & STATE_MASK) == STATE_IN_COMPLEX )
+					{
+						int p;
+						if( block.mean_field ) 
+							p = i;	
 
+						for( tracked_pair *apair = tracked_pairs; apair; apair = apair->next )
+						{
+							if( apair->aqueous_id == i && apair->state == STATE_IN_COMPLEX )
+								p = apair->surface_id;
+						}
+						temp_complexes[i]->init(sub_surface, r, pfaces[p], puv[2*p+0], puv[2*p+1] );
+					}
+					else
+						temp_complexes[i]->init(aqueous_r+3*i);
+					temp_complexes[i]->refresh(sub_surface,r);
+					temp_complexes[i]->sigma[0] = binding_radius*4;
+				}
+				
+				sub_surface->writeTachyon( block.jobName, block.tachyon_res, block.tachyon_interp, 
+					r, temp_complexes, aqueous_np, &block, NULL, block.tachyon_tri_center ); 
+			}
 	
 	//		printf("membrane fudge: %le\n", membrane_fudge / nmembrane_fudge );
 		}
