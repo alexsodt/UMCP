@@ -333,8 +333,9 @@ void surface::createAllAtom( parameterBlock *block )
 	area(rsurf,-1, &cur_area,&area0);
 
 	// Expected TOTAL neutral surface area.		
-	// A0*(1 + K * PP * PP ) 
+	// A0*(1 + J * PP + K * PP * PP ) 
 	
+	double JZ =0;
 	double KZ =0;
 	double Z = 0;
 	for( int f = 0; f < nt; f++ )
@@ -347,14 +348,18 @@ void surface::createAllAtom( parameterBlock *block )
 		double c1=0,c2=0;
 		double ctot = c(f,u_cen,v_cen,rsurf,cvec1,cvec2,&c1,&c2);
 		
+		JZ += (c1+c2)*gv;
 		KZ += c1*c2 * gv;
 	        Z  += gv;
 	}
 
+	JZ /= Z;
 	KZ /= Z;
 
-	double area_target = area0 * (1 + KZ * PP * PP );
-	printf("Area-midplane: %le Area_NS/PP: %le\n", area0, area_target );
+	double area_target_outside = area0 * (1 + JZ * PP + KZ * PP * PP );
+	double area_target_inside  = area0 * (1 - JZ * PP + KZ * PP * PP );
+	printf("Area-midplane: %le Area_NS/PP_outside: %le\n", area0, area_target_outside );
+	printf("Area-midplane: %le Area_NS/PP_inside:  %le\n", area0, area_target_inside  );
 
 	// target one fourth of the area?
 	int nregions = 3*area0 / (Lx*Ly/4);
@@ -414,19 +419,25 @@ void surface::createAllAtom( parameterBlock *block )
 	crd_psf_pair *pairs = (crd_psf_pair *)malloc( sizeof(crd_psf_pair) * npair_space );
 
 
-	double area_fraction = 1.0;
+	double area_fraction_outside = 1.0;
+	double area_fraction_inside = 1.0;
 
 	int seed = rand();
 	for( int pass = 0; pass < 2; pass++ )
 	{
 		srand(seed); // generate the same random numbers.
 
-		double alpha = 1;
+		double alpha_outside = 1;
+		double alpha_inside  = 1;
 
 		if( pass == 1 )
-			alpha = sqrt(area_fraction);
-
+		{
+			alpha_outside = sqrt(area_fraction_outside);
+			alpha_inside = sqrt(area_fraction_inside);
+		}
 		int nlipids_placed = 0;
+		int nlipids_placed_outside = 0;
+		int nlipids_placed_inside = 0;
 		for( int r = 0; r < nregions; r++ )
 		{
 			int N = 0;
@@ -499,6 +510,9 @@ void surface::createAllAtom( parameterBlock *block )
 			{
 				// pick a lipid on the upper leaflet to put in the center of the face.
 			
+				double alpha = alpha_outside;
+				if( x_leaflet == 1 )
+					alpha = alpha_inside;
 				int l_cen = rand() % nlipids;
 	
 				while( leaflet[l_cen] != (x_leaflet ? 1 : -1 ) )
@@ -560,6 +574,11 @@ void surface::createAllAtom( parameterBlock *block )
 					if( regions_for_face[fout] == r )
 					{
 						nlipids_placed += 1;
+						if( x_leaflet == 0 )
+							nlipids_placed_outside += 1;
+						else
+							nlipids_placed_inside += 1;
+	
 						if( pass == 0 ) continue;	
 
 						int base_res = cur_res; 
@@ -797,11 +816,13 @@ void surface::createAllAtom( parameterBlock *block )
 			}
 		}
 		
-		double likely_area_covered = nlipids_placed * Lx * Ly / nlipids;
+		double likely_area_covered_outside = nlipids_placed_outside * Lx * Ly / (nlipids/2);
+		double likely_area_covered_inside = nlipids_placed_inside  * Lx * Ly / (nlipids/2);
 
-		area_fraction = likely_area_covered / area_target;
+		area_fraction_outside = likely_area_covered_outside / area_target_outside;
+		area_fraction_inside = likely_area_covered_inside / area_target_inside;
 
-		printf("PASS %d area percentage: %lf%%.\n", pass, area_fraction );
+		printf("PASS %d area percentage: %lf%% outside %lf%% inside.\n", pass, area_fraction_outside, area_fraction_inside );
 	}
 
 

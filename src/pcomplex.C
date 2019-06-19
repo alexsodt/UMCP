@@ -944,6 +944,13 @@ void pcomplex::compute_qdot( surface *theSurface, double *rsurf, double *mesh_qd
 
 void pcomplex::propagate_surface_q( surface *theSurface, double *rsurf, double dt )
 {
+	static double av_dstep = 0;
+	static double av_dstep2 = 0;
+	static double n_dstep = 0;
+
+	static double av_root_g = 0;
+	static double av_root_g2 = 0;
+	static double n_av_root_g = 0;
 	// move a step.
 
 	for( int s = 0; s < nattach; s++ )
@@ -966,6 +973,23 @@ void pcomplex::propagate_surface_q( surface *theSurface, double *rsurf, double d
 			// gval is the sqrt metric
 			double root_g = theSurface->metric( fs[s], puv[2*s+0], puv[2*s+1], rsurf, gmat, &g_u, &g_v );
 
+#ifdef TRACK_UNUSUAL
+			if( n_av_root_g > 10 )
+			{
+				double var = av_root_g2/n_av_root_g - pow(av_root_g/n_av_root_g,2);
+				double stdd = sqrt(var);
+
+				if( fabs( (root_g - av_root_g/n_av_root_g)/stdd ) > 3 )
+				{
+					printf("Unusual root g %le av %le stdd %le\n",
+						root_g, av_root_g/n_av_root_g, stdd );
+				}
+			}
+
+			av_root_g2 += root_g*root_g;
+			av_root_g += root_g;
+			n_av_root_g += 1;
+#endif
 			double val = sqrt(gmat[0]*gmat[0]+4*gmat[1]*gmat[1]-2*gmat[0]*gmat[3]+gmat[3]*gmat[3]);
 
 			double gamma_neg_half[4] = { 
@@ -979,18 +1003,40 @@ void pcomplex::propagate_surface_q( surface *theSurface, double *rsurf, double d
 				gmat[0]/(root_g*root_g), -gmat[1]/(root_g*root_g), -gmat[1]/(root_g*root_g), gmat[3]/(root_g*root_g)
 			};
 
-	
+			// g_u + means metric increases in u direction, move particle there.
 			double pre_drift[2] = { 
-					save_grad[0]/kT + (-g_u/(2*root_g*root_g)), // 1/g done with sqrt
-					save_grad[1]/kT + (-g_v/(2*root_g*root_g))
+					save_grad[2*s+0]/kT + (-g_u/(2*root_g*root_g)), // 1/g done with sqrt
+					save_grad[2*s+1]/kT + (-g_v/(2*root_g*root_g))
 						};
 
 
 			double corr_noise[2] = { gamma_neg_half[0] * noise[0] + gamma_neg_half[1] * noise[1],
 						 gamma_neg_half[2] * noise[0] + gamma_neg_half[3] * noise[1] }; 
 
-			duv[0] = (gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[0];
-			duv[1] = (gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[1];	
+#ifdef TRACK_UNUSUAL
+			double dstep[2] = { (gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt,
+					  (gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt };
+			
+			double dstep_mag = sqrt(dstep[0]*dstep[0]+dstep[1]*dstep[1]);
+			
+			av_dstep += dstep_mag;
+			av_dstep2 += dstep_mag*dstep_mag;
+			n_dstep += 1;
+
+			double av = av_dstep/n_dstep;
+			double av2 = av_dstep2/n_dstep;
+			double var = av2-av*av;
+			double stdd = sqrt(var);
+			double del = (dstep_mag-av)/stdd;
+
+			if( del > 3 )
+			{
+				printf("unusual step %le av %le std %le grad: %le %le gg: %le %le\n", dstep_mag, av, stdd, save_grad[2*s+0]/kT, save_grad[2*s+1]/kT, -g_u/(2*root_g*root_g), -g_v/(2*root_g*root_g)  );
+			}
+#endif
+			// negative sign means move in the direction of force not grad.
+			duv[0] = -(gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[0];
+			duv[1] = -(gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[1];	
 		}
 		else
 		{
