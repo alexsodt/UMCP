@@ -1,4 +1,4 @@
-time_step 3e-13
+time_step 3e-12
 add NBAR nbound 1 outside
 load min.save
 planar_topology yes
@@ -11,7 +11,8 @@ o_lim 100
 nsteps 3000
 seed 2
 movie		yes	
-gamma_langevin 10000
+gamma_langevin 100
+do_bd_particles	yes
 KA		0.2
 lipid	inner	DOPS	46
 lipid	inner	DOPE	30
@@ -19,4 +20,3 @@ lipid	inner	DOPC	24
 lipid	outer	DOPS	46
 lipid	outer	DOPE	30
 lipid	outer	DOPC	24
-lipid_mc_period	100
