@@ -1141,7 +1141,7 @@ int temp_main( int argc, char **argv )
 			}
 			
 			// has special routines for handling elastic collisions.
-			propagateSolutionParticles( sub_surface, r, allComplexes, ncomplex, time_step * AKMA_TIME );
+			propagateSolutionParticles( sub_surface, r, allComplexes, ncomplex, time_step);
 
 			gettimeofday(&tnow, NULL);
 			double complex_time_stop = tnow.tv_sec + (1e-6) * tnow.tv_usec;
@@ -1395,11 +1395,14 @@ int temp_main( int argc, char **argv )
 			T += srd_T;
 			dof += srd_dof;
 			for( int c = 0; c < ncomplex; c++ )
+			{
 #ifdef DISABLE_ON_MEMBRANE_T
 				dof += 3 * (allComplexes[c]->nsites - allComplexes[c]->nattach);
 #else
-				dof += 3 * allComplexes[c]->nsites - allComplexes[c]->nattach;
+				if( ! allComplexes[c]->do_bd ) 
+					dof += 3 * allComplexes[c]->nsites - allComplexes[c]->nattach;
 #endif
+			}
 			double TEMP = 2 * T / dof;
 
 			// in kcal/mol
