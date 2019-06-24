@@ -31,6 +31,8 @@ void elasticCrowder::init( surface *theSurface, double *rsurf, int f, double u, 
 	mass[0] = crowder_mass;
 	mass[1] = crowder_mass;
 
+	DC[0] = 1e9;
+	DC[1] = 1e10;
 	
 	grad_puv[0] = puv[0] = u;
 	grad_puv[1] = puv[1] = v;

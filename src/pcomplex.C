@@ -15,6 +15,7 @@
 extern double kc;
 static double default_particle_area = 65;
 static double lipid_DC = 1e9; //Angstrom^2/s
+static double solution_DC = 1e10; //Angstrom^2/s
 
 // For doing Newtonian/Langevin dynamics:
 static double default_mass = 20000;
@@ -2356,6 +2357,8 @@ void pcomplex::unpackF( double *io )
 
 void propagateSolutionParticles( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex, double dt )
 {
+	dt *= AKMA_TIME;
+
 	static double ncol = 0;
 	static int icntr=0;
 	double *alphas = rsurf + 3*theSurface->nv;
@@ -2364,10 +2367,18 @@ void propagateSolutionParticles( surface *theSurface, double *rsurf, pcomplex **
 	// propagate them all forward, then backtrack as we see fit.
 	double propagated = dt;
 
-	
-	
 	for( int c = 0; c < ncomplex; c++ )
 	{
+		if( allComplexes[c]->do_bd )
+		{
+			for( int s = allComplexes[c]->nattach; s < allComplexes[c]->nsites; s++ )
+			{
+				allComplexes[c]->qdot[3*s+0] = (-allComplexes[c]->save_grad[3*s+0] * allComplexes[c]->DC[s] + sqrt(2 * allComplexes[c]->DC[s]/dt ) * gsl_ran_gaussian(r_gen_global, 1 )) / AKMA_TIME;
+				allComplexes[c]->qdot[3*s+1] = (-allComplexes[c]->save_grad[3*s+1] * allComplexes[c]->DC[s] + sqrt(2 * allComplexes[c]->DC[s]/dt ) * gsl_ran_gaussian(r_gen_global, 1 )) / AKMA_TIME;
+				allComplexes[c]->qdot[3*s+2] = (-allComplexes[c]->save_grad[3*s+2] * allComplexes[c]->DC[s] + sqrt(2 * allComplexes[c]->DC[s]/dt ) * gsl_ran_gaussian(r_gen_global, 1 )) / AKMA_TIME;
+			}
+		}
+	
 		for( int s = allComplexes[c]->nattach; s < allComplexes[c]->nsites; s++ )
 		{
 			allComplexes[c]->rall[3*s+0] += allComplexes[c]->qdot[3*s+0] * dt;
