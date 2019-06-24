@@ -30,7 +30,7 @@
 
 //#define MONTE_CARLO_HACK
 
-//#define SAVE_RESTARTS
+#define SAVE_RESTARTS
 #define NUM_SAVE_BUFFERS 50
 //#define DEBUG_MOMENTUM_CHANGE
 #define NO_DIFF_R
