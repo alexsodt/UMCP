@@ -1330,6 +1330,7 @@ int temp_main( int argc, char **argv )
 					}	
 				}
 			}
+			
 			memcpy( pp, next_pp, sizeof(double) * NQ );
 			memset( qdot0, 0, sizeof(double) * 3 * nv );
 
@@ -1385,7 +1386,7 @@ int temp_main( int argc, char **argv )
 #endif
 			double dof = NQ;
 			if( !do_gen_q )
-				dof = 3*nv-3;
+				dof = 3*nv;
 			double mem_T = 2*T / dof;
 			
 			T += PT;

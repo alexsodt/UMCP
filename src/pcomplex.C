@@ -2459,7 +2459,11 @@ void propagateSolutionParticles( surface *theSurface, double *rsurf, pcomplex **
 					pos1_at_c[0] - pos2_at_c[0],
 					pos1_at_c[1] - pos2_at_c[1],
 					pos1_at_c[2] - pos2_at_c[2] };
-			theSurface->wrapPBC( dr_at_c, alphas );
+
+			double len = length3(dr_at_c);
+			if( len > 1.1 * (allComplexes[c1]->sigma[p1] + allComplexes[c2]->sigma[p2]) )
+				theSurface->wrapPBC( dr_at_c, alphas );
+
 			normalize(dr_at_c);
 			// solve for dKE
 		
