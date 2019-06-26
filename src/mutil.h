@@ -3,6 +3,7 @@
 double dot( double *a, double *b );
 double cross( double *dr1, double *dr2, double *cp );
 double normalize( double *dr );
+double length3( double *dr );
 void d_triangle_area( double *der, double *pt1, double *pt2, double *pt3 );
 double triangle_area( double *pt1, double *pt2, double *pt3 );
 void dnrm( double *g, double *pt1, double *pt2, double *pt3 );
