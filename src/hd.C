@@ -21,6 +21,7 @@
 #include "random_global.h"
 #include "sans.h"
 #include "globals.h"
+#include "rd_kayla.h"
 
 #define MM_METHOD_1
 #define BOXED
@@ -123,6 +124,7 @@ int temp_main( int argc, char **argv )
 	int on_surface = block.on_surface;
 	int do_bd_membrane = block.do_bd_membrane;
 	int do_bd_particles = block.do_bd_particles;
+	int do_rd = block.do_rd;
 	int debug = block.debug;
 	double kcal_mol_K = (5.92186663194E-01/298);
 	kT = (5.92186663194E-01/298) * (block.T);
@@ -141,11 +143,11 @@ int temp_main( int argc, char **argv )
 	surface *prev_surface = theSurface;
 	surface *next_surface;
 
+	RD *rd = NULL;
 
 	pcomplex **allComplexes = NULL;
 
 	int ncomplex = 0;
-
 
 	int ndiv = 0;
 	for( int d = 0; d < ndiv; d++ )
@@ -1136,6 +1138,12 @@ int temp_main( int argc, char **argv )
 						
 					allComplexes[c]->propagate_surface_q( sub_surface, r, dt );
 
+					if( do_rd )
+					{
+						rd = (RD *)malloc( sizeof(RD) );
+						if( debug ) 
+							rd->get_tracked(theSurface, r, allComplexes, ncomplex, &rd);
+					}
 					time_remaining -= dt;
 				}
 			}

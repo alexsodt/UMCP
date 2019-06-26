@@ -68,6 +68,7 @@ void setDefaults( parameterBlock *block )
 	block->do_ld = 0;
 	block->do_bd_membrane = 0;
 	block->do_bd_particles = 0;
+	block->do_rd = 0;
 	block->nve_switch = -1; // switch to NVE dynamics at this timestep.
 	block->gamma_langevin = 10; 
 	block->planar_topology = 0;
@@ -727,6 +728,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}
 		}
+		else if( !strcasecmp( word1, "do_rd" ) )
+                {
+                        if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+                                block->do_rd = 1;
+                        else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+                                block->do_rd = 0;
+                        else
+                        {
+                                printf("Could not interpret input line '%s'.\n", tbuf );
+                                ERROR = 1;
+                        }
+                }
 		else if( !strcasecmp( word1, "timestep_analysis" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )

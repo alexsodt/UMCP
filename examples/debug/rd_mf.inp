@@ -1,0 +1,19 @@
+mesh planar.mesh
+sphere no
+# lipid concentration in lipids per square angstrom.
+rho 0.00025
+# concentration is in proteins per cubic angstrom.
+# concentration  0.0000000125
+concentration  1.25e-8
+# A^2/s
+diffc          1e9
+aqueous_diffc  1.2e10
+k_on	       3.4737e2
+k_off	       2.09
+mean_field	yes
+mode_max 0
+o_lim 10
+movie no
+jobname rd_sim
+time_step 1e-7
+hours 0.1

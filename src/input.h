@@ -184,6 +184,8 @@ class parameterBlock
 	int srd_collision_freq;
 	int planar_topology;
 	int collect_hk;
+	//reaction diffusion
+	int do_rd;
 
 	int on_surface;
 
