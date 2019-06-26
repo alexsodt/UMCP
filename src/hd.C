@@ -30,7 +30,7 @@
 
 //#define MONTE_CARLO_HACK
 
-#define SAVE_RESTARTS
+//#define SAVE_RESTARTS
 #define NUM_SAVE_BUFFERS 50
 //#define DEBUG_MOMENTUM_CHANGE
 #define NO_DIFF_R
@@ -1212,7 +1212,7 @@ int temp_main( int argc, char **argv )
 
 			// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t), report properties for this state (perform Monte Carlo?)
 
-			if( !block.disable_mesh && (!debug || o < nequil) )
+			if( !block.disable_mesh )
 			{
 
 				if( do_gen_q )
@@ -1286,7 +1286,7 @@ int temp_main( int argc, char **argv )
  * 			 *****************************/
 
 
-			if( !block.disable_mesh && (!debug || o < nequil) )
+			if( !block.disable_mesh )
 			{
 				if( do_bd_membrane || do_ld || o < nequil )
 				{
@@ -1348,16 +1348,12 @@ int temp_main( int argc, char **argv )
 				AltSparseCartMatVecIncrScale( qdot, qdot_temp, EFFM, 1.0, r+3*nv  );
 
 			// LEAPFROG: increment q by eps, we have q(t+eps), p(t+eps/2)
-
-			if( ! debug || o < nequil )
+			for( int v1 = 0; v1 < nv; v1++ )
 			{
-				for( int v1 = 0; v1 < nv; v1++ )
-				{
-					r[3*v1+0] += qdot[3*v1+0] * AKMA_TIME * time_step;
-					r[3*v1+1] += qdot[3*v1+1] * AKMA_TIME * time_step;
-					r[3*v1+2] += qdot[3*v1+2] * AKMA_TIME * time_step;
-				}
-			}	
+				r[3*v1+0] += qdot[3*v1+0] * AKMA_TIME * time_step;
+				r[3*v1+1] += qdot[3*v1+1] * AKMA_TIME * time_step;
+				r[3*v1+2] += qdot[3*v1+2] * AKMA_TIME * time_step;
+			}
 
 			if( do_gen_q )
 			{
