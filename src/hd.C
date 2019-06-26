@@ -1141,8 +1141,14 @@ int temp_main( int argc, char **argv )
 					if( do_rd )
 					{
 						rd = (RD *)malloc( sizeof(RD) );
-						if( debug ) 
-							rd->get_tracked(theSurface, r, allComplexes, ncomplex, &rd);
+						rd->get_tracked(theSurface, r, allComplexes, ncomplex, &rd);
+						if( debug )
+						  {
+						    for(int p = 0; p < ncomplex; p++)
+						      {
+							printf("Track: %d\n", rd->ntracked);
+						      }
+						  }
 					}
 					time_remaining -= dt;
 				}
