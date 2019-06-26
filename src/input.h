@@ -89,6 +89,7 @@ class parameterBlock
 	int tachyon_curvature;
 	int tachyon_gauss;
 	int tachyon_dull;
+	int tachyon_clear;
 	int movie;
 	int random_seed;
 	int debug;
