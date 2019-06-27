@@ -513,6 +513,10 @@ int convex_hull( double *pts, int npts, const char *unique ) {
   vertStorage[1] = -10.101;
   vertStorage[2] = -10.101;
 
+  ntri_space = 1;
+  triStorage = (double *)malloc( sizeof(double) * 3 * ntri_space );
+  
+
   // I guess for now I want: s o Fv TO qvo2.result 
 
   int fake_argc = 4;
