@@ -865,42 +865,59 @@ forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light
 
 				off += allComplexes[c]->nsites;
 			}
-		}
 
-		if( params->tachyon_face_box_spline >= 0 )
-		{
-			// draw the box spline for a particular face.
-
-			int f = params->tachyon_face_box_spline;
-			int npts = 12;
-			int *indices = NULL;
-			double *pbc = NULL;
-				
-			if( f >= nf_faces )
+			if( params->tachyon_face_box_spline >= 0 )
 			{
-				indices = theIrregularFormulas[(f-nf_faces)*nf_irr_pts].cp;		
-				pbc = theIrregularFormulas[(f-nf_faces)*nf_irr_pts].r_pbc;		
-				npts = theIrregularFormulas[(f-nf_faces)*nf_irr_pts].ncoor;	
-			} 
-			else
-			{
-				indices = theFormulas[(f)*nf_g_q_p].cp;		
-				pbc     = theFormulas[(f)*nf_g_q_p].r_pbc;		
-				npts    = theFormulas[(f)*nf_g_q_p].ncoor;	
-			} 
+				// draw the box spline for a particular face.
+	
+				int f = params->tachyon_face_box_spline;
+				int npts = 12;
+				int *indices = NULL;
+				double *pbc = NULL;
+					
+				if( f >= nf_faces )
+				{
+					indices = theIrregularFormulas[(f-nf_faces)*nf_irr_pts].cp;		
+					pbc = theIrregularFormulas[(f-nf_faces)*nf_irr_pts].r_pbc;		
+					npts = theIrregularFormulas[(f-nf_faces)*nf_irr_pts].ncoor;	
+				} 
+				else
+				{
+					indices = theFormulas[(f)*nf_g_q_p].cp;		
+					pbc     = theFormulas[(f)*nf_g_q_p].r_pbc;		
+					npts    = theFormulas[(f)*nf_g_q_p].ncoor;	
+				} 
+	
+				double hull_pts[3*npts];
+	
+				for( int x = 0; x < npts; x++ )
+				{
+					hull_pts[3*x+0] = theVertices[indices[x]].r[0] + pbc[3*x+0];
+					hull_pts[3*x+1] = theVertices[indices[x]].r[1] + pbc[3*x+1];
+					hull_pts[3*x+2] = theVertices[indices[x]].r[2] + pbc[3*x+2];
+				}
+	
+				// get the convex hull.
+	
+				convex_hull( hull_pts, npts, "tachyon_qhull");
+				extern int ntri;
+				extern int *triStorage;
 
-			double hull_pts[3*npts];
-
-			for( int x = 0; x < npts; x++ )
-			{
-				hull_pts[3*x+0] = theVertices[indices[x]].r[0] + pbc[3*x+0];
-				hull_pts[3*x+1] = theVertices[indices[x]].r[1] + pbc[3*x+1];
-				hull_pts[3*x+2] = theVertices[indices[x]].r[2] + pbc[3*x+2];
+				double convex_hull_spec = 0.5;
+				double convex_hull_opacity = 0.2;
+	
+				for( int t = 0; t < ntri; t++ )
+				{
+					fprintf(theFile, "Tri\n");
+						fprintf(theFile, "V0 %lf %lf %lf\n", theVertices[indices[triStorage[10*t+1]]].r[0]*scale + dx*Lx*scale, theVertices[indices[triStorage[10*t+1]]].r[1]*scale+ dy*Ly*scale, theVertices[indices[triStorage[10*t+1]]].r[2]*scale+ dz*Lz*scale );
+						fprintf(theFile, "V1 %lf %lf %lf\n", theVertices[indices[triStorage[10*t+2]]].r[0]*scale + dx*Lx*scale, theVertices[indices[triStorage[10*t+2]]].r[1]*scale+ dy*Ly*scale, theVertices[indices[triStorage[10*t+2]]].r[2]*scale+ dz*Lz*scale );
+						fprintf(theFile, "V2 %lf %lf %lf\n", theVertices[indices[triStorage[10*t+3]]].r[0]*scale + dx*Lx*scale, theVertices[indices[triStorage[10*t+3]]].r[1]*scale+ dy*Ly*scale, theVertices[indices[triStorage[10*t+3]]].r[2]*scale+ dz*Lz*scale );
+						fprintf(theFile, "Texture\n"
+								"Ambient 0 Diffuse 0.45 Specular %lf Opacity %lf\n"
+								 "Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", convex_hull_spec, convex_hull_opacity, 1.0, 0.0, 0.0  );
+				}
 			}
 
-			// get the convex hull.
-
-			convex_hull( hull_pts, npts, "tachyon_qhull");
 		}
 
 		
