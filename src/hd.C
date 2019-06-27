@@ -413,7 +413,11 @@ int temp_main( int argc, char **argv )
 	int doing_planar_harmonics = 0;
 	double *output_qvals=NULL;
 
-	if( block.mode_max >= 0 )
+	if( block.mode_max == 0 || block.fix_membrane )
+	{
+		block.fix_membrane = 1;
+	}
+	else if( block.mode_max >= 0 )
 	{
 		do_gen_q=1;
 		if( block.sphere )
@@ -684,6 +688,7 @@ int temp_main( int argc, char **argv )
 	setupParallel( sub_surface, allComplexes, ncomplex, ( do_gen_q ? NQ : 0) );
 	SparseMatrix *EFFM = NULL;
 	SparseMatrix *MMat = NULL;
+
 	int max_mat = nv;
 	if( NQ > nv )
 		max_mat = NQ;
@@ -691,11 +696,13 @@ int temp_main( int argc, char **argv )
 	int n_vuse = 0;
 	double *mass_scaling = NULL;
 
-	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
-	if( do_bd_membrane )
-		sub_surface->getSparseRoot( theForceSet, &MMat ); 
-	setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
-
+	if( ! block.fix_membrane )
+	{
+		sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
+		if( do_bd_membrane )
+			sub_surface->getSparseRoot( theForceSet, &MMat ); 
+		setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
+	}
 
 
 	double V = sub_surface->energy(r,NULL);
@@ -793,15 +800,18 @@ int temp_main( int argc, char **argv )
 	double prev_TV = 0;
 
 	memset( qdot0, 0, sizeof(double) * 3 * nv );
-	if( do_gen_q )
+
+	if( !block.fix_membrane )
 	{
-		memset( Qdot0, 0, sizeof(double) * NQ );
-		GenQMatVecIncrScale( Qdot0, pp, EFFM, 1.0 );
-		MatVec( gen_transform, Qdot0, qdot0, NQ, 3*nv ); 
+		if( do_gen_q )
+		{
+			memset( Qdot0, 0, sizeof(double) * NQ );
+			GenQMatVecIncrScale( Qdot0, pp, EFFM, 1.0 );
+			MatVec( gen_transform, Qdot0, qdot0, NQ, 3*nv ); 
+		}
+		else
+			AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, r+3*nv );
 	}
-	else
-		AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, r+3*nv );
-	
 	memcpy( qdot, qdot0, sizeof(double) * 3 * nv );
 	
 	memset( qdot_temp, 0, sizeof(double) * 3 * nv );	
@@ -813,7 +823,7 @@ int temp_main( int argc, char **argv )
 #ifdef PARALLEL		
 	ParallelSum( qdot_temp, 3*nv );
 #endif
-	if( ! do_gen_q )
+	if( ! do_gen_q && ! block.fix_membrane )
 		AltSparseCartMatVecIncrScale( qdot, qdot_temp, EFFM, 1.0, r+3*nv );
 	sub_surface->grad( r, g );
 
@@ -1166,7 +1176,7 @@ int temp_main( int argc, char **argv )
 
 			/* BEGIN SRD */
 			
-			if( do_srd )
+			if( do_srd && ! block.fix_membrane )
 			{
 				sub_surface->rebox_system();
 				double use_dhull = 0;
@@ -1206,7 +1216,7 @@ int temp_main( int argc, char **argv )
 #endif
 
 			memcpy( next_pp, pp, sizeof(double) * NQ );
-			if( !block.disable_mesh )
+			if( !block.fix_membrane )
 			{
 				if( do_bd_membrane || do_ld || o < nequil || (switched) )
 				{
@@ -1226,7 +1236,7 @@ int temp_main( int argc, char **argv )
 
 			// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t), report properties for this state (perform Monte Carlo?)
 
-			if( !block.disable_mesh )
+			if( !block.fix_membrane )
 			{
 
 				if( do_gen_q )
@@ -1261,11 +1271,13 @@ int temp_main( int argc, char **argv )
 			memcpy( pp, next_pp, sizeof(double) * NQ );
 			memset( Qdot0_trial, 0, sizeof(double) * NQ );
 
-			if( do_gen_q )
-				GenQMatVecIncrScale( Qdot0_trial, pp, EFFM, 1.0 );
-			else
-				AltSparseCartMatVecIncrScale( Qdot0_trial, pp, EFFM, 1.0, r+3*nv );
-
+			if( ! block.fix_membrane )
+			{
+				if( do_gen_q )
+					GenQMatVecIncrScale( Qdot0_trial, pp, EFFM, 1.0 );
+				else
+					AltSparseCartMatVecIncrScale( Qdot0_trial, pp, EFFM, 1.0, r+3*nv );
+			}
 			double T = 0;				
 			for( int Q = 0; Q < NQ; Q++ )
 			{
@@ -1300,7 +1312,7 @@ int temp_main( int argc, char **argv )
  * 			 *****************************/
 
 
-			if( !block.disable_mesh )
+			if( !block.fix_membrane )
 			{
 				if( do_bd_membrane || do_ld || o < nequil )
 				{
@@ -1348,18 +1360,20 @@ int temp_main( int argc, char **argv )
 			memcpy( pp, next_pp, sizeof(double) * NQ );
 			memset( qdot0, 0, sizeof(double) * 3 * nv );
 
-			if( do_gen_q )
-			{	
-				memset( Qdot0, 0, sizeof(double) * NQ );
-				GenQMatVecIncrScale( Qdot0, pp, EFFM, 1.0 );
-				MatVec( gen_transform, Qdot0, qdot0, NQ, 3*nv ); 
+			if( ! block.fix_membrane )
+			{
+				if( do_gen_q )
+				{	
+					memset( Qdot0, 0, sizeof(double) * NQ );
+					GenQMatVecIncrScale( Qdot0, pp, EFFM, 1.0 );
+					MatVec( gen_transform, Qdot0, qdot0, NQ, 3*nv ); 
+				}
+				else
+					AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, r+3*nv );
 			}
-			else
-				AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, r+3*nv );
-
 			memcpy( qdot, qdot0, sizeof(double) * 3 * nv );
 
-			if( !do_gen_q )
+			if( !do_gen_q && ! block.fix_membrane)
 				AltSparseCartMatVecIncrScale( qdot, qdot_temp, EFFM, 1.0, r+3*nv  );
 
 			// LEAPFROG: increment q by eps, we have q(t+eps), p(t+eps/2)
