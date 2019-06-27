@@ -84,6 +84,7 @@ class parameterBlock
 	int tachyon_overlay_mesh;
 	int tachyon_interp;
 	int tachyon_tri_center;
+	int tachyon_face_box_spline;
 	int tachyon_res;
 	int tachyon;
 	int tachyon_curvature;
