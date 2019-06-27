@@ -87,11 +87,11 @@ void RD::get_tracked(surface *theSurface, double *rsurf, pcomplex **allComplexes
 void RD::init( int ncomplex)
 {
 	// setup tracked: allocate tracked
-	tracked = (RD_tracked **)malloc(sizeof(RD_tracked)*ncomplex);
+	tracked = (RD_tracked **)malloc(sizeof(RD_tracked));
 	// for each particle, set ntracked_space = 10, set ntracked=0
 	for(int p = 0; p < ncomplex; p++)
         {
-		tracked[p] = (RD_tracked *)malloc(sizeof(RD_tracked));
+		
 		tracked[p]->ntracked = 0;
 		tracked[p]->ntracked_space = 10;
 		tracked[p]->tracked_info = (RD_tracked_info *)malloc(sizeof(RD_tracked_info) * tracked[p]->ntracked_space);

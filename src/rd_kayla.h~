@@ -12,23 +12,24 @@ typedef struct
 	int info;
 } RD_tracked_info;
 
-typedef struct
+struct RD_tracking
 {
         int ntracked;
         int ntracked_space;
         RD_tracked_info *tracked_info;
-} RD_tracked;
+};
 
 struct RD
 {
-	RD_tracked **tracked;	
+	int id;
 
+	RD_tracking **tracked;	
 	double k_on;
 	double k_off;
 	double binding_radius;
 	
-	void init(int ncomplex);
-	void get_tracked(surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex);
+	void init( int ncomplexes );
+	void get_tracked(surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex );
 };
 
 #endif

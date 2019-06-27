@@ -143,7 +143,6 @@ int temp_main( int argc, char **argv )
 	surface *prev_surface = theSurface;
 	surface *next_surface;
 
-	RD *rd = NULL;
 
 	pcomplex **allComplexes = NULL;
 
@@ -221,6 +220,17 @@ int temp_main( int argc, char **argv )
 	sub_surface->area(r, -1, &cur_area, &area0 );
 	printf("area: %le area0: %le\n", cur_area, area0 );
 	theSurface->loadComplexes( &allComplexes, &ncomplex, &block ); 
+	
+	// INITIALIZE REACTION DIFFUSION
+	RD *rd = NULL;
+
+	if(do_rd)
+	{
+		rd = (RD *)malloc( sizeof(RD) );
+		rd->init(ncomplex);
+		if(debug)
+			printf("debug RD 1st ncomplexes: %d\n", ncomplex);
+	}
 
 	int nmodes = 8;
 	int nspacehk = 10;
@@ -977,7 +987,7 @@ int temp_main( int argc, char **argv )
 			V += VP;
 			
                         /*********** END COMPUTE ENERGY ************/	
-
+                                                
 			/*********** SAVE RESTARTS FOR DEBUGGING ***/
 #ifdef SAVE_RESTARTS
 #ifdef PARALLEL
@@ -1148,22 +1158,10 @@ int temp_main( int argc, char **argv )
 						
 					allComplexes[c]->propagate_surface_q( sub_surface, r, dt );
 
-					if( do_rd )
-					{
-						rd = (RD *)malloc( sizeof(RD) );
-						rd->get_tracked(theSurface, r, allComplexes, ncomplex, &rd);
-						if( debug )
-						  {
-						    for(int p = 0; p < ncomplex; p++)
-						      {
-							printf("Track: %d\n", rd->ntracked);
-						      }
-						  }
-					}
 					time_remaining -= dt;
 				}
 			}
-			
+
 			// has special routines for handling elastic collisions.
 			propagateSolutionParticles( sub_surface, r, allComplexes, ncomplex, time_step);
 
@@ -1408,7 +1406,19 @@ int temp_main( int argc, char **argv )
 				PartialSyncVertices(pp);
 #endif
 
+			// ************* DO REACTION DIFFUSION
 
+			if(do_rd)
+			{	
+				// get_tracked
+				if(debug)
+					printf("debug RD 2nd ncomplexes: %d\n", ncomplex);
+				rd->get_tracked(theSurface, r, allComplexes, ncomplex); 
+
+				//run RD
+			}
+
+			// ************* END REACTION DIFFUSION
 #ifdef PARALLEL
 			ParallelSum( &PT, 1 );
 #endif
