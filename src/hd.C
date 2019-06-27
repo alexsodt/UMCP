@@ -1414,7 +1414,13 @@ int temp_main( int argc, char **argv )
 				if(debug)
 					printf("debug RD 2nd ncomplexes: %d\n", ncomplex);
 				rd->get_tracked(theSurface, r, allComplexes, ncomplex); 
-
+				if(debug)
+				{
+					for(int p = 0; p < ncomplex; p++)
+					{
+						printf("debug RD 3rd id: %d ntracked: %d\n", p, rd->tracked[p]->ntracked);
+					}
+				}
 				//run RD
 			}
 
