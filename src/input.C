@@ -82,6 +82,7 @@ void setDefaults( parameterBlock *block )
 
 	block->disable_mesh = 0;
 
+	block->tachyon_face_box_spline = -1;
 	block->tachyon_dull = 0;
 	block->tachyon_clear = 0;
 	block->tachyon_flip_sense = 0;
@@ -1065,6 +1066,8 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->tachyon_res = atoi( word2 );
 		else if( !strcasecmp( word1, "tachyon_tri_center" ) )
 			block->tachyon_tri_center = atoi( word2 );
+		else if( !strcasecmp( word1, "tachyon_face_box_spline" ) )
+			block->tachyon_face_box_spline = atof( word2 );
 		else if( !strcasecmp( word1, "tachyon_view_x" ) )
 			block->tachyon_view_x = atof( word2 );
 		else if( !strcasecmp( word1, "tachyon_view_y" ) )

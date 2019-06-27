@@ -28,6 +28,8 @@ static double fixed_center[3] = {0,0,0};
 static double fixed_view[3] = {0,0,1};
 static int fixed_views_set = 0;
 
+extern "C" int convex_hull( double *pts, int npts, const char *unique );
+
 int surface::writeTachyon( const char *name,
 				int grid_uv, // resolution, how many points we do on one side of a triangle 
 				int nint, // number of interpolation frames
@@ -863,6 +865,42 @@ forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light
 
 				off += allComplexes[c]->nsites;
 			}
+		}
+
+		if( params->tachyon_face_box_spline >= 0 )
+		{
+			// draw the box spline for a particular face.
+
+			int f = params->tachyon_face_box_spline;
+			int npts = 12;
+			int *indices = NULL;
+			double *pbc = NULL;
+				
+			if( f >= nf_faces )
+			{
+				indices = theIrregularFormulas[(f-nf_faces)*nf_irr_pts].cp;		
+				pbc = theIrregularFormulas[(f-nf_faces)*nf_irr_pts].r_pbc;		
+				npts = theIrregularFormulas[(f-nf_faces)*nf_irr_pts].ncoor;	
+			} 
+			else
+			{
+				indices = theFormulas[(f)*nf_g_q_p].cp;		
+				pbc     = theFormulas[(f)*nf_g_q_p].r_pbc;		
+				npts    = theFormulas[(f)*nf_g_q_p].ncoor;	
+			} 
+
+			double hull_pts[3*npts];
+
+			for( int x = 0; x < npts; x++ )
+			{
+				hull_pts[3*x+0] = theVertices[indices[x]].r[0] + pbc[3*x+0];
+				hull_pts[3*x+1] = theVertices[indices[x]].r[1] + pbc[3*x+1];
+				hull_pts[3*x+2] = theVertices[indices[x]].r[2] + pbc[3*x+2];
+			}
+
+			// get the convex hull.
+
+			convex_hull( hull_pts, npts, "tachyon_qhull");
 		}
 
 		

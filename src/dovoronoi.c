@@ -477,3 +477,107 @@ int voronoi2D( double *pts, int npts, const char *unique ) {
   for( x = 0; x < 6; x++ ) free(fake_args[x]);
   return exitcode;
 } /* main */
+
+int convex_hull( double *pts, int npts, const char *unique ) {
+  int curlong, totlong; /* used !qh_NOmem */
+  int exitcode, numpoints, dim;
+  coordT *points;
+  boolT ismalloc;
+  char filename[256];
+
+  sprintf(filename, "qvo.%s.run", unique );
+  FILE *dummy_out = fopen(filename,"w"); 
+  sprintf(filename, "qvo.%s.err", unique );
+  FILE *dummy_err = fopen(filename,"w"); 
+
+  if( ridgeStorage != NULL )
+  {
+       int x;
+	for( x = 0; x < nridges; x++ )
+		free( ridgeStorage[x].vertices );
+	free(ridgeStorage);
+  }
+  ridgeStorage = NULL;
+  nridge_space = 0;
+  nridges = 0;
+
+  if( vertStorage != NULL )
+	free(vertStorage);
+  vertStorage = NULL;
+  nvert_space = 100;
+  nverts = 1;
+
+  vertStorage = (double *)malloc( sizeof(double) * 3 * nvert_space );
+
+  vertStorage[0] = -10.101;
+  vertStorage[1] = -10.101;
+  vertStorage[2] = -10.101;
+
+  // I guess for now I want: s o Fv TO qvo2.result 
+
+  int fake_argc = 4;
+
+  char *fake_args[6];
+  int x = 0;
+  for( x = 0; x < 6; x++ ) fake_args[x] = (char *)malloc( sizeof(char) * 128 );
+
+	sprintf(fake_args[0], "qconvex" );
+	sprintf(fake_args[1], "s" );
+	sprintf(fake_args[2], "o" );
+	sprintf(fake_args[3], "Fv" );
+//	sprintf(fake_args[4], "TO" );
+//	sprintf(fake_args[5], "qvo2.%s.result", unique );
+
+  qh_init_A(NULL,dummy_out, dummy_err, fake_argc, fake_args);  /* sets qh qhull_command */
+  exitcode= setjmp(qh errexit); /* simple statement for CRAY J916 */
+  if (!exitcode) {
+//    qh_option("voronoi  _bbound-last  _coplanar-keep", NULL, NULL);
+    qh_checkflags(qh qhull_command, hidden_options);
+    qh_initflags(qh qhull_command);
+//    points= qh_readpoints(&numpoints, &dim, &ismalloc);
+    dim = 4;
+    numpoints = npts;
+
+    points = (coordT *)malloc( sizeof(coordT) * dim * (npts+1) );
+
+    for( x = 0; x < npts; x++ )
+	{
+		points[4*x+0] = pts[3*x+0];
+		points[4*x+1] = pts[3*x+1];
+		points[4*x+2] = pts[3*x+2];
+		points[4*x+3] = pts[3*x+0]*pts[3*x+0]+pts[3*x+1]*pts[3*x+1]+pts[3*x+2]*pts[3*x+2];
+	}
+
+    if (dim >= 5) {
+      qh_option("_merge-exact", NULL, NULL);
+      qh MERGEexact= True; /* 'Qx' always */
+    }
+    qh_init_B(points, numpoints, dim, ismalloc);
+    qh_qhull();
+    qh_check_output();
+    qh_produce_output();
+    if (qh VERIFYoutput && !qh FORCEoutput && !qh STOPpoint && !qh STOPcone)
+      qh_check_points();
+    exitcode= qh_ERRnone;
+  }
+  else
+  {
+	printf("TERRIBLE EXIT CODE: %d.\n", exitcode );
+  }
+
+
+  qh NOerrexit= True;  /* no more setjmp */
+#ifdef qh_NOmem
+  qh_freeqhull( True);
+#else
+  qh_freeqhull( False);
+  qh_memfreeshort(&curlong, &totlong);
+  if (curlong || totlong)
+    fprintf(stderr, "qhull internal warning (main): did not free %d bytes of long memory(%d pieces)\n",
+       totlong, curlong);
+#endif
+  fclose(dummy_out);
+  fclose(dummy_err);
+  for( x = 0; x < 6; x++ ) free(fake_args[x]);
+  return exitcode;
+} /* main */

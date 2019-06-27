@@ -24,11 +24,11 @@ rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutin
 
 hull_SRCS = dovoronoi.c clusterv.C
 
-rd_opt_SOURCES        = rd.C $(rd_SRCS) $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
-hd_opt_SOURCES        = hd.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
-min_opt_SOURCES       = min.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
-subdivide_opt_SOURCES = subdivide.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
-scale_opt_SOURCES	  = scale.C  $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
+rd_opt_SOURCES        = rd.C $(rd_SRCS) $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
+hd_opt_SOURCES        = hd.C $(interp_SRCS) $(complex_SRCS) $(hull_SRCS) $(util_SRCS)
+min_opt_SOURCES       = min.C $(interp_SRCS) $(complex_SRCS) $(hull_SRCS) $(util_SRCS)
+subdivide_opt_SOURCES = subdivide.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
+scale_opt_SOURCES	  = scale.C  $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
 icosahedron_opt_SOURCES = icosahedron.C $(util_SRCS)
 makeBud_opt_SOURCES   = makeBud.C $(hull_SRCS) $(util_SRCS)
 makePore_opt_SOURCES   = makePore.C $(hull_SRCS) $(util_SRCS) getCylinderMesh.C
@@ -40,11 +40,11 @@ writeCylRTraj_opt_SOURCES      = writeCylRTraj.C $(util_SRCS)
 
 hd_opt_LDFLAGS		  = $(AM_LDFLAGS) 
 
-rd_opt_LDADD		  = $(AM_LDADD) -lstdc++ 
-hd_opt_LDADD              = $(AM_LDADD) -lstdc++
-min_opt_LDADD             = $(AM_LDADD) -lstdc++
-subdivide_opt_LDADD       = $(AM_LDADD) -lstdc++
-scale_opt_LDADD           = $(AM_LDADD) -lstdc++
+rd_opt_LDADD		  = $(AM_LDADD) $(AM_QHULL) -lstdc++ 
+hd_opt_LDADD              = $(AM_LDADD) $(AM_QHULL) -lstdc++
+min_opt_LDADD             = $(AM_LDADD) $(AM_QHULL) -lstdc++
+subdivide_opt_LDADD       = $(AM_LDADD) $(AM_QHULL) -lstdc++
+scale_opt_LDADD           = $(AM_LDADD) $(AM_QHULL) -lstdc++
 icosahedron_opt_LDADD     = $(AM_LDADD) -lstdc++
 makeBud_opt_LDADD         = $(AM_LDADD) $(AM_QHULL) -lstdc++
 makePore_opt_LDADD        = $(AM_LDADD) $(AM_QHULL) -lstdc++

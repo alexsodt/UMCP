@@ -24,11 +24,11 @@ rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutin
 
 hull_SRCS = dovoronoi.c clusterv.C
 
-rd_dbg_SOURCES        = rd.C $(rd_SRCS) $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
-hd_dbg_SOURCES        = hd.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
-min_dbg_SOURCES       = min.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
-subdivide_dbg_SOURCES = subdivide.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
-scale_dbg_SOURCES	  = scale.C  $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
+rd_dbg_SOURCES        = rd.C $(rd_SRCS) $(hull_SRCS) $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
+hd_dbg_SOURCES        = hd.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
+min_dbg_SOURCES       = min.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
+subdivide_dbg_SOURCES = subdivide.C $(interp_SRCS)  $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
+scale_dbg_SOURCES	  = scale.C  $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
 icosahedron_dbg_SOURCES = icosahedron.C $(util_SRCS)
 join_dbg_SOURCES	= join.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(hull_SRCS) getCylinderMesh.C
 makeBud_dbg_SOURCES   = makeBud.C $(hull_SRCS) $(util_SRCS)
@@ -40,12 +40,12 @@ writeBiasPotential_dbg_SOURCES = writeBiasPotential.C $(util_SRCS)
 writeCylRTraj_dbg_SOURCES      = writeCylRTraj.C $(util_SRCS) 
 
 
-rd_dbg_LDADD		  = $(AM_LDADD) -lstdc++ 
-hd_dbg_LDADD              = $(AM_LDADD) -lstdc++
+rd_dbg_LDADD		  = $(AM_LDADD) $(AM_QHULL) -lstdc++ 
+hd_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) -lstdc++
 join_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) -lstdc++
-min_dbg_LDADD             = $(AM_LDADD) -lstdc++
-subdivide_dbg_LDADD       = $(AM_LDADD) -lstdc++
-scale_dbg_LDADD           = $(AM_LDADD) -lstdc++
+min_dbg_LDADD             = $(AM_LDADD) $(AM_QHULL) -lstdc++
+subdivide_dbg_LDADD       = $(AM_LDADD) $(AM_QHULL) -lstdc++
+scale_dbg_LDADD           = $(AM_LDADD) $(AM_QHULL) -lstdc++
 icosahedron_dbg_LDADD     = $(AM_LDADD) -lstdc++
 makeBud_dbg_LDADD         = $(AM_LDADD) $(AM_QHULL) -lstdc++
 makePore_dbg_LDADD         = $(AM_LDADD) $(AM_QHULL) -lstdc++
