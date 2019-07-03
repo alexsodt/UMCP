@@ -3,7 +3,7 @@ add simpleLipid nbound 20 outside
 sphere no	
 do_rd yes
 debug yes
-diffc 1e9
+diffc 1e7
 aqueous_diffc 1.2e10
 k_on 3.4737e2
 k_off 2.09

@@ -51,16 +51,18 @@ void RD::get_tracked(surface *theSurface, double *rsurf, pcomplex **allComplexes
 	for(int p = 0; p < ncomplex; p++)
 	{
 		int npairs = 0;
+		int nnew = 0;
 		int near = boxing->getNearPts(allComplexes[p]->rall+3*p, nearlist, binding_radius);
-		for(int n = 0; n < near; n++)
+		
+		for(int np = 0; np < near; np++)
 		{
-			int p2 = nearlist[n];
+			int p2 = nearlist[np];
 
 			if( p == p2 )
 				continue;
 			if( p2 < p )
 				continue;
-			// we have the list, now we need the particles within the binding radius that are being tracked -- kept in the tracked structure
+
 			double dr[3] = {
 				allComplexes[p]->rall[3*p+0] - allComplexes[p2]->rall[3*p2+0],
 				allComplexes[p]->rall[3*p+1] - allComplexes[p2]->rall[3*p2+1],
@@ -71,16 +73,64 @@ void RD::get_tracked(surface *theSurface, double *rsurf, pcomplex **allComplexes
 			if( r < binding_radius )
 			{
 				npairs++;
-				if(npairs == tracked[p]->ntracked_space )
+				int old_id = 0;
+				// Need to determine if newly tracked or already tracked
+				for(int n = 0; n < tracked[p]->ntracked; n++)
 				{
-					tracked[p]->ntracked_space *= 2;
-					tracked[p]->tracked_info = (RD_tracked_info *)realloc(tracked[p]->tracked_info,  sizeof(RD_tracked_info) * tracked[p]->ntracked_space);
+					// Does this pair already exist?
+					if(tracked[p]->tracked_info[n].id == p2)
+					{
+						old_id = n;
+					}
+
 				}
-				tracked[p]->tracked_info[npairs].id = p2;
+				//If already tracked need to update prev_sep, prevnorm, curr_sep, etc.
+				if(old_id > 0)
+				{
+					tracked[p]->tracked_info[old_id].info = 1;
+					tracked[p]->tracked_info[old_id].prev_sep = tracked[p]->tracked_info[old_id].curr_sep;
+					tracked[p]->tracked_info[old_id].prev_norm = tracked[p]->tracked_info[old_id].curr_norm;
+					tracked[p]->tracked_info[old_id].curr_sep = r;
+					tracked[p]->tracked_info[old_id].curr_norm = 1.0;
+				}
+				// If newly tracked need to add to list
+				else
+				{
+					nnew++;
+					if(nnew == tracked[p]->ntracked_space )
+					{
+						tracked[p]->ntracked_space *= 2;
+						tracked[p]->tracked_new = (RD_tracked_info *)realloc(tracked[p]->tracked_new,  sizeof(RD_tracked_info) * tracked[p]->ntracked_space);
+						tracked[p]->tracked_info = (RD_tracked_info *)realloc(tracked[p]->tracked_info,  sizeof(RD_tracked_info) * tracked[p]->ntracked_space);
+					}
+					tracked[p]->tracked_new[nnew].curr_sep = r;
+					tracked[p]->tracked_new[nnew].curr_norm = 1.0;
+				}
 			}
 		}
-		int nnew = npairs - tracked[p]->ntracked;
-		tracked[p]->ntracked += nnew;
+		int count = nnew;
+		for(int n = 0; n < tracked[p]->ntracked; n++)
+		{
+			if(npairs == tracked[p]->ntracked_space )
+			{
+				tracked[p]->ntracked_space *= 2;
+				tracked[p]->tracked_new = (RD_tracked_info *)realloc(tracked[p]->tracked_new,  sizeof(RD_tracked_info) * tracked[p]->ntracked_space);
+				tracked[p]->tracked_info = (RD_tracked_info *)realloc(tracked[p]->tracked_info,  sizeof(RD_tracked_info) * tracked[p]->ntracked_space);
+			}
+			if(tracked[p]->tracked_info[n].info)
+			{
+				count++;
+				tracked[p]->tracked_new[count].id = tracked[p]->tracked_info[n].id;
+				tracked[p]->tracked_new[count].prev_sep = tracked[p]->tracked_info[n].prev_sep;
+				tracked[p]->tracked_new[count].prev_norm = tracked[p]->tracked_info[n].prev_norm;
+				tracked[p]->tracked_new[count].curr_sep = tracked[p]->tracked_info[n].curr_sep;
+				tracked[p]->tracked_new[count].prev_norm = tracked[p]->tracked_info[n].curr_norm;
+				tracked[p]->tracked_new[count].info = 0;
+
+			}
+		}
+		tracked[p]->ntracked = npairs;
+		tracked[p]->tracked_info = tracked[p]->tracked_new;
 	}
 }
 
@@ -95,6 +145,7 @@ void RD::init( int ncomplex)
 		tracked[p]->ntracked = 0;
 		tracked[p]->ntracked_space = 10;
 		tracked[p]->tracked_info = (RD_tracked_info *)malloc(sizeof(RD_tracked_info) * tracked[p]->ntracked_space);
+		tracked[p]->tracked_new = (RD_tracked_info *)malloc(sizeof(RD_tracked_info) * tracked[p]->ntracked_space);
 	}
 }
 

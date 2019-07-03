@@ -9,6 +9,8 @@ typedef struct
 	int id;
 	double prev_norm;
 	double prev_sep;
+	double curr_sep;
+	double curr_norm;
 	int info;
 } RD_tracked_info;
 
@@ -17,6 +19,7 @@ typedef struct
         int ntracked;
         int ntracked_space;
         RD_tracked_info *tracked_info;
+	RD_tracked_info *tracked_new;
 } RD_tracked;
 
 struct RD
