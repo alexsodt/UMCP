@@ -1418,7 +1418,7 @@ int temp_main( int argc, char **argv )
 				{
 					for(int p = 0; p < ncomplex; p++)
 					{
-						printf("debug RD 3rd id: %d ntracked: %d\n", p, allComplexes[p]->rall[3*p+0]);
+						printf("debug RD 3rd id: %d ntracked: %d\n", p, rd->tracked[p]->ntracked);
 					}
 				}
 				//run RD
