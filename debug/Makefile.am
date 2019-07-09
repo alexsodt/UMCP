@@ -9,11 +9,16 @@ AM_CPPFLAGS = -include ../config.h -include ../src/local_config.h $(AM_INCLUDE)
 AM_CFLAGS = -g
 AM_CXXFLAGS = -g
 
-vpath %.C ../src
-vpath %.c ../src
-vpath %.cpp ../src
-vpath %.h ../src
+SRC_DIR = ../src
 
+vpath %.C $(SRC_DIR)
+vpath %.c $(SRC_DIR)
+vpath %.cpp $(SRC_DIR)
+vpath %.h  $(SRC_DIR)
+vpath %.cu $(SRC_DIR)
+
+.cu.o:
+	$(NVCC) -o $*.o -c $(SRC_DIR)/$*.cu
 
 complex_SRCS = NBAR.C dimer.C crowder.C
 util_SRCS    = mutil.C util.C
@@ -24,8 +29,14 @@ rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutin
 
 hull_SRCS = dovoronoi.c clusterv.C
 
+if CUDA
+cuda_SRCS = cuda.cu
+else
+cuda_SRCS =
+endif
+
 rd_dbg_SOURCES        = rd.C $(rd_SRCS) $(hull_SRCS) $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
-hd_dbg_SOURCES        = hd.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
+hd_dbg_SOURCES        = hd.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS)
 min_dbg_SOURCES       = min.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
 subdivide_dbg_SOURCES = subdivide.C $(interp_SRCS)  $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
 scale_dbg_SOURCES	  = scale.C  $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
@@ -41,7 +52,7 @@ writeCylRTraj_dbg_SOURCES      = writeCylRTraj.C $(util_SRCS)
 
 
 rd_dbg_LDADD		  = $(AM_LDADD) $(AM_QHULL) -lstdc++ 
-hd_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) -lstdc++
+hd_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
 join_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) -lstdc++
 min_dbg_LDADD             = $(AM_LDADD) $(AM_QHULL) -lstdc++
 subdivide_dbg_LDADD       = $(AM_LDADD) $(AM_QHULL) -lstdc++

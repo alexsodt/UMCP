@@ -21,6 +21,9 @@
 #include "random_global.h"
 #include "sans.h"
 #include "globals.h"
+#ifdef USE_CUDA
+#include "local_cuda.h"
+#endif
 
 #define MM_METHOD_1
 #define BOXED
@@ -89,6 +92,11 @@ int temp_main( int argc, char **argv )
 	quietParallel();
 #endif
 	printCompilationTime();
+
+#ifdef USE_CUDA
+	showCUDAStats();
+#endif
+
 
 	int nprocs = 1;
 	int taskid = 0;
