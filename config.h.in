@@ -150,7 +150,6 @@
 /* Define to compile with CUDA */
 #undef USE_CUDA
 #ifdef USE_CUDA
-#include "local_cuda.h"
 #endif
 
 /* Define to 1 if you have the ANSI C header files. */
