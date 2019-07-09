@@ -1139,6 +1139,7 @@ int surface::loadAndCopyLattice( const char *fileName, surface *copyFrom )
 
 int surface::loadLattice( const char *fileName, double noise, surface *copyFrom )
 {
+	on_surface = 0;
 	disable_PBC = 0;
 	cumulative_area = NULL;
 	max_valence = 15; // points used.
@@ -2678,6 +2679,7 @@ void surface::subdivideSurface( surface *copy_surface )
 
 */
 
+	on_surface = 0;
 	disable_PBC = 0;
 	cumulative_area = NULL;
 	max_valence = 15; // points used.
