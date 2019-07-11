@@ -31,7 +31,7 @@ else
 cuda_SRCS =
 endif
 
-rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutines/pirr_pfree_ratio_psF.cpp 
+rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutines/pirr_pfree_ratio_psF.cpp fpr_subroutines/2D.o fpr_subroutines/DDmatrixcreate.cpp fpr_subroutines/DDpsur.cpp fpr_subroutines/TBLnorm.cpp fpr_subroutines/TBLpirr.cpp fpr_subroutines/TBLsur.cpp fpr_subroutines/fpir.cpp fpr_subroutines/fsur.cpp fpr_subroutines/integrator.cpp fpr_subroutines/fnorm.cpp
 hull_SRCS = dovoronoi.c clusterv.C
 
 rd_opt_SOURCES        = rd.C $(rd_SRCS) $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
