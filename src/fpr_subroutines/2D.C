@@ -37,8 +37,13 @@ twoDReactionPTable *newTable( void )
 	return theTable;
 }
 
-double get_2D_2D_rxn_prob( double R1, double kr, double bindrad, double Dtot, twoDReactionPTable *rxnTable, double deltat, double Rmax )
+static twoDReactionPTable *rxnTable = NULL;
+
+double get_2D_2D_rxn_prob( double R1, double kr, double bindrad, double Dtot, double deltat, double Rmax )
 {
+	if( !rxnTable )
+		rxnTable = newTable();
+
 	double ktemp = kr / 2 / bindrad;
 	int uniquetableindex = -1;
 	int tableexistflag = 0;
