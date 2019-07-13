@@ -1673,9 +1673,9 @@ double surface::evaluate_T( double *vq, double *pmesh, double *vq_m1, double *pm
 
 	if( vq_m1 && pmesh_m1 )
 	{
-		for( int vx = 0; vx < par_info.nv; vx++ )
+		for( int vx = 0; vx < par_info.nv[surface_id]; vx++ )
 		{
-			int v = par_info.verts[vx];
+			int v = par_info.verts[surface_id][vx];
 
 			alt_T += 0.5 * (pmesh[3*v+0]+pmesh_m1[3*v+0])/2 * (vq[3*v+0]+vq_m1[3*v+0])/2;
 			alt_T += 0.5 * (pmesh[3*v+1]+pmesh_m1[3*v+1])/2 * (vq[3*v+1]+vq_m1[3*v+1])/2;
@@ -1684,9 +1684,9 @@ double surface::evaluate_T( double *vq, double *pmesh, double *vq_m1, double *pm
 	}
 	else
 	{
-		for( int vx = 0; vx < par_info.nv; vx++ )
+		for( int vx = 0; vx < par_info.nv[surface_id]; vx++ )
 		{
-			int v = par_info.verts[vx];
+			int v = par_info.verts[surface_id][vx];
 			alt_T += 0.5 * pmesh[3*v+0] * vq[3*v+0];
 			alt_T += 0.5 * pmesh[3*v+1] * vq[3*v+1];
 			alt_T += 0.5 * pmesh[3*v+2] * vq[3*v+2];
@@ -1870,9 +1870,9 @@ void surface::getSparseEffectiveMass( force_set * theForceSet, int *use_map, int
 		for( int v2 = 0; v2 < NQ; v2++ )
 		{
 			int use_it = 0;
-			for( int v1x = 0; v1x < par_info.nv; v1x++ )
+			for( int v1x = 0; v1x < par_info.nv[surface_id]; v1x++ )
 			{
-				int v1 = par_info.verts[v1x];
+				int v1 = par_info.verts[surface_id][v1x];
 	
 				if( fabs(effective_mass[v1*nv+v2]) / sqrt(fabs(effective_mass[v1*nv+v1]*effective_mass[v2*nv+v2])) > rel_tol )
 				{

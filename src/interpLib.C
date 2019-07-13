@@ -4180,9 +4180,9 @@ double surface::energy( double *r, double *puv, int do_vertex, int *plist, int *
 	}
 	else
 	{
-		for( int fx = 0; fx < par_info.nf; fx++ )
+		for( int fx = 0; fx < par_info.nf[surface_id]; fx++ )
 		{
-			int f = par_info.faces[fx];
+			int f = par_info.faces[surface_id][fx];
 	
 			e +=  faceEnergy( f, r, puv, doMonge ); 
 		}

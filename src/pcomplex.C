@@ -47,6 +47,8 @@ void pcomplex::alloc( void )
 	rall = (double *)malloc( sizeof(double) * 3 * nsites );
 	memset( rall, 0, sizeof(double) * 3 * nsites );
 
+	sid = (int*)malloc( sizeof(int) * nsites );
+
 	fs = (int *)malloc( sizeof(int) * nsites );
 	puv = (double *)malloc( sizeof(double) * 2 * nsites );
 
@@ -250,9 +252,12 @@ void pcomplex::prepareForGradient( void )
 	memset( save_grad, 0, sizeof(double) * 3 * nsites );
 }
 
-double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *mesh_grad, double *mesh_qdot, double *mesh_qdot0, double time_step, double timestep_total)
+double pcomplex::update_dH_dq( Simulation *theSimulation, double time_step, double timestep_total)
 {
-	double *alphas = rsurf+3*theSurface->nv;
+	printf("NYI for multiple surfaces.\n");
+	exit(1);
+
+	double *alphas = theSimulation->alpha;
 
 	// select the minimum timestep we can do.
 
@@ -261,6 +266,10 @@ double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *mesh_
 	int is_irreg = 0;
 	for( int s = 0; s < nattach; s++ )
 	{
+		surface *theSurface;
+		double *rsurf;
+		theSimulation->fetch(sid[s],&theSurface,&rsurf);
+
 		if( grad_fs[s] >= theSurface->nf_faces )
 			is_irreg = 1;
 	}
@@ -274,6 +283,23 @@ double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *mesh_
 
 		for( int s = 0; s < nattach; s++ )
 		{
+			surface_record *sRec = NULL;
+			surface *theSurface =NULL;
+			for( surface_record *tRec = theSimulation->allSurfaces; tRec; tRec = tRec->next )
+			{
+				if( tRec->id == sid[s] )
+				{
+					sRec = tRec;	
+					theSurface = sRec->theSurface;
+					break;
+				}
+			}
+
+			double *rsurf = sRec->r;
+			double *mesh_grad = sRec->g;
+			double *mesh_qdot = sRec->qdot;
+			double *mesh_qdot0 = sRec->qdot0;
+
 			int f = grad_fs[s];
 	
 			double u = grad_puv[2*s+0];
@@ -411,7 +437,6 @@ double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *mesh_
 
 	if( nattach > 0  )
 	{	
-		int nv = theSurface->nv;
 
 		double surfacer_g[3*nattach];
 		double surfacen_g[3*nattach];
@@ -421,15 +446,21 @@ double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *mesh_
 
 		double pg[2*nattach];
 		memset( pg, 0, sizeof(double) * 2 * nattach );
-
-		// complex's internal potential.	
-		grad( theSurface, rsurf, surfacer_g, surfacen_g );
-
+		grad( theSimulation, surfacer_g, surfacen_g );
 		if( debug == DEBUG_OFF || debug == DEBUG_NO_T )
-			AttachG( theSurface, rsurf, mesh_grad, pg ); 
+			AttachG( theSimulation, pg ); 
 	
 		for( int s = 0; s < nattach; s++ )
 		{
+			surface_record *sRec = theSimulation->fetch(sid[s]);
+			surface *theSurface = sRec->theSurface;
+
+			int nv = theSurface->nv;
+			double *rsurf = sRec->r;
+			double *mesh_grad = sRec->g;
+			double *mesh_qdot = sRec->qdot;
+			double *mesh_qdot0 = sRec->qdot0;
+
 			double coefs[3*(MAX_VALENCE+6)];
 			int coef_list[MAX_VALENCE+6];
 			int ncoef=0;
@@ -739,16 +770,33 @@ double pcomplex::update_dH_dq( surface *theSurface, double *rsurf, double *mesh_
 	return time_step;
 }
 
-void pcomplex::compute_qdot( surface *theSurface, double *rsurf, double *mesh_qdot0, double *mesh_qdot_temp, double frac_mult )
+void pcomplex::compute_qdot( Simulation *theSimulation,  double frac_mult )
 {
-	double *alphas = rsurf+3*theSurface->nv;
+	double *alphas = theSimulation->alpha;
 
 	if( nattach > 0  )
 	{	
-		int nv = theSurface->nv;
 	
 		for( int s = 0; s < nattach; s++ )
 		{
+			surface_record *sRec = NULL;
+			surface *theSurface =NULL;
+			for( surface_record *tRec = theSimulation->allSurfaces; tRec; tRec = tRec->next )
+			{
+				if( tRec->id == sid[s] )
+				{
+					sRec = tRec;	
+					theSurface = sRec->theSurface;
+					break;
+				}
+			}
+
+			int nv = theSurface->nv;
+			double *rsurf = sRec->r;
+			double *mesh_grad = sRec->g;
+			double *mesh_qdot = sRec->qdot;
+			double *mesh_qdot0 = sRec->qdot0;
+
 			double zero_order[2] = { 0,0 };
 			double first_order[2] = {0,0};
 
@@ -927,7 +975,7 @@ void pcomplex::compute_qdot( surface *theSurface, double *rsurf, double *mesh_qd
 	}
 }
 
-void pcomplex::propagate_surface_q( surface *theSurface, double *rsurf, double dt )
+void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 {
 	static double av_dstep = 0;
 	static double av_dstep2 = 0;
@@ -940,6 +988,22 @@ void pcomplex::propagate_surface_q( surface *theSurface, double *rsurf, double d
 
 	for( int s = 0; s < nattach; s++ )
 	{
+		surface_record *sRec = NULL;
+		surface *theSurface =NULL;
+		for( surface_record *tRec = theSimulation->allSurfaces; tRec; tRec = tRec->next )
+		{
+			if( tRec->id == sid[s] )
+			{
+				sRec = tRec;	
+				theSurface = sRec->theSurface;
+				break;
+			}
+		}
+
+		double *rsurf = sRec->r;
+		double *mesh_grad = sRec->g;
+		double *mesh_qdot = sRec->qdot;
+		double *mesh_qdot0 = sRec->qdot0;
 		int last_f = fs[s];
 		double last_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
 		double duv[2];
@@ -1048,12 +1112,13 @@ void pcomplex::propagate_surface_q( surface *theSurface, double *rsurf, double d
 	} 
 }
 
-void pcomplex::propagate_p( surface *theSurface, double *rsurf, double dt )
+void pcomplex::propagate_p( Simulation *theSimulation, double dt )
 {
 	// move a step.
 
+#if 0 // presim
 	double T_before = T(theSurface,rsurf);
-
+#endif 
 	for( int s = 0; s < nattach; s++ )
 	{
 		p[2*s+0] -= save_grad[2*s+0] * dt * AKMA_TIME;
@@ -1066,14 +1131,15 @@ void pcomplex::propagate_p( surface *theSurface, double *rsurf, double dt )
 		p[3*s+1] -= save_grad[3*s+1] * dt * AKMA_TIME;
 		p[3*s+2] -= save_grad[3*s+2] * dt * AKMA_TIME;
 	}
-	
+
+#if 0 //presim	
 	double T_after = T(theSurface,rsurf);
 
 	if( fabs(T_after-T_before) > 0.592  )
 	{
 		printf("dKE: %le f: %d u: %le v: %le\n", T_after-T_before, fs[0], puv[0], puv[1] );
 	}
-
+#endif
 	if( bound )	
 	{
 		// 
@@ -1347,12 +1413,12 @@ pcomplex *loadComplex( const char *name )
 }
 
 
-double pcomplex::V( surface *theSurface, double *rsurf )
+double pcomplex::V( Simulation *theSimulation )
 {
 	return 0;
 }
 
-double pcomplex::grad(surface *theSurface, double *rsurf, double *surface_g, double *particle_g )
+double pcomplex::grad( Simulation *theSimulation, double *surface_g, double *particle_g )
 {
 	memset( particle_g, 0, sizeof(double) * 3 * nattach );
 	memset( surface_g, 0, sizeof(double) * 3 * nattach );
@@ -1592,7 +1658,7 @@ void pcomplex::evaluate_momentum( surface *theSurface, double *rsurf, double *po
 	}
 }
 
-double pcomplex::T( surface *theSurface, double *rsurf, int subp)
+double pcomplex::T( Simulation *theSimulation, int subp)
 {
 	double T = 0;
 
@@ -1601,6 +1667,10 @@ double pcomplex::T( surface *theSurface, double *rsurf, int subp)
 	for( int s = 0; s < nattach; s++ )
 	{
 		if( subp != -1 && s!= subp) continue;
+		surface_record *sRec = theSimulation->fetch(sid[s]);
+		surface *theSurface = sRec->theSurface;
+		double *rsurf = sRec->r;
+
 		int f = fs[s];
 		double u = puv[2*s+0];
 		double v = puv[2*s+1];
@@ -1639,6 +1709,7 @@ void pcomplex::putBonds( int *bond_list )
 {
 }
 
+#if 0 // pre sim
 void pcomplex::debug_dynamics( surface *theSurface,
 		      double *rsurf,
 		
@@ -1679,203 +1750,9 @@ void pcomplex::debug_dynamics( surface *theSurface,
 		dV_dcomplex[2*s+1] += save_grad[2*s+1];
 	}
 }
-/*
-void pcomplex::getMeshQxdot( surface *theSurface, double *rsurf, double *Minv, double *mesh_p, double *mesh_qdot, double *mesh_qdot0, double *mesh_der_qdot )
-{
-	if( nattach > 0  )
-	{	
-		int nv = theSurface->nv;
-
-		double surfacer_g[3*nattach];
-		double surfacen_g[3*nattach];
-
-		memset( surfacer_g, 0, sizeof(double)*3*nattach);
-		memset( surfacen_g, 0, sizeof(double)*3*nattach);
-
-		grad( theSurface, rsurf, surfacer_g, surfacen_g );
-	
-		for( int s = 0; s < nattach; s++ )
-		{
-			double coefs[3*(MAX_VALENCE+6)];
-			int coef_list[MAX_VALENCE+6];
-			int ncoef=0;
-			theSurface->get_pt_dcoeffs( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], coefs, coef_list, &ncoef ); 
-			double *dcoef = coefs + ncoef;
-
-			double uv_grad[2] = { 0,0 };
-
-//			if( debug == DEBUG_OFF || debug == DEBUG_NO_T )
-//			theSurface->pointGradient( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1],
-//				rsurf, mesh_grad, uv_grad, surfacer_g+3*s, surfacen_g+3*s ); 
-
-			double drdu[3];
-			double drdv[3];
-
-			theSurface->ru( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1],
-					rsurf, drdu );
-			theSurface->rv( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1],
-					rsurf, drdv );
-
-			double ruu[3] = {0,0,0};
-			double ruv[3] = {0,0,0};	
-			double rvv[3] = {0,0,0};
-
-			theSurface->r2der( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], rsurf, ruu, ruv, rvv );
-
-		// gradient is uv_grad.
-
-			// compute instantaneous inverse mass matrix and its u/v/q derivatives that show up as effective forces.
-			int f = grad_fs[s];
-			double u = grad_puv[2*s+0];
-			double v = grad_puv[2*s+1];
-	
-			double P_uv[4] = {
-				0,	0,
-				0,	0
-			};
-
-		
-			theSurface->fetchPuv( f, u, v, P_uv, rsurf );
-		
-			P_uv[0] *= mass[s];
-			P_uv[1] *= mass[s];
-			P_uv[2] *= mass[s];
-			P_uv[3] *= mass[s];
-
-
-			double *C_iu;
-		
-			int nc = theSurface->fetchCiu( f, u, v, &C_iu, rsurf );
-	
-			for( int t = 0; t < 3 * ncoef * 2; t++ )
-				C_iu[t] *= mass[s];	
-
-				
-			double *d_P_duv;
-				
-			// these derivatives include the mesh derivatives wrt u/v
-			nc = theSurface->fetchdP_duv( f, u, v, &d_P_duv, rsurf );
-			for( int t = 0; t < 8; t++ )
-				d_P_duv[t] *= mass[s];
-
-			for( int c = 0; c < ncoef; c++ )
-			for( int uv = 0; uv < 4; uv++ )
-			for( int xyz = 0; xyz < 3; xyz++ )
-				d_P_duv[8+c*4*3+uv*3+xyz] *= mass[s];
- 
-			// SCALE d_P_duv BY THE MASS?
-		
-			// the contribution from dV/du and dV/dv
-			save_grad[2*s+0] = uv_grad[0];
-			save_grad[2*s+1] = uv_grad[1];
-
-			// compute d inverse d u and dinverse dv.
-
-			double Pdet = P_uv[0] * P_uv[3] - P_uv[1] * P_uv[2];
-			double Pinv[4] = { P_uv[3]/Pdet, -P_uv[2]/Pdet, -P_uv[1]/Pdet, P_uv[0]/Pdet };
-
-			double qdot0[2] = { Pinv[0] * p[2*s+0] + Pinv[1] * p[2*s+1],
-					    Pinv[2] * p[2*s+0] + Pinv[3] * p[2*s+1] };
-
-			double d_inv_P_uv_du[4], T[4], d_inv_P_uv_dv[4];	
-
-			Mul22( Pinv, d_P_duv, T );
-			Mul22( T, Pinv, d_inv_P_uv_du );  	
-			Mul22( Pinv, d_P_duv+4, T );
-			Mul22( T, Pinv, d_inv_P_uv_dv );  	
-
-			// Pinv and Mij are the block inverses of the particle and mesh, respectively.
-			// Ciu is the coupling element.
-			//
-			// Ciu is stored as [ ncoords * (6) + 2 (u/v dot) x 3 (cartesian) 
-			//
-			// tM[i,v] = Ciu[i u] P[u,v]
-
-			double *C_Pinv = (double *)malloc( sizeof(double) * 3 * ncoef * 2 );
-			memset( C_Pinv, 0, sizeof(double) * 3 * ncoef * 2 );
-
-			// right multiply by Pinv.
-			for( int c = 0; c < ncoef; c++ )
-			for( int i = 0; i < 2; i++ )
-			{
-				for( int j = 0; j < 2; j++ )
-				{
-					C_Pinv[c*3*2+i*3+0] += C_iu[c*3*2+j*3+0] * Pinv[i*2+j]; 
-					C_Pinv[c*3*2+i*3+1] += C_iu[c*3*2+j*3+1] * Pinv[i*2+j]; 
-					C_Pinv[c*3*2+i*3+2] += C_iu[c*3*2+j*3+2] * Pinv[i*2+j]; 
-				}
-			}
-			
-			double *Pcouple = (double *)malloc( sizeof(double) * nv * 3 * 2 );
-			memset( Pcouple, 0, sizeof(double) * nv * 3 * 2 );
-	
-			// left multiply by Pinv.
-			for( int c1 = 0; c1 < nv; c1++ )
-			{
-				for( int i = 0; i < 2; i++ )
-				for( int c = 0; c < ncoef; c++ )
-				{
-					Pcouple[c1*6+i*3+0] -= Minv[c1*nv+coef_list[c]] * C_Pinv[c*3*2+i*3+0];		
-					Pcouple[c1*6+i*3+1] -= Minv[c1*nv+coef_list[c]] * C_Pinv[c*3*2+i*3+1];		
-					Pcouple[c1*6+i*3+2] -= Minv[c1*nv+coef_list[c]] * C_Pinv[c*3*2+i*3+2];		
-				}
-			}
-			
-			// TERM 2B, derivative of inverse term wrt q
-
-			double f1 = 1;
-			double f2 = 1;
-
-			for( int c    = 0; c   < ncoef;  c++ )
-			for( int c2    = 0; c2   < ncoef;  c2++ )
-			{		// (-) signs cancel
-
-
-
-#ifdef PART_A
-				mesh_der_qdot[3*coef_list[c]+0] += qdot0[0] * mass[s] *( drdu[0] * dcoef[0*ncoef+c] + dcoef[0*ncoef+c] * drdu[0]) * C_Pinv[c2*3*2+0*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-				mesh_der_qdot[3*coef_list[c]+1] += qdot0[0] * mass[s] *( drdu[1] * dcoef[0*ncoef+c] + dcoef[0*ncoef+c] * drdu[1]) * C_Pinv[c2*3*2+0*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-				mesh_der_qdot[3*coef_list[c]+2] += qdot0[0] * mass[s] *( drdu[2] * dcoef[0*ncoef+c] + dcoef[0*ncoef+c] * drdu[2]) * C_Pinv[c2*3*2+0*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-				
-				mesh_der_qdot[3*coef_list[c]+0] += qdot0[1] * mass[s] *( drdv[0] * dcoef[0*ncoef+c] + dcoef[1*ncoef+c] * drdu[0]) * C_Pinv[c2*3*2+0*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-				mesh_der_qdot[3*coef_list[c]+1] += qdot0[1] * mass[s] *( drdv[1] * dcoef[0*ncoef+c] + dcoef[1*ncoef+c] * drdu[1]) * C_Pinv[c2*3*2+0*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-				mesh_der_qdot[3*coef_list[c]+2] += qdot0[1] * mass[s] *( drdv[2] * dcoef[0*ncoef+c] + dcoef[1*ncoef+c] * drdu[2]) * C_Pinv[c2*3*2+0*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-				
-				mesh_der_qdot[3*coef_list[c]+0] += qdot0[0] * mass[s] *( drdu[0] * dcoef[1*ncoef+c] + dcoef[0*ncoef+c] * drdv[0]) * C_Pinv[c2*3*2+1*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-				mesh_der_qdot[3*coef_list[c]+1] += qdot0[0] * mass[s] *( drdu[1] * dcoef[1*ncoef+c] + dcoef[0*ncoef+c] * drdv[1]) * C_Pinv[c2*3*2+1*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-				mesh_der_qdot[3*coef_list[c]+2] += qdot0[0] * mass[s] *( drdu[2] * dcoef[1*ncoef+c] + dcoef[0*ncoef+c] * drdv[2]) * C_Pinv[c2*3*2+1*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-
-
-				mesh_der_qdot[3*coef_list[c]+0] += qdot0[1] * mass[s] *( drdv[0] * dcoef[1*ncoef+c] + dcoef[1*ncoef+c] * drdv[0]) * C_Pinv[c2*3*2+1*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-				mesh_der_qdot[3*coef_list[c]+1] += qdot0[1] * mass[s] *( drdv[1] * dcoef[1*ncoef+c] + dcoef[1*ncoef+c] * drdv[1]) * C_Pinv[c2*3*2+1*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-				mesh_der_qdot[3*coef_list[c]+2] += qdot0[1] * mass[s] *( drdv[2] * dcoef[1*ncoef+c] + dcoef[1*ncoef+c] * drdv[2]) * C_Pinv[c2*3*2+1*3+0] * Minv[coef_list[c]*nv+coef_list[c2]]; 
-#endif
-			}
-
-			for( int cj = 0; cj < ncoef; cj++ )
-			for( int ci = 0; ci < ncoef; ci++ )
-			for( int uv = 0; uv < 2; uv++ )
-			{
-				// DOES THIS NEED A FACTOR OF 1/2 ??? 
-				// TERM 2D	
-#ifdef PART_B
-				mesh_der_qdot[3*coef_list[ci]+0] -= mass[s]* Minv[coef_list[ci]*nv+coef_list[cj]] * coefs[cj] * dcoef[(uv)*ncoef+ci] * qdot0[uv];
 #endif
 
-				
-			}
-
-			
-			// that's it for derivatives wrt u/v
-
-
-			free(d_P_duv);
-			free(C_iu);
-		}
-	}
-}
-*/
-void pcomplex::applyLangevinFriction( surface *theSurface, double *rsurf, double dt, double gamma )
+void pcomplex::applyLangevinFriction( Simulation *theSimulation, double dt, double gamma )
 {
 
 	for( int s = 0; s < nattach; s++ )
@@ -1893,7 +1770,7 @@ void pcomplex::applyLangevinFriction( surface *theSurface, double *rsurf, double
 	}
 }
 
-void pcomplex::applyLangevinNoise( surface * theSurface, double *rsurf, double dt, double gamma, double temperature )
+void pcomplex::applyLangevinNoise( Simulation *theSimulation,  double dt, double gamma, double temperature )
 {
 	check_random_init();
 
@@ -2028,14 +1905,15 @@ void pcomplex::saveComplex( FILE *theFile )
 
 
 // the surface energy of attachments.
-double pcomplex::AttachV( surface *theSurface, double *rsurf )
+double pcomplex::AttachV( Simulation *theSimulation )
 {	
 	double pot = 0;
 
 #ifndef DISABLE_ATTACH
 	for( int s = 0; s < nattach; s++ )
 	{
-		double curv = theSurface->c( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], rsurf );
+		struct surface_record *sRec = theSimulation->fetch(sid[s]);
+		double curv = sRec->theSurface->c( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], sRec->r);
 
 
 		pot += 0.5 * kc * p_area[s] * ( curv - p_c0[s]) * (curv - p_c0[s]); 
@@ -2045,27 +1923,16 @@ double pcomplex::AttachV( surface *theSurface, double *rsurf )
 	return pot;
 }
 
-double pcomplex::AttachG( surface *theSurface, double *rsurf, double *gr, double *pg )
+double pcomplex::AttachG( Simulation *theSimulation,  double *pg )
 {
 	double pot = 0;
 
 #ifndef DISABLE_ATTACH
 	for( int s = 0; s < nattach; s++ )
 	{
-		theSurface->particle_H_grad( rsurf, gr, grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], p_area[s], p_c0[s], pg + 2 *s );
-		double curv = theSurface->c( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], rsurf );
-
-//#define C0_DEBUG
-#ifdef C0_DEBUG
-		if( grad_fs[s] >= theSurface->nf_faces )
-		{
-			double *temp = (double *)malloc( sizeof(double) * (3*theSurface->nv+3) );
-			memset(temp,0,sizeof(double)*(3*theSurface->nv+3));
-			double gtest[2]={0,0};
-			theSurface->particle_H_grad( rsurf, temp, grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], p_area[s], p_c0[s], gtest );
-			printf("IRREGULAR FACE GRADIENT: curv: %le f %d uv %le %le, %le %le\n", curv, grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], gtest[0], gtest[1] );
-		}
-#endif
+		struct surface_record *sRec = theSimulation->fetch(sid[s]);
+		sRec->theSurface->particle_H_grad( sRec->r, sRec->g, grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], p_area[s], p_c0[s], pg + 2 *s );
+		double curv = sRec->theSurface->c( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], sRec->r );
 
 		pot += 0.5 * kc * p_area[s] * ( curv - p_c0[s]) * (curv - p_c0[s]); 
 	}
@@ -2075,27 +1942,32 @@ double pcomplex::AttachG( surface *theSurface, double *rsurf, double *gr, double
 	
 }
 
-double pcomplex::local_curvature( surface *theSurface, double *rsurf )
+double pcomplex::local_curvature( Simulation *theSimulation )
 {
 	double av = 0;
 
 	for( int s = 0; s < nattach; s++ )
 	{
-		double curv = theSurface->c( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
+		struct surface_record *sRec = theSimulation->fetch(sid[s]);
+		double curv = sRec->theSurface->c( fs[s], puv[2*s+0], puv[2*s+1], sRec->r );
 
 		av += curv/nattach;
 	}
 	return av;
 }
 
-void pcomplex::setrall( surface *theSurface, double *rsurf )
+void pcomplex::setrall( Simulation *theSimulation  )
 {
-	double *alphas = rsurf+theSurface->nv*3;
+	double *alphas = theSimulation->alpha ;
 	if( bound )
 	{
-				double njunk[3];
+		double njunk[3];
 		for( int s = 0; s < nattach; s++ )
 		{
+			double *rsurf;
+			surface *theSurface;
+			theSimulation->fetch( sid[s], &theSurface, &rsurf );
+
 			int f_1 = fs[s], nf = fs[s];
 			double uv1[2] = { 0.33, 0.33 };
 			double duv1[2] = { puv[2*s+0]-uv1[0], puv[2*s+1]-uv1[1] };
@@ -2341,11 +2213,13 @@ void pcomplex::unpackF( double *io )
 	}
 }
 
-void propagateSolutionParticles( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex, double dt )
+void propagateSolutionParticles( Simulation *theSimulation, double dt )
 {
+	pcomplex **allComplexes = theSimulation->allComplexes;
+	int ncomplex = theSimulation->ncomplex;
 	static double ncol = 0;
 	static int icntr=0;
-	double *alphas = rsurf + 3*theSurface->nv;
+	double *alphas = theSimulation->alpha;
 	int done = 0;
 
 	for( int c = 0; c < ncomplex; c++ )
@@ -2384,7 +2258,7 @@ void propagateSolutionParticles( surface *theSurface, double *rsurf, pcomplex **
 			
 		ParallelSyncComplexes( allComplexes, ncomplex );
 
-		double toc = timePrecedingElasticCollision( theSurface, rsurf, allComplexes, ncomplex, propagated, &col1, &p1, &col2, &p2  );
+		double toc = timePrecedingElasticCollision( theSimulation, allComplexes, ncomplex, propagated, &col1, &p1, &col2, &p2  );
 		
 	
 		if( col1 >= 0 )
@@ -2446,10 +2320,9 @@ void propagateSolutionParticles( surface *theSurface, double *rsurf, pcomplex **
 					pos1_at_c[0] - pos2_at_c[0],
 					pos1_at_c[1] - pos2_at_c[1],
 					pos1_at_c[2] - pos2_at_c[2] };
-
 			double len = length3(dr_at_c);
 			if( len > 1.1 * (allComplexes[c1]->sigma[p1] + allComplexes[c2]->sigma[p2]) )
-				theSurface->wrapPBC( dr_at_c, alphas );
+				theSimulation->wrapPBC( dr_at_c, alphas );
 
 			normalize(dr_at_c);
 			// solve for dKE

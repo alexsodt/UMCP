@@ -3,6 +3,7 @@
 
 #include "lagrange.h"
 #include "sparse.h"
+#include "simulation.h"
 
 #define POINT_INSIDE -1
 #define POINT_UNKNOWN 0
@@ -82,12 +83,12 @@ typedef struct srd_integrator
 	void writeXYZ( FILE *theFile );
 	void stream( double dt );
 	void collide( void );
-	int stream_and_collide( double *r, double *g,  double *vmem, SparseMatrix *effm, surface *theSurface, double **M  , int mlow, int mhigh, double delta_hull, force_set *theForceSet , double running_time, double integrate_time, double dt_col );
+	int stream_and_collide( Simulation *theSimulation, double **M  , int mlow, int mhigh, double delta_hull, double running_time, double integrate_time, double dt_col );
 	int collide_with_membrane( double *r, double *g, surface *theSurface, double **M  , int mlow, int mhigh, double delta_hull, force_set *theForceSet , double time_step, double force_factor, double *vmem, SparseMatrix *effm );
 	int collide_with_membrane_inside_outside( double *r, double *g, surface *theSurface, double **M  , int mlow, int mhigh, double delta_hull, force_set *theForceSet , double time_step, double force_factor, double *vmem, SparseMatrix *effm );
 	int collide_with_membrane_planar( double *r, double *g, surface *theSurface, double **M  , int mlow, int mhigh, double delta_hull, force_set *theForceSet , double time_step, double force_factor, double *vmem, SparseMatrix *effm );
 	int collide_with_membrane_planar_multi_collision( double *r, double *g, surface *theSurface, double **M  , int mlow, int mhigh, double delta_hull, force_set *theForceSet , double time_step, double force_factor, double *vmem, SparseMatrix *effm );
-	void initializeDistances( double *r, surface *theSurface, double **M, int mlow, int mhigh );
+	void initializeDistances( Simulation *theSimulation, double **M, int mlow, int mhigh );
 	void tagParticlesForCollision( double *r, surface * theSurface, double delta_hull_collision, double **M, int mlow, int mhigh );
 	void altTag( double *r, surface * theSurface, double delta_hull_collision, double **M, int mlow, int mhigh );
 	void checkResolve( double *r, surface * theSurface, double delta_hull_collision, double **M, int mlow, int mhigh );

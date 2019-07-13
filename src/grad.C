@@ -65,8 +65,11 @@ void surface::fdiff_check_grad( double *r )
 void surface::grad( double *r, double *gr, double *puv, double *pg )
 {	
 	if( !setup_for_parallel )
-		setupParallel(this,NULL,0,-1);
-
+	{
+		printf("IMPLEMENTATION ERROR. parallel info must be setup before grad called.\n");
+//		setupParallel(this,NULL,0,-1);
+		exit(1);
+	}
 	double alpha_x = r[3*nv];
 	double alpha_y = r[3*nv+1];
 	double alpha_z = r[3*nv+2];
@@ -80,9 +83,9 @@ void surface::grad( double *r, double *gr, double *puv, double *pg )
 	double wgt = 0;
 		double dudv = 0.5;
 
-	for( int fx = 0; fx < par_info.nf; fx++ )
+	for( int fx = 0; fx < par_info.nf[surface_id]; fx++ )
 	{
-		int f = par_info.faces[fx];
+		int f = par_info.faces[surface_id][fx];
 
 		if( f >= nf_faces )
 			continue;
@@ -3375,16 +3378,20 @@ d_e_d_rvz += d_e_d_g * d_g_d_rvz;
 void surface::pgrad( double *r, double *gr, double *p_uv, double *pg )
 {
 	if( !setup_for_parallel )
-		setupParallel(this,NULL,0,-1);
+	{
+		printf("IMPLEMENTATION ERROR. parallel info must be setup before grad called.\n");
+//		setupParallel(this,NULL,0,-1);
+		exit(1);
+	}
 
 	double alpha_x = r[3*nv];
 	double alpha_y = r[3*nv+1];
 	double alpha_z = r[3*nv+2];
 	// gradient of the particle energy wrt the vertices.
 
-	for( int fx = 0; fx < par_info.nf; fx++ )
+	for( int fx = 0; fx < par_info.nf[surface_id]; fx++ )
 	{
-		int f = par_info.faces[fx];
+		int f = par_info.faces[surface_id][fx];
 
 		if( f >= nf_faces )
 			continue;
@@ -4259,9 +4266,9 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 	}
 
 
-	for( int fx = 0; fx < par_info.nf; fx++ )
+	for( int fx = 0; fx < par_info.nf[surface_id]; fx++ )
 	{
-		int tf = par_info.faces[fx];
+		int tf = par_info.faces[surface_id][fx];
 
 		if( tf < nf_faces )
 			continue;
@@ -6329,7 +6336,11 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 void surface::igrad( double *r, double *gr )
 {	
 	if( !setup_for_parallel )
-		setupParallel(this,NULL,0,-1);
+	{
+		printf("IMPLEMENTATION ERROR. parallel info must be setup before grad called.\n");
+//		setupParallel(this,NULL,0,-1);
+		exit(1);
+	}
 
 	double alpha_x = r[3*nv];
 	double alpha_y = r[3*nv+1];
@@ -6346,9 +6357,9 @@ void surface::igrad( double *r, double *gr )
 //	printf("This gradient needs to be corrected to use the total area on an irregular face instead of the individual integration point area.\n");
 //	exit(1);
 
-	for( int fx = 0; fx < par_info.nf; fx++ )
+	for( int fx = 0; fx < par_info.nf[surface_id]; fx++ )
 	{
-		int tf = par_info.faces[fx];
+		int tf = par_info.faces[surface_id][fx];
 
 		if( tf < nf_faces )
 			continue;

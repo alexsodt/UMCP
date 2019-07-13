@@ -1340,3 +1340,185 @@ void surface::writeVertexXYZandPSFPeriodic( const char *baseName )
 	free(all_bonds);
 	free(coord_space);
 }
+
+void Simulation::writeLimitingSurface( FILE *theFile )
+{
+	int npts = 0;
+	int ppd = 0;
+
+	for( int fi = 0; fi <= plim; fi++ )
+	for( int fj = 0; fj <= plim-fi; fj++ )
+	{
+		double f1 = fi / (double)plim;
+		double f2 = fj / (double)plim;
+		
+		ppd++;
+	}
+
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+		npts += ppd * sRec->theSurface->nt;
+	
+	for( int c = 0; c < ncomplex; c++ )
+		npts += allComplexes[c]->nsites;
+
+	fprintf(theFile, "%d\n", npts );
+	fprintf(theFile, "limiting surface\n");
+
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+	{
+		surface *theSurface = sRec->theSurface;
+		int nv = theSurface->nv;
+		int nt = theSurface->nt;
+		double *r = (double *)malloc( sizeof(double) * 3 * (nv+1) );
+	
+		r[3*nv+0] = alpha[0];
+		r[3*nv+1] = alpha[1];
+		r[3*nv+2] = alpha[2];
+		theSurface->get(r);
+		
+		for( int t = 0; t < nt; t++ )
+		{	
+			for( int fi = 0; fi <= plim; fi++ )
+			for( int fj = 0; fj <= plim-fi; fj++ )
+			{
+				double f1 = fi / (double)plim;
+				double f2 = fj / (double)plim;
+				
+				double rl[3],nrm[3];
+			
+				theSurface->evaluateRNRM( t, f1, f2, rl, nrm, r );
+		
+		
+				fprintf(theFile, "C %lf %lf %lf\n", rl[0], rl[1], rl[2] );
+			}
+		}
+
+		free(r);
+	}
+	for( int c = 0; c < ncomplex; c++ )
+	{
+		for( int p = 0; p < allComplexes[c]->nsites; p++ )
+			fprintf(theFile, "O %lf %lf %lf\n", allComplexes[c]->rall[3*p+0], allComplexes[c]->rall[3*p+1], allComplexes[c]->rall[3*p+2] );
+	}
+	fflush(theFile);
+
+}
+        		
+void Simulation::writeLimitingSurfacePSF(FILE *theFile )
+{
+	int ppd = 0;
+
+	for( int fi = 0; fi <= plim; fi++ )
+	for( int fj = 0; fj <= plim-fi; fj++ )
+	{
+		double f1 = fi / (double)(plim+1e-14);
+		double f2 = fj / (double)(plim+1e-14);
+		
+		ppd++;
+	}
+	
+	int npts = 0;
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+		npts += ppd * sRec->theSurface->nt;
+	
+	int nbonds = 0;	
+		
+	int index[plim+1][plim+1];
+	for( int fi = 0; fi <= plim; fi++)
+	for( int fj = 0; fj <= plim; fj++)
+		index[fi][fj] = -1;
+	
+	int t_index = 0;
+	for( int fi = 0; fi <= plim; fi++ )
+	for( int fj = 0; fj <= plim-fi; fj++)
+	{
+		index[fi][fj] = t_index;
+		t_index++;
+	}
+
+	int *the_bonds = NULL;
+	
+	for( int pass = 0; pass < 2; pass++ )
+	{
+		if( pass == 1 )
+			the_bonds = (int *)malloc( sizeof(int) * 2 * nbonds );
+		nbonds=0;
+		int i_tot = 0;
+		for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+		{
+	
+			for( int t = 0; t < sRec->theSurface->nt; t++ )
+			{	
+				int base_index = i_tot;
+	
+				for( int fi = 0; fi <= plim; fi++ )
+				for( int fj = 0; fj <= plim-fi; fj++ )
+				{
+					double f1 = fi / (double)plim;
+					double f2 = fj / (double)plim;
+				
+					int bonds[3][2] = {
+						{fi+1, fj-1},
+						{fi+1, fj},
+						{ fi, fj+1}
+					};
+		
+					for( int b = 0; b < 3; b++ )
+					{
+						if( bonds[b][0] >= 0 && bonds[b][1] >= 0 && bonds[b][0]+bonds[b][1] <= plim )
+						{
+							int i1 = base_index + index[fi][fj];
+							int i2 = base_index + index[bonds[b][0]][bonds[b][1]];
+							
+							if( pass == 1 )
+							{
+								the_bonds[2*nbonds+0] = i1; 
+								the_bonds[2*nbonds+1] = i2; 
+							}
+						
+							nbonds++;
+						}
+					}
+			
+				}
+	
+				i_tot += ppd; 
+			}
+		}	
+		int curp = npts;
+
+		for( int c = 0; c < ncomplex; c++ )
+		{
+			int c_nbonds = allComplexes[c]->getNBonds();
+			
+			if( pass == 1 )
+			{
+				allComplexes[c]->putBonds( the_bonds + nbonds*2 );
+
+				for( int x = 0; x < c_nbonds; x++ )
+				{
+					the_bonds[2*nbonds+2*x] += curp;
+					the_bonds[2*nbonds+2*x+1] += curp;
+
+				}
+				nbonds += c_nbonds;
+		
+			}
+			else
+				nbonds += c_nbonds;
+			
+			curp += allComplexes[c]->nsites;
+		}
+	}
+
+	int cpts = 0;
+	for( int c = 0; c < ncomplex; c++ )
+		cpts += allComplexes[c]->nsites;
+
+	writePSF( theFile, npts+cpts, NULL, the_bonds, nbonds );
+
+	free(the_bonds);
+
+}
+
+

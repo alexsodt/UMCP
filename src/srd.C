@@ -681,8 +681,9 @@ void srd_integrator::initializeDistances_works( double *r, surface *theSurface, 
 	free(nump);
 }
 */
-void srd_integrator::initializeDistances( double *r, surface *theSurface, double **M, int mlow, int mhigh )
+void srd_integrator::initializeDistances( Simulation *theSimulation,  double **M, int mlow, int mhigh )
 {
+#if 0 // pre-simulation, change me!
 	double *vertex_data = NULL;
 	int *ptr_to_data = (int *)malloc( sizeof(int) * theSurface->nt );
 	int *nump = (int *)malloc( sizeof(int) * theSurface->nt );
@@ -994,13 +995,14 @@ void srd_integrator::initializeDistances( double *r, surface *theSurface, double
 	free(vertex_data);
 	free(ptr_to_data);
 	free(nump);
+#endif
 }
 
-int srd_integrator::stream_and_collide( double *r, double *g, double *vmem, SparseMatrix *effm, surface *theSurface, double **M, int mlow, int mhigh, double del_hull, force_set *theForceSet, double running_time, double integrate_time, double time_step_collision )
+int srd_integrator::stream_and_collide( Simulation *theSimulation, double **M, int mlow, int mhigh, double del_hull,  double running_time, double integrate_time, double time_step_collision )
 {
-
-
 	int ncol = 0;
+#if 0  // pre-simulation change me!!
+
 
 	double force_factor = time_step_collision / integrate_time;
 
@@ -1053,7 +1055,9 @@ int srd_integrator::stream_and_collide( double *r, double *g, double *vmem, Spar
 		}
 	}
 
+#endif
 	return ncol;
+
 }
 
 int srd_integrator::collide_with_membrane( double *r, double *g, surface *theSurface, double **M, int mlow, int mhigh, double del_hull, force_set *theForceSet, double time_step, double force_factor, double *vmem, SparseMatrix *effm )

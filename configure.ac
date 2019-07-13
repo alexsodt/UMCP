@@ -32,7 +32,6 @@ if test "$parallel" = "yes"; then
 	AC_DEFINE(PARALLEL,1,[Define to compile in parallel.])
 	c_compilers="mpicc $c_compilers"
 	cxx_compilers="mpic++ mpicxx $cxx_compilers"
-fi
 
 if test "a$cuda" = "ayes"; then
 	AC_CHECK_PROG(NVCC, nvcc, nvcc)

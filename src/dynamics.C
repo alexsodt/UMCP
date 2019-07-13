@@ -15,6 +15,7 @@
 
 
 static double FD_TOL = 1e-3;
+#if 0 // pre sim
 void surface::debug_dynamics( double *r, force_set *theForceSet,  double *Minv, pcomplex **allComplexes, int ncomplex )
 {
 	double pmag = 10;
@@ -412,9 +413,11 @@ void surface::debug_dynamics( double *r, force_set *theForceSet,  double *Minv, 
 #endif
 	
 }
+#endif
 
 void surface::timestep_analysis( double *r, force_set *theForceSet,  double *Minv, pcomplex **allComplexes, int ncomplex, double approx_timestep )
 {
+#if 0   //pre-simulation, change me
 	// for now do the diagonals. could diagonalize the whole system...
 
 	int nscan = 5;
@@ -595,6 +598,7 @@ void surface::timestep_analysis( double *r, force_set *theForceSet,  double *Min
 	}
 
 	printf("Timestep %le limited by %s.\n", min_TS, dof );
+#endif
 }
 
 
