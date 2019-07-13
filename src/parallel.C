@@ -30,8 +30,8 @@ void quietParallel( void )
            exit(1);
          }
 
-//	if( taskid != BASE_TASK )
-	if( taskid != 2)
+	if( taskid != BASE_TASK )
+//	if( taskid != 2)
 	{
 		freopen( "/dev/null","w", stdout );
 	}
@@ -495,6 +495,7 @@ void setupSparseVertexPassing( Simulation *theSimulation )
 							{
 								par_info.get_from[id][p2] = (int *)malloc( sizeof(int) * nneed );
 								memcpy( par_info.get_from[id][p2], need_list, sizeof(int) * nneed );
+								printf("partial %d getting %d from %d.\n", p1, nneed, p2 );
 							}
 							else
 							{
@@ -1044,8 +1045,12 @@ void PartialSyncGenQ( double *pp )
 void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double scale, double *alphas, int surface_id )
 {
 #ifdef PARALLEL
-//	FullSyncVertices( vec_in, surface_id );
-	PartialSyncVertices( vec_in, surface_id );
+	FullSyncVertices( vec_in, surface_id );
+//	PartialSyncVertices( vec_in, surface_id );
+	if( surface_id == 1 )
+	{
+		printf("vec_in[0]: %.14le\n", vec_in[0] );
+	}
 #endif
 	double *mcopy = (double *)malloc( sizeof(double) * Mat->nsource*3 );
 

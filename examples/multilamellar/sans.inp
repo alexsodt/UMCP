@@ -1,0 +1,11 @@
+time_step 		1e-11
+jobname			MLV_sans
+mesh 			small.mesh
+mesh2			big.mesh
+do_ld 			yes
+o_lim 			10
+nequil			1000
+nsteps			5000
+movie			yes	
+gamma_langevin 		100	
+KA			0.2
