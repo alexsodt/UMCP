@@ -15,6 +15,7 @@ static surface *min_surface;
 extern double VA,VC;
 double surface_f( double *p )
 {
+#if 0 // pre-simulation change me
 #ifdef PARALLEL
 	ParallelSyncComplexes( min_complexes, min_ncomplex );
 #endif
@@ -49,12 +50,14 @@ double surface_f( double *p )
 #endif
 //	printf("v: %le\n", v);
 	return v;
+#endif
 }
 
 
 
 double surface_fdf( double *p, double *g)
 {
+#if 0 // pre-simulation change me
 #ifdef PARALLEL
 	ParallelSyncComplexes( min_complexes, min_ncomplex );
 #endif
@@ -246,11 +249,13 @@ double surface_fdf( double *p, double *g)
 	exit(1);
 #endif
 	return v;
+#endif
 
 }
 
 void full_fd_test( double *p )
 {
+#if 0 // pre-simulation change me
 	double deps = 1e-10;
 
 	double *tp = (double *)malloc( sizeof(double) * min_nparams );
@@ -299,10 +304,12 @@ void full_fd_test( double *p )
 
 	free(tp);
 	free(g);
+#endif
 }
 
 void fd_test( double *p )
 {
+#if 0 // pre-simulation change me
 	double deps = 1e-10;
 
 	double *tp = (double *)malloc( sizeof(double) * min_nparams );
@@ -327,10 +334,12 @@ void fd_test( double *p )
 
 	free(tp);
 	free(g);
+#endif
 }
 
 void surface::minimize( double *r, pcomplex **allComplexes, int ncomplex, int freeze_membrane )
 {
+#if 0 // pre-simulation change me
 	do_freeze_membrane = freeze_membrane;
 
 	int prev_enable = enable_elastic_interior; 
@@ -420,6 +429,7 @@ void surface::minimize( double *r, pcomplex **allComplexes, int ncomplex, int fr
 	free(g);
 	
 	enable_elastic_interior = prev_enable;
+#endif
 }
 
 

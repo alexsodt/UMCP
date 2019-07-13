@@ -36,9 +36,11 @@ static double use_max_sigma = 0;
 
 double rmin_mult = pow(neg_pot,1.0/(neg_pot-pos_pot)) * pow(pos_pot,1.0/(pos_pot-neg_pot) );
 	
-void local_setup( surface *theSurface, pcomplex **allComplexes, int ncomplex )
+void local_setup( Simulation *theSimulation )
 {
-	double max_sigma = theSurface->PBC_vec[0][0] / 100;
+	double max_sigma = theSimulation->PBC_vec[0][0] / 100;
+	int ncomplex = theSimulation->ncomplex;
+	pcomplex **allComplexes = theSimulation->allComplexes;
 
 	for( int c1 = 0; c1 < ncomplex; c1++ )
 	{
@@ -56,20 +58,22 @@ void local_setup( surface *theSurface, pcomplex **allComplexes, int ncomplex )
 	use_max_sigma = max_sigma;
 
 	pp_boxing = (global_boxing *)malloc( sizeof(global_boxing) );
-	pp_boxing->setup_boxing(2 * max_sigma, theSurface->PBC_vec  );
+	pp_boxing->setup_boxing(2 * max_sigma, theSimulation->PBC_vec  );
 }
 
 /* potential */
-double PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex )
+double PP_V( Simulation *theSimulation )
 {
-	double *alphas = rsurf + theSurface->nv*3;
+	pcomplex **allComplexes = theSimulation->allComplexes;
+	int ncomplex = theSimulation->ncomplex;
+	double *alphas = theSimulation->alpha;
 
 #ifdef DISABLE_PP
 	return 0;
 #endif
 
 	for( int c = 0; c < ncomplex; c++ )
-		allComplexes[c]->setrall(theSurface, rsurf);
+		allComplexes[c]->setrall(theSimulation);
 
 	double v = 0;
 
@@ -107,7 +111,7 @@ double PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, int nc
 						allComplexes[c1]->rall[3*p1+1] - allComplexes[c2]->rall[3*p2+1],
 						allComplexes[c1]->rall[3*p1+2] - allComplexes[c2]->rall[3*p2+2] };
 	
-					theSurface->wrapPBC( dr, alphas );
+					theSimulation->wrapPBC( dr, alphas );
 	
 					double sigma = sigma1+sigma2;
 					double att_sigma = att_sigma1+att_sigma2;
@@ -161,9 +165,11 @@ double PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, int nc
 }
 
 /* gradient */
-double PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex, double *mesh_grad )
+double PP_G( Simulation *theSimulation )
 {
-	double *alphas = rsurf + theSurface->nv*3;
+	pcomplex **allComplexes = theSimulation->allComplexes;
+	int ncomplex = theSimulation->ncomplex;
+	double *alphas = theSimulation->alpha;
 #ifdef DISABLE_PP
 	return 0;
 #endif
@@ -217,7 +223,7 @@ double PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, int nc
 						allComplexes[c1]->rall[3*p1+1] - allComplexes[c2]->rall[3*p2+1],
 						allComplexes[c1]->rall[3*p1+2] - allComplexes[c2]->rall[3*p2+2] };
 	
-					theSurface->wrapPBC( dr, alphas );
+					theSimulation->wrapPBC( dr, alphas );
 	
 					double sigma = sigma1+sigma2;
 					double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
@@ -319,10 +325,12 @@ double PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, int nc
 							{
 								if( ourp[c1] )
 								{
-								theSurface->pointGradient( allComplexes[c1]->grad_fs[p1], 
+									struct surface_record *sRec = theSimulation->fetch(allComplexes[c1]->sid[p1]);
+
+								sRec->theSurface->pointGradient( allComplexes[c1]->grad_fs[p1], 
 										allComplexes[c1]->grad_puv[2*p1+0], 
 										allComplexes[c1]->grad_puv[2*p1+1],
-											rsurf, mesh_grad, allComplexes[c1]->save_grad+2*p1, f1, null_f ); 
+											sRec->r, sRec->g, allComplexes[c1]->save_grad+2*p1, f1, null_f ); 
 								}
 							}
 							else
@@ -339,10 +347,11 @@ double PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, int nc
 							{
 								if( ourp[c2] )
 								{
-									theSurface->pointGradient( allComplexes[c2]->grad_fs[p2], 
+									struct surface_record *sRec = theSimulation->fetch(allComplexes[c2]->sid[p2]);
+									sRec->theSurface->pointGradient( allComplexes[c2]->grad_fs[p2], 
 										allComplexes[c2]->grad_puv[2*p2+0], 
 										allComplexes[c2]->grad_puv[2*p2+1],
-											rsurf, mesh_grad, allComplexes[c2]->save_grad+2*p2, f2, null_f ); 
+											sRec->r, sRec->g, allComplexes[c2]->save_grad+2*p2, f2, null_f ); 
 								}
 							}
 							else
@@ -366,20 +375,22 @@ double PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, int nc
 }
 
 /* gradient */
-double Boxed_PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex )
+double Boxed_PP_V( Simulation *theSimulation )
 {
-	double *alphas = rsurf + theSurface->nv*3;
+	pcomplex **allComplexes = theSimulation->allComplexes;
+	int ncomplex = theSimulation->ncomplex;
+	double *alphas = theSimulation->alpha;
 #ifdef DISABLE_PP
 	return 0;
 #endif
 
 	for( int c = 0; c < ncomplex; c++ )
-		allComplexes[c]->setrall(theSurface, rsurf);
+		allComplexes[c]->setrall(theSimulation);
 
 	if( !pp_boxing )
-		local_setup( theSurface, allComplexes, ncomplex );
+		local_setup( theSimulation );
 
-	pp_boxing->setPBC( theSurface->PBC_vec, alphas );
+	pp_boxing->setPBC( theSimulation->PBC_vec, alphas );
 
 	int ntotp = 0;
 	for( int c = 0; c < ncomplex; c++ )
@@ -458,7 +469,7 @@ double Boxed_PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 					allComplexes[c1]->rall[3*p1+1] - allComplexes[c2]->rall[3*p2+1],
 					allComplexes[c1]->rall[3*p1+2] - allComplexes[c2]->rall[3*p2+2] };
 
-				theSurface->wrapPBC( dr, alphas );
+				theSimulation->wrapPBC( dr, alphas );
 
 				double sigma = sigma1+sigma2;
 				double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
@@ -529,15 +540,17 @@ double Boxed_PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 }
 
 /* gradient */
-double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex, double *mesh_grad )
+double Boxed_PP_G( Simulation *theSimulation )
 {
-	double *alphas = rsurf + theSurface->nv*3;
+	pcomplex **allComplexes = theSimulation->allComplexes;
+	int ncomplex = theSimulation->ncomplex;
+	double *alphas = theSimulation->alpha;
 #ifdef DISABLE_PP
 	return 0;
 #endif
 	if( !pp_boxing )
-		local_setup( theSurface, allComplexes, ncomplex );
-	pp_boxing->setPBC( theSurface->PBC_vec, alphas );
+		local_setup( theSimulation );
+	pp_boxing->setPBC( theSimulation->PBC_vec, alphas );
 
 
 	int ntotp = 0;
@@ -630,7 +643,7 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 					allComplexes[c1]->rall[3*p1+1] - allComplexes[c2]->rall[3*p2+1],
 					allComplexes[c1]->rall[3*p1+2] - allComplexes[c2]->rall[3*p2+2] };
 
-				theSurface->wrapPBC( dr, alphas );
+				theSimulation->wrapPBC( dr, alphas );
 
 				double att_sigma = att_sigma1+att_sigma2;
 				double att_eps = (allComplexes[c1]->att_eps[p1] + allComplexes[c2]->att_eps[p2])/2;
@@ -739,10 +752,11 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 						{
 							if( ourp[c1] )
 							{
-							theSurface->pointGradient( allComplexes[c1]->grad_fs[p1], 
+								struct surface_record *sRec = theSimulation->fetch(allComplexes[c1]->sid[p1]);
+							sRec->theSurface->pointGradient( allComplexes[c1]->grad_fs[p1], 
 									allComplexes[c1]->grad_puv[2*p1+0], 
 									allComplexes[c1]->grad_puv[2*p1+1],
-										rsurf, mesh_grad, allComplexes[c1]->save_grad+2*p1, f1, null_f ); 
+										sRec->r, sRec->g, allComplexes[c1]->save_grad+2*p1, f1, null_f ); 
 							}
 						}
 						else
@@ -759,10 +773,11 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 						{
 							if( ourp[c2] )
 							{
-								theSurface->pointGradient( allComplexes[c2]->grad_fs[p2], 
+								struct surface_record *sRec = theSimulation->fetch(allComplexes[c2]->sid[p2]);
+								sRec->theSurface->pointGradient( allComplexes[c2]->grad_fs[p2], 
 									allComplexes[c2]->grad_puv[2*p2+0], 
 									allComplexes[c2]->grad_puv[2*p2+1],
-										rsurf, mesh_grad, allComplexes[c2]->save_grad+2*p2, f2, null_f ); 
+										sRec->r, sRec->g, allComplexes[c2]->save_grad+2*p2, f2, null_f ); 
 							}
 						}
 						else
@@ -794,16 +809,16 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 	return v;
 }
 
-double handleElasticCollisions( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex, double time_step )
+double handleElasticCollisions( Simulation *theSimulation, pcomplex **allComplexes, int ncomplex, double time_step )
 {
 #ifdef DISABLE_ELASTIC
 	return 0.0;
 #endif
 
-	double *alphas = rsurf + theSurface->nv*3;
+	double *alphas = theSimulation->alpha;
 	if( ! pp_boxing )
-		local_setup( theSurface, allComplexes, ncomplex );
-	pp_boxing->setPBC( theSurface->PBC_vec, alphas );
+		local_setup( theSimulation );
+	pp_boxing->setPBC( theSimulation->PBC_vec, alphas );
 
 	int ntotp = 0;
 	for( int c = 0; c < ncomplex; c++ )
@@ -880,7 +895,7 @@ double handleElasticCollisions( surface *theSurface, double *rsurf, pcomplex **a
 					double m2 = allComplexes[c2]->mass[p2];
 
 					double dr[3] = { r1[0]-r2[0], r1[1]-r2[1],r1[2]-r2[2]};
-					theSurface->wrapPBC( dr, alphas );
+					theSimulation->wrapPBC( dr, alphas );
 					double dr2 = dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2];
 	
 					double p1r = allComplexes[c1]->sigma[p1];
@@ -953,7 +968,7 @@ double handleElasticCollisions( surface *theSurface, double *rsurf, pcomplex **a
 											pos1_at_c[0] - pos2_at_c[0],
 											pos1_at_c[1] - pos2_at_c[1],
 											pos1_at_c[2] - pos2_at_c[2] };
-									theSurface->wrapPBC( dr_at_c, alphas );
+									theSimulation->wrapPBC( dr_at_c, alphas );
 									normalize(dr_at_c);
 									// solve for dKE
 	
@@ -1059,12 +1074,12 @@ double handleElasticCollisions( surface *theSurface, double *rsurf, pcomplex **a
 
 
 #define OVERRIDE_BOXING
-double nElasticCollisions( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex )
+double nElasticCollisions( Simulation *theSimulation, pcomplex **allComplexes, int ncomplex )
 {
-	double *alphas = rsurf + theSurface->nv*3;
+	double *alphas = theSimulation->alpha;
 	if( ! pp_boxing )
-		local_setup( theSurface, allComplexes, ncomplex );
-	pp_boxing->setPBC( theSurface->PBC_vec, alphas );
+		local_setup( theSimulation );
+	pp_boxing->setPBC( theSimulation->PBC_vec, alphas );
 
 	int ntotp = 0;
 	for( int c = 0; c < ncomplex; c++ )
@@ -1145,7 +1160,7 @@ double nElasticCollisions( surface *theSurface, double *rsurf, pcomplex **allCom
 					double m2 = allComplexes[c2]->mass[p2];
 
 					double dr[3] = { r1[0]-r2[0], r1[1]-r2[1],r1[2]-r2[2]};
-					theSurface->wrapPBC( dr, alphas );
+					theSimulation->wrapPBC( dr, alphas );
 					double dr2 = dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2];
 	
 					double p1r = allComplexes[c1]->sigma[p1];
@@ -1179,16 +1194,16 @@ double nElasticCollisions( surface *theSurface, double *rsurf, pcomplex **allCom
 #endif
 }
 
-double timePrecedingElasticCollision( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex, double time_step, int *out_col_c1, int *out_col_p1, int *out_col_c2, int *out_col_p2 )
+double timePrecedingElasticCollision( Simulation *theSimulation, pcomplex **allComplexes, int ncomplex, double time_step, int *out_col_c1, int *out_col_p1, int *out_col_c2, int *out_col_p2 )
 {
 #ifdef DISABLE_ELASTIC
 	return 0.0;
 #endif
 
-	double *alphas = rsurf + theSurface->nv*3;
+	double *alphas = theSimulation->alpha;
 	if(!pp_boxing )
-		local_setup( theSurface, allComplexes, ncomplex );
-	pp_boxing->setPBC( theSurface->PBC_vec, alphas );
+		local_setup( theSimulation );
+	pp_boxing->setPBC( theSimulation->PBC_vec, alphas );
 
 	int ntotp = 0;
 	for( int c = 0; c < ncomplex; c++ )
@@ -1270,7 +1285,7 @@ double timePrecedingElasticCollision( surface *theSurface, double *rsurf, pcompl
 					double m2 = allComplexes[c2]->mass[p2];
 
 					double dr[3] = { r1[0]-r2[0], r1[1]-r2[1],r1[2]-r2[2]};
-					theSurface->wrapPBC( dr, alphas );
+					theSimulation->wrapPBC( dr, alphas );
 					double dr2 = dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2];
 	
 					double p1r = allComplexes[c1]->sigma[p1];

@@ -1,8 +1,10 @@
 #ifndef __pcomplexh__
-#define __pcomplexh__
 
+#include "simulation.h"
 #include "interp.h"
 #include "input.h"
+
+#define __pcomplexh__
 
 #define DEBUG_OFF	0
 #define DEBUG_NO_V	1
@@ -31,6 +33,7 @@ struct pcomplex
 	// all coordinates in 3D
 	double *rall;
 	// attach coordinates in f/uv; can exceed face bounds
+	int *sid; // id of surface we are on.
 	int *fs;	
 	double *puv;
 
@@ -69,8 +72,8 @@ struct pcomplex
 	virtual void orient( surface *theSurface, double *rsurf ) { }
 
 	virtual void refresh( surface *theSurface, double *rsurf );
-	virtual double V(surface *theSurface, double *rsurf);
-	virtual double grad(surface *theSurface, double *rsurf, double *surface_g, double *particle_g ); 
+	virtual double V( Simulation *theSimulation );
+	virtual double grad( Simulation *theSimulation, double *surface_g, double *particle_g ); 
 	virtual void fd_grad_debug(surface *theSurface, double *rsurf ); 
 	virtual void loadParams( parameterBlock *block );
 
@@ -92,35 +95,26 @@ struct pcomplex
 	void cacheVelocities( void );
 	void prepareForGradient( void );
 	void loadCoords( surface *theSurface, double *rsurf, double *r, double *n );
-	void setrall( surface *theSurface, double *rsurf );
+	void setrall( Simulation *theSimulation  );
 	void base_init( void );
-	double T(surface *theSurface, double *rsurf);
-	double update_dH_dq( surface *theSurface, double *rsurf, double *mesh_grad, double *mesh_qdot, double *mesh_qdot0, double time_step=-1, double timestep_total=0 );
-	void propagate_p( surface *theSurface, double *rsurf, double dt );
-	void compute_qdot( surface *theSurface, double *rsurf, double *mesh_qdot0, double *mesh_qdot, double frac_mult=1.0 );
-	void propagate_surface_q( surface *theSurface, double *rsurf, double dt );
+	double T(Simulation *theSimulation );
+	double update_dH_dq( Simulation *theSimulation, double time_step=-1, double timestep_total=0 );
+	void propagate_p( Simulation *theSimulation, double dt );
+	//void compute_qdot( surface *theSurface, double *rsurf, double *mesh_qdot0, double *mesh_qdot, double frac_mult=1.0 );
+	void compute_qdot( Simulation *theSimulation,  double frac_mult=1.0 );
+	void propagate_surface_q( Simulation *theSimulation, double dt );
 
-	void debug_dynamics( surface *theSurface,
-		      double *rsurf,
-		
-		      double *mesh_qdot,
-		      double *mesh_qdot0,
-
-		      double *dV_dmesh, 
-		      double *dT_dmesh,
-		      double *dV_dcomplex,
-		      double *dT_dcomplex );
 	void debug_dPinv_dq( surface * theSurface, double *rsurf  );
 	void getMeshQxdot( surface *theSurface, double *rsurf, double *Minv, double *mesh_p, double *mesh_qdot, double *mesh_qdot0, double *mesh_der_qdot );
-	void applyLangevinFriction( surface * theSurface, double *rsurf, double dt, double gamma );
-	void applyLangevinNoise( surface * theSurface, double *rsurf, double dt, double gamma, double temperature );
+	void applyLangevinFriction( Simulation *theSimulation, double dt, double gamma );
+	void applyLangevinNoise( Simulation *theSimulation, double dt, double gamma, double temperature );
 	int saveComplex( char *buffer, int *buflen, int bufLenMax );
 	void saveComplex( FILE * theFile );
 	void loadComplex( FILE * theFile, surface *theSurface, double *rsurf );
-	double AttachV( surface *theSurface, double *rsurf );
-	double AttachG( surface *theSurface, double *rsurf, double *gr, double *pg );
+	double AttachV( Simulation *theSimulation );
+	double AttachG( Simulation *theSimulation, double *pg );
 	void evaluate_momentum( surface *theSurface, double *rsurf, double *pout );
-	double local_curvature( surface *theSurface, double *rsurf );
+	double local_curvature( Simulation *theSimulation);
 	void print_type( char **outp );
 
 };
@@ -217,7 +211,7 @@ struct elasticCrowder : pcomplex
 	virtual double grad( surface *theSurface, double *rsurf, double *surface_g, double *particle_g );
 };
 
-void propagateSolutionParticles( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex, double dt );
+void propagateSolutionParticles( Simulation *theSimulation, double dt );
 pcomplex *loadComplex( const char *name );
 
 #endif

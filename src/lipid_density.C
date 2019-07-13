@@ -190,7 +190,7 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 	// let's set this based on dt.
 	double nL_move_average = 1./10.0; // times the area.
 
-	FullSyncVertices(r);
+	FullSyncVertices(r, surface_id);
 
 	int nacc = 0;
 	int nrej = 0;

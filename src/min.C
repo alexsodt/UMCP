@@ -64,7 +64,7 @@ int main( int argc, char **argv )
 
 	if( argc < 2 )
 	{
-		printf("Syntax: subdivide lattice\n");
+		printf("Syntax: min lattice\n");
 		return -1;
 	}
 	surface *theSurface =(surface *)malloc( sizeof(surface) );

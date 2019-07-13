@@ -7,7 +7,7 @@
 #include "p_p.h"
 #include "npt.h"
 extern double VC,AVC;
-void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, double beta, double *qdot, double *pp, int move_type, parameterBlock *block )
+void Simulation::area_MC_move( double beta, int move_type, parameterBlock *block )
 {
 	static double nacc = 0;
 	static double nrej = 0;
@@ -24,30 +24,34 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 	ParallelSyncComplexes( allComplexes, ncomplex );
 #endif
 	double E0 = 0;
-	double MEME0 = energy(r,NULL);
+	double MEME0 = 0;
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+		MEME0 += sRec->theSurface->energy(sRec->r,NULL);
 	E0 += MEME0;
 	ParallelSum(&MEME0,1);		
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
 
-		double dE = allComplexes[c]->V(this, r );
+		double dE = allComplexes[c]->V(this );
 		E0 += dE;
-		E0 += allComplexes[c]->AttachV( this, r );
+		E0 += allComplexes[c]->AttachV( this );
 	}
 
-	E0 += Boxed_PP_V( this, r, allComplexes, ncomplex );
+	E0 += Boxed_PP_V( this );
 	
 	ParallelSum(&E0,1);
 
 	double d_complex = 0;
 			
-	double npt_KE0 = evaluate_T( qdot, pp, NULL, NULL, r+3*nv );
+	double npt_KE0 = 0;
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+		npt_KE0 += sRec->theSurface->evaluate_T( sRec->qdot, sRec->pp, NULL, NULL, alpha );
 	double PT = 0;
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
-		PT += allComplexes[c]->T(this,r);
+		PT += allComplexes[c]->T(this);
 
 		double dr[3] = {
 			allComplexes[c]->rall[0] - allComplexes[c]->rall[3],
@@ -69,9 +73,9 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 	double ERestraint = 0;
 	if( block->alpha_restraint_k )
 	{
-		if( block->alpha_restraint_x > 0 ) ERestraint += 0.5 * block->alpha_restraint_k * pow( r[3*nv+0] - block->alpha_restraint_x, 2.0); 
-		if( block->alpha_restraint_y > 0 ) ERestraint += 0.5 * block->alpha_restraint_k * pow( r[3*nv+1] - block->alpha_restraint_y, 2.0); 
-		if( block->alpha_restraint_z > 0 ) ERestraint += 0.5 * block->alpha_restraint_k * pow( r[3*nv+2] - block->alpha_restraint_z, 2.0); 
+		if( block->alpha_restraint_x > 0 ) ERestraint += 0.5 * block->alpha_restraint_k * pow( alpha[0] - block->alpha_restraint_x, 2.0); 
+		if( block->alpha_restraint_y > 0 ) ERestraint += 0.5 * block->alpha_restraint_k * pow( alpha[1] - block->alpha_restraint_y, 2.0); 
+		if( block->alpha_restraint_z > 0 ) ERestraint += 0.5 * block->alpha_restraint_k * pow( alpha[2] - block->alpha_restraint_z, 2.0); 
 	}
 
 	E0 += ERestraint;
@@ -80,7 +84,7 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 	MPI_Bcast( &E0, 1, MPI_DOUBLE, BASE_TASK, MPI_COMM_WORLD );
 #endif
 	
-	double nElastic0 = nElasticCollisions( this, r, allComplexes, ncomplex ); 
+	double nElastic0 = nElasticCollisions( this, allComplexes, ncomplex  ); 
 
 #ifdef PARALLEL
 	ParallelSum(&nElastic0,1);
@@ -111,7 +115,9 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 		double cur_area;
 		area(r, -1, &cur_area, &area0 );
 		//printf("area: %le area0: %le\n", cur_area, area0 );
-		double E = energy( r, NULL );
+		double E = 0;
+		for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+			E+= sRec->theSurface->energy(sRec->r,NULL);
 
 		printf("%le %.14le VC: %.14le AVC: %le area: %le\n", r[3*nv+0], E, VC, AVC, cur_area ); 
 	}
@@ -132,9 +138,9 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 		scale_fac[2] = dAlpha;
 	}
 	
-	r[3*nv+0] *= scale_fac[0];
-	r[3*nv+1] *= scale_fac[1];
-	r[3*nv+2] *= scale_fac[2];
+	alpha[0] *= scale_fac[0];
+	alpha[1] *= scale_fac[1];
+	alpha[2] *= scale_fac[2];
 
 //	for( int cx = 0; cx < par_info.nc; cx++ )
 //	{
@@ -158,7 +164,9 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 		}
 	}
 	double E1=0;
-	double MEME1 = energy(r,NULL);
+	double MEME1 = 0;
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+		MEME1+= sRec->theSurface->energy(sRec->r,NULL);
 	E1 += MEME1;
 	ParallelSum(&MEME1,1);		
 
@@ -166,30 +174,33 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 	{
 		int c = par_info.complexes[cx];
 
-		double dE = allComplexes[c]->V(this, r );
+		double dE = allComplexes[c]->V(this );
 		E1 += dE;
-		E1 += allComplexes[c]->AttachV( this, r );
+		E1 += allComplexes[c]->AttachV( this );
 	}
 
-	E1 += Boxed_PP_V( this, r, allComplexes, ncomplex );
+	E1 += Boxed_PP_V( this );
 	
 	ParallelSum(&E1,1);
 
 	// reciprocal relationship for scaling factor through effective mass matrix which is inverse of position-position dot product.
-	for( int x = 0; x < nv; x++ )
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+	for( int x = 0; x < sRec->theSurface->nv; x++ )
 	{
-		qdot[3*x+0] /= scale_fac[0]*scale_fac[0];
-		qdot[3*x+1] /= scale_fac[1]*scale_fac[1];
-		qdot[3*x+2] /= scale_fac[2]*scale_fac[2];
+		sRec->qdot[3*x+0] /= scale_fac[0]*scale_fac[0];
+		sRec->qdot[3*x+1] /= scale_fac[1]*scale_fac[1];
+		sRec->qdot[3*x+2] /= scale_fac[2]*scale_fac[2];
 	}
 	
-	double npt_KE1 = evaluate_T( qdot, pp, NULL, NULL, r+3*nv );
+	double npt_KE1 = 0;
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+		npt_KE1 += sRec->theSurface->evaluate_T( sRec->qdot, sRec->pp, NULL, NULL, alpha );
 	PT = 0;
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 
 		int c = par_info.complexes[cx];
-		PT += allComplexes[c]->T(this,r);
+		PT += allComplexes[c]->T(this);
 	}
 
 #ifdef PARALLEL
@@ -202,14 +213,14 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 	ERestraint = 0;
 	if( block->alpha_restraint_k )
 	{
-		if( block->alpha_restraint_x > 0 ) ERestraint += 0.5 * block->alpha_restraint_k * pow( r[3*nv+0] - block->alpha_restraint_x, 2.0); 
-		if( block->alpha_restraint_y > 0 ) ERestraint += 0.5 * block->alpha_restraint_k * pow( r[3*nv+1] - block->alpha_restraint_y, 2.0); 
-		if( block->alpha_restraint_z > 0 ) ERestraint += 0.5 * block->alpha_restraint_k * pow( r[3*nv+2] - block->alpha_restraint_z, 2.0); 
+		if( block->alpha_restraint_x > 0 ) ERestraint += 0.5 * block->alpha_restraint_k * pow( alpha[0] - block->alpha_restraint_x, 2.0); 
+		if( block->alpha_restraint_y > 0 ) ERestraint += 0.5 * block->alpha_restraint_k * pow( alpha[1] - block->alpha_restraint_y, 2.0); 
+		if( block->alpha_restraint_z > 0 ) ERestraint += 0.5 * block->alpha_restraint_k * pow( alpha[2] - block->alpha_restraint_z, 2.0); 
 	}
 	E1 += ERestraint;
 	
 	// probably should ignore particles that are colliding before move, or both before and after -- those particles wouldn't be colliding anyway.
-	double nElastic1 = nElasticCollisions( this, r, allComplexes, ncomplex ); 
+	double nElastic1 = nElasticCollisions( this, allComplexes, ncomplex ); 
 
 #ifdef PARALLEL
 	ParallelSum(&nElastic1,1);
@@ -269,15 +280,17 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 //			npt_KE1_p - npt_KE0_p,
 //			MEME1-MEME0,
 //			E1-E0-(MEME1-MEME0), d_complex, dAlpha );		
-		r[3*nv+0] /= scale_fac[0];
-		r[3*nv+1] /= scale_fac[1];
-		r[3*nv+2] /= scale_fac[2];
+		alpha[0] /= scale_fac[0];
+		alpha[1] /= scale_fac[1];
+		alpha[2] /= scale_fac[2];
 	
-		for( int x = 0; x < nv; x++ )
+
+		for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+		for( int x = 0; x < sRec->theSurface->nv; x++ )
 		{
-			qdot[3*x+0] *= scale_fac[0]*scale_fac[0];
-			qdot[3*x+1] *= scale_fac[1]*scale_fac[1];
-			qdot[3*x+2] *= scale_fac[2]*scale_fac[2];
+			sRec->qdot[3*x+0] *= scale_fac[0]*scale_fac[0];
+			sRec->qdot[3*x+1] *= scale_fac[1]*scale_fac[1];
+			sRec->qdot[3*x+2] *= scale_fac[2]*scale_fac[2];
 		}
 	
 		for( int c = 0; c < ncomplex; c++ )
@@ -324,7 +337,7 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 
 		double area0, o_area;
 
-		area( r, -1, &area0, &o_area );
+//		area( r, -1, &area0, &o_area );
 
 		printf("N_RADIAL_EXPANSIONS_PREVENTED %lf N_RADIAL_CONTRACTIONS_PREVENTED %lf NEXP,FRCD %lf NCOL,FRCD %lf\n",
 			N_REXPANSIONS_PREVENTED,N_RCONTRACTIONS_PREVENTED, NEXPAND_COL_FRCD, NCONTRACT_COL_FRCD );
@@ -334,7 +347,7 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 		icntr = 0;
 	}
 #ifdef PARALLEL
-	ParallelBroadcast(r+3*nv,3);	
+	ParallelBroadcast(alpha,3);	
 #endif
 
 //	if( block->alpha_restraint_k > 0 )

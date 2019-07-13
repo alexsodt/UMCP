@@ -30,7 +30,7 @@ if test "$parallel" = "yes"; then
 	AC_CHECK_PROG(MPIRUN, mpirun, mpirun)
 	AC_DEFINE(PARALLEL,1,[Define to compile in parallel.])
 	c_compilers="mpicc $c_compilers"
-	cxx_compilers="mpic++ mpiCC $cxx_compilers"
+	cxx_compilers="mpic++ mpicxx $cxx_compilers"
 fi
 
 AC_PROG_CC([$c_compilers])

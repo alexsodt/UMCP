@@ -5,13 +5,13 @@
 #include "pcomplex.h"
 
 /* potential */
-double PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex );
+double PP_V( Simulation *theSimulation );
 /* gradient */
-double PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex, double *mesh_g);
-double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex, double *mesh_grad );
-double Boxed_PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex );
-double timePrecedingElasticCollision( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex, double time_step, int *, int *, int *, int* );
-double handleElasticCollisions( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex, double time_step );
-double nElasticCollisions( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex );
+double PP_G( Simulation *theSimulation );
+double Boxed_PP_G( Simulation *theSimulation );
+double Boxed_PP_V( Simulation *theSimulation );
+double timePrecedingElasticCollision( Simulation *theSimulation, pcomplex **allComplexes, int ncomplex, double time_step, int *, int *, int *, int* );
+double handleElasticCollisions( Simulation *theSimulation, pcomplex **allComplexes, int ncomplex, double time_step );
+double nElasticCollisions( Simulation *theSimulation, pcomplex **allComplexes, int ncomplex );
 
 #endif

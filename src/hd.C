@@ -21,6 +21,7 @@
 #include "random_global.h"
 #include "sans.h"
 #include "globals.h"
+#include "simulation.h"
 
 #define MM_METHOD_1
 #define BOXED
@@ -79,33 +80,6 @@ int main( int argc, char **argv )
 	return temp_main( argc, argv );
 }
 
-typedef struct surface_record
-{
-	int id; // for locating bound particles
-	surface *theSurface;
-	FILE *tFile; // for writing trajectory
-	struct surface_record *next;
-	double *r;
-	double *g;
-	double *pp;
-	double *qdot;
-	double *qdot0;
-
-	// for harmonic modes
-	int NQ;
-	double *gen_transform;
-	double *scaling_factor;
-	int NQ;
-	int do_gen_q;
-	int doing_spherical_harmonics;
-	int doing_planar_harmonics;
-	double *output_qvals;
-	
-
-	SparseMatrix *EFFM;
-	SparseMatrix *MMat;
-	force_set *theForceSet;
-} surface_record;
 
 int temp_main( int argc, char **argv )
 {
@@ -160,11 +134,13 @@ int temp_main( int argc, char **argv )
 //1.3e-13;
 	double dt = block.time_step;
 
+	Simulation *theSimulation = (Simulation *)malloc( sizeof(Simulation) );
+
 	srd_integrator *srd_i = NULL;
-	surface_record *allSurfaces = NULL;
-	
+	theSimulation->allSurfaces = NULL;	
 
 	surface *theSurface1 =(surface *)malloc( sizeof(surface) );
+	double *r1 = NULL;
 	theSurface1->loadLattice( block.meshName , 0. );
 
 	pcomplex **allComplexes = NULL;
@@ -188,8 +164,8 @@ int temp_main( int argc, char **argv )
 	surface_record *newSurface = (struct surface_record*)malloc( sizeof(surface_record) );
 	newSurface->theSurface = theSurface1;
 	newSurface->id = 0;
-	newSurface->next = allSurfaces;
-	allSurfaces = newSurface;
+	newSurface->next = theSimulation->allSurfaces;
+	theSimulation->allSurfaces = newSurface;
 
 	if( block.meshName2 )
 	{
@@ -201,41 +177,58 @@ int temp_main( int argc, char **argv )
 		surface_record *newSurface = (struct surface_record*)malloc( sizeof(surface_record) );
 		newSurface->theSurface = addSurface;
 		newSurface->id = 1;
-		newSurface->next = allSurfaces;
-		allSurfaces = newSurface;
+		newSurface->next = theSimulation->allSurfaces;
+		theSimulation->allSurfaces = newSurface;
 	
 	}
 
 	double av_edge_length = 0;
 	double n_edge_length = 0;
 
-	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+	theSimulation->alpha[0] = 1.0;
+	theSimulation->alpha[1] = 1.0;
+	theSimulation->alpha[2] = 1.0;
+
+	for( int x = 0; x < 3; x++ )
+	for( int y = 0; y < 3; y++ )
+		theSimulation->PBC_vec[x][y] = theSurface1->PBC_vec[x][y];
+
+
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 	{
 		surface *useSurface =sRec->theSurface;
 
 		int nc = 3 * useSurface->nv+3;
 		int nv = useSurface->nv;
 		sRec->r = (double *)malloc( sizeof(double) * nc );
-		useSurface->get(r);
+		sRec->nc = nc;
+		useSurface->get(sRec->r);
+
+		if( useSurface == theSurface1 )
+			r1 = sRec->r;
+
 		sRec->g = (double *)malloc( sizeof(double) * nc );
+		memset( sRec->g, 0, sizeof(double) * nc );
+		double *r = sRec->r;
+
 		r[3*nv+0] = 1.0;
 		r[3*nv+1] = 1.0;
 		r[3*nv+2] = 1.0;
 
 		for ( int x = 0; x < nv; x++ )
 		{
-			int val = theSurface->theVertices[x].valence;
+			int val = useSurface->theVertices[x].valence;
 	
 			for( int e = 0; e < val; e++ )
 			{
-				int j = theSurface->theVertices[x].edges[e];
+				int j = useSurface->theVertices[x].edges[e];
 	
-				double *epbc = theSurface->theVertices[x].edge_PBC+3*e;
+				double *epbc = useSurface->theVertices[x].edge_PBC+3*e;
 	
 				double dr[3] = { 
-					r[3*x+0] - r[3*j+0] - (epbc[0]*theSurface->PBC_vec[0][0] + epbc[1] * theSurface->PBC_vec[1][0] + epbc[2]*theSurface->PBC_vec[2][0]), 
-					r[3*x+1] - r[3*j+1] - (epbc[0]*theSurface->PBC_vec[0][1] + epbc[1] * theSurface->PBC_vec[1][1] + epbc[2]*theSurface->PBC_vec[2][1]), 
-					r[3*x+2] - r[3*j+2] - (epbc[0]*theSurface->PBC_vec[0][2] + epbc[1] * theSurface->PBC_vec[1][2] + epbc[2]*theSurface->PBC_vec[2][2]) };
+					r[3*x+0] - r[3*j+0] - (epbc[0]*useSurface->PBC_vec[0][0] + epbc[1] * useSurface->PBC_vec[1][0] + epbc[2]*useSurface->PBC_vec[2][0]), 
+					r[3*x+1] - r[3*j+1] - (epbc[0]*useSurface->PBC_vec[0][1] + epbc[1] * useSurface->PBC_vec[1][1] + epbc[2]*useSurface->PBC_vec[2][1]), 
+					r[3*x+2] - r[3*j+2] - (epbc[0]*useSurface->PBC_vec[0][2] + epbc[1] * useSurface->PBC_vec[1][2] + epbc[2]*useSurface->PBC_vec[2][2]) };
 				double r = normalize(dr);
 	
 				av_edge_length += r;
@@ -260,6 +253,9 @@ int temp_main( int argc, char **argv )
 	// for now we are putting all complexes on the first surface.
 	
 	theSurface1->loadComplexes( &allComplexes, &ncomplex, &block ); 
+	theSimulation->allComplexes = allComplexes;
+	theSimulation->ncomplex = ncomplex;
+
 
 	// for now only collect kc info from first surface.
 
@@ -277,25 +273,25 @@ int temp_main( int argc, char **argv )
 		lhq  = (double *)malloc( sizeof(double) * nmodes * nmodes * 2 );
 		lhq2 = (double *)malloc( sizeof(double) * nmodes * nmodes * 2 );
 	}
-	double *ro = (double *)malloc( sizeof(double) * nc );
-	memcpy( ro, r, sizeof(double) * nc );	
 
 	double T = 300;
 
 	int n = 16;
 	
-	double V0 = 0;
 	double Vtot = 0;
 	double Vtot2 = 0;
 	double NV = 0;
-	double sphere_rad = 1e10;
+	double area0;
 
 	if( block.sphere )
 	{
-		V0 =fabs(theSurface1->volume( r));
-		printf("Area: %lf (R: %lf)\n", area0, sqrt(area0/(4*M_PI))  );
-		printf("Volume: %lf (R: %lf)\n", V0, pow( V0/(4*M_PI/3.0), 1.0/3.0) );
-		sphere_rad = sqrt(area0/(4*M_PI));
+		for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+		{
+			double V0 = 0;
+			V0 =fabs(theSurface1->volume( sRec->r));
+			printf("Area: %lf (R: %lf)\n", area0, sqrt(area0/(4*M_PI))  );
+			printf("Volume: %lf (R: %lf)\n", V0, pow( V0/(4*M_PI/3.0), 1.0/3.0) );
+		}
 	}
 
 	double *qvals = NULL;
@@ -330,10 +326,20 @@ int temp_main( int argc, char **argv )
 	
 	
 	int nsurfaces = 0;
-	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 		nsurfaces++;
 
-	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+#if 1 
+	FILE *tpsf = NULL;
+	char fname[256];
+	sprintf(fname, "%s.psf", block.jobName );
+	tpsf = fopen(fname,"w");
+	sprintf(fname, "%s.xyz", block.jobName );
+	FILE *tFile = fopen(fname,"w");
+	theSimulation->writeLimitingSurfacePSF(tpsf);
+	fclose(tpsf);
+#else
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 	{	
 		sRec->tFile = NULL;
 		if( block.movie && par_info.my_id == BASE_TASK )
@@ -360,7 +366,7 @@ int temp_main( int argc, char **argv )
 			sRec->tFile = fopen(fname,"w");
 		}
 	}
-
+#endif
 	int o_lim = nsteps;
 
 	double hours = block.hours;
@@ -390,14 +396,10 @@ int temp_main( int argc, char **argv )
 		ppf++;
 	}
 	
-	double MSCALE = 1;//500;
-	double mass_per_lipid = MSCALE * 1000 * 760.09 / 6.022e23 / 1000; // POPC kg, wikipedia
-	double area_per_lipid = 65.35; // A^2, POPC, interpolated from Kucerka 2011 BBA 2761
-	// factor of two for leaflets.
-	double mass_per_pt = AMU_PER_KG * 2 * area0 / (theSurface->nf_faces + theSurface->nf_irr_faces) / ppf * mass_per_lipid / area_per_lipid; 
-	printf("mass per mesh vertex: %le\n", AMU_PER_KG * 2 * area0 * mass_per_lipid / area_per_lipid / (theSurface->nv) );
 
-	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+	double min_mass_per_pt = -1;
+
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 	{
 		surface *useSurface = sRec->theSurface;
 
@@ -412,11 +414,24 @@ int temp_main( int argc, char **argv )
 		theForceSet->uv_set = (double *)malloc( sizeof(double) * theForceSet->npts *2 );
 		theForceSet->mass = (double *)malloc( sizeof(double) * theForceSet->npts );
 
+		double cur_area,area0;
+		useSurface->area(sRec->r, -1, &cur_area, &area0 );
+	
+		double MSCALE = 1;//500;
+		double mass_per_lipid = MSCALE * 1000 * 760.09 / 6.022e23 / 1000; // POPC kg, wikipedia
+		double area_per_lipid = 65.35; // A^2, POPC, interpolated from Kucerka 2011 BBA 2761
+		// factor of two for leaflets.
+		double mass_per_pt = AMU_PER_KG * 2 * area0 / (useSurface->nf_faces + useSurface->nf_irr_faces) / ppf * mass_per_lipid / area_per_lipid; 
+		printf("mass per mesh vertex: %le\n", AMU_PER_KG * 2 * area0 * mass_per_lipid / area_per_lipid / (useSurface->nv) );
+
+		if( mass_per_pt < min_mass_per_pt || min_mass_per_pt < 0 )
+			min_mass_per_pt = mass_per_pt;
+
 		int totp = 0;
 
-		for( int t = 0; t < sRec->theSurface->nt; t++ )
+		for( int t = 0; t < useSurface->nt; t++ )
 		{
-			int f = sRec->theSurface->theTriangles[t].f;
+			int f = useSurface->theTriangles[t].f;
 			
 			for( int fi = 0; fi <= plim; fi++ )
 			for( int fj = 0; fj <= plim-fi; fj++, totp++)
@@ -432,7 +447,7 @@ int temp_main( int argc, char **argv )
 			}
 		}
 	
-		sRec->theSurface->load_least_squares_fitting( theForceSet );
+		useSurface->load_least_squares_fitting( theForceSet );
 	
 	// END BLOCK FOR SETTING UP POINT EVALULATIONS ON SURFACE
 
@@ -504,7 +519,6 @@ int temp_main( int argc, char **argv )
 		sRec->del_pp = NULL;
 		sRec->n_real_q = 3*nv;
 		sRec->nav_Q = NULL;
-		sRec->nav_Q = NULL;
 		sRec->av_Q = NULL;
 		sRec->av_Q2 = NULL;
 		sRec->av_Q_T = NULL;
@@ -568,16 +582,14 @@ int temp_main( int argc, char **argv )
 	{
 		srd_i = (srd_integrator *)malloc( sizeof(srd_integrator) );
 		
-		srd_i->init( av_edge_length, theSurface->PBC_vec, temperature, eta_SI, time_step_collision, time_step_collision * AKMA_TIME, doPlanarTopology, mass_per_pt, block.srd_M, block.hard_z_boundary ); 
-		srd_i->initializeDistances( r, theSurface, M, mlow, mhigh );
+		srd_i->init( av_edge_length, theSurface1->PBC_vec, temperature, eta_SI, time_step_collision, time_step_collision * AKMA_TIME, doPlanarTopology, min_mass_per_pt, block.srd_M, block.hard_z_boundary ); 
+		srd_i->initializeDistances( theSimulation, M, mlow, mhigh );
 		if( debug )
 			srd_i->activateDebugMode();
 		srdXYZFile = fopen("srd.xyz", "w" );
 	
 	}
 			
-	memset( g, 0, sizeof(double) * nc );
-
 
 	double *delta_hull = (double *)malloc( sizeof(double) * block.o_lim );
 
@@ -614,41 +626,52 @@ int temp_main( int argc, char **argv )
 			printf("Couldn't load save file '%s'.\n", block.loadName );
 			exit(1);
 		}
-		for( int x = 0; x < nv+1; x++ )
+		for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 		{
-			getLine( xyzLoad, buffer );
+			double *r = sRec->r;
+			int nv = sRec->theSurface->nv;
+			double *pp = sRec->pp;
 
-			double mom[3];
-			int nr = sscanf( buffer, "%lf %lf %lf %lf %lf %lf", r+3*x+0, r+3*x+1, r+3*x+2, mom, mom+1, mom+2 );
-
-			if( nr != 3 && nr != 6 )
+			for( int x = 0; x < nv+1; x++ )
 			{
-				printf("LINE %d, %s\n", x+1, buffer );
-				printf("ERROR reading load file '%s'.\n", block.loadName );
-				exit(1);
-			}	
-
-			if( nr == 6 && ! do_gen_q )
-			{
-				pp[3*x+0] = mom[0];
-				pp[3*x+1] = mom[1];
-				pp[3*x+2] = mom[2];
+				getLine( xyzLoad, buffer );
+	
+				double mom[3];
+				int nr = sscanf( buffer, "%lf %lf %lf %lf %lf %lf", r+3*x+0, r+3*x+1, r+3*x+2, mom, mom+1, mom+2 );
+	
+				if( nr != 3 && nr != 6 )
+				{
+					printf("LINE %d, %s\n", x+1, buffer );
+					printf("ERROR reading load file '%s'.\n", block.loadName );
+					exit(1);
+				}	
+	
+				if( nr == 6 && ! sRec->do_gen_q )
+				{
+					pp[3*x+0] = mom[0];
+					pp[3*x+1] = mom[1];
+					pp[3*x+2] = mom[2];
+				}
 			}
 		}
-
 		for( int c = 0; c < ncomplex; c++ )
-			allComplexes[c]->loadComplex(xyzLoad,theSurface,r);
-
-		for( int Q = 0; Q < NQ; Q++ )
+			allComplexes[c]->loadComplex(xyzLoad,theSurface1,r1);
+		
+		for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 		{
-			getLine(xyzLoad,buffer);
-			if(feof(xyzLoad) ) break;
-			double genp;
-			int nr = sscanf(buffer, "GQ %lf\n", &genp );
-			if( nr == 1 && do_gen_q )
-				pp[Q] = genp;
-		}
+			double *pp = sRec->pp;
+			int NQ = sRec->NQ;
 
+			for( int Q = 0; Q < NQ; Q++ )
+			{
+				getLine(xyzLoad,buffer);
+				if(feof(xyzLoad) ) break;
+				double genp;
+				int nr = sscanf(buffer, "GQ %lf\n", &genp );
+				if( nr == 1 && sRec->do_gen_q )
+					pp[Q] = genp;
+			}
+		}
 		int nr = fscanf( xyzLoad, "seed %d", &debug_seed );
 
 		if( nr > 0 )
@@ -658,32 +681,51 @@ int temp_main( int argc, char **argv )
 		}
 	}
 	
+	setupParallel( theSimulation ); //theSurface, allComplexes, ncomplex, ( do_gen_q ? NQ : 0) );
 
-	setupParallel( theSurface, allComplexes, ncomplex, ( do_gen_q ? NQ : 0) );
-	SparseMatrix *EFFM = NULL;
-	SparseMatrix *MMat = NULL;
-	int max_mat = nv;
-	if( NQ > nv )
-		max_mat = NQ;
-	int *sparse_use = (int *)malloc( sizeof(int) * (NQ > nv ? NQ : nv) );
-	int n_vuse = 0;
-	double *mass_scaling = NULL;
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+	{
+		surface *useSurface = sRec->theSurface;
+		int nv = useSurface->nv;
+		int NQ = sRec->NQ;
 
-	theSurface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
-	if( do_bd_membrane )
-		theSurface->getSparseRoot( theForceSet, &MMat ); 
-	setupSparseVertexPassing( EFFM, theSurface->nv, do_gen_q );
+		sRec->EFFM = NULL;
+		sRec->MMat = NULL;
+
+		int max_mat = nv;
+
+		if( NQ > nv )
+			max_mat = NQ;
+		int *sparse_use = (int *)malloc( sizeof(int) * (NQ > nv ? NQ : nv) );
+		int n_vuse = 0;
+		double *mass_scaling = NULL;
+	
+		useSurface->getSparseEffectiveMass( sRec->theForceSet, sparse_use, &n_vuse, &sRec->EFFM, sRec->gen_transform, NQ, mass_scaling );	
+		if( do_bd_membrane )
+			useSurface->getSparseRoot( sRec->theForceSet, &sRec->MMat ); 
+
+		free(sparse_use);
+	}
+		
+	setupSparseVertexPassing( theSimulation );
 
 
-
-	double V = theSurface->energy(r,NULL);
+	double V = 0;
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+		sRec->theSurface->energy( sRec->r,NULL);
 #ifdef PARALLEL
 	ParallelSum(&V,1);
 #endif
 	printf("Initial energy: %lf\n", V );
+
 	
-	if( !do_gen_q ) // generalized coordinates are simply the control point positions.
-		NQ = 3 * nv;
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+	{
+		if( !sRec->do_gen_q ) // generalized coordinates are simply the control point positions.
+			sRec->NQ = 3 * sRec->theSurface->nv;
+	}
+
+#ifdef REDO_MINIMIZE
 	if( block.nmin > 0 )
 	{
 		FILE *mpsf;
@@ -725,7 +767,7 @@ int temp_main( int argc, char **argv )
 			fclose(minFile);
 		
 	}
-		
+#endif		
 	
 //	if( block.timestep_analysis && taskid == BASE_TASK )
 //		theSurface->timestep_analysis( r, theForceSet, effective_mass, allComplexes, ncomplex, dt );
@@ -740,14 +782,15 @@ int temp_main( int argc, char **argv )
 
 	if( block.nsteps == 0 )
 	{
-		printf("Writing tachyon object file.\n");
 
+#ifdef MULTISURFACE_TACHYON
 		if( block.tachyon && par_info.my_id == BASE_TASK )
 		{
+			printf("Writing tachyon object file.\n");
 			theSurface->writeTachyon( block.jobName, block.tachyon_res, 1, 
 				r, allComplexes, ncomplex, &block, srd_i, block.tachyon_tri_center ); 
 		}
-
+#endif
 		printf("Requested no dynamics, exiting.\n");
 	}
 	else
@@ -770,36 +813,45 @@ int temp_main( int argc, char **argv )
 	double prev_mom[3] = {0,0,0};
 	double prev_TV = 0;
 
-	memset( qdot0, 0, sizeof(double) * 3 * nv );
-	if( do_gen_q )
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 	{
-		memset( Qdot0, 0, sizeof(double) * NQ );
-		GenQMatVecIncrScale( Qdot0, pp, EFFM, 1.0 );
-		MatVec( gen_transform, Qdot0, qdot0, NQ, 3*nv ); 
+		memset( sRec->qdot0, 0, sizeof(double) * 3 * sRec->theSurface->nv );
+		if( sRec->do_gen_q )
+		{
+			memset( sRec->Qdot0, 0, sizeof(double) * sRec->NQ );
+			GenQMatVecIncrScale( sRec->Qdot0, sRec->pp, sRec->EFFM, 1.0  );
+			MatVec( sRec->gen_transform, sRec->Qdot0, sRec->qdot0, sRec->NQ, 3*sRec->theSurface->nv ); 
+		}
+		else
+			AltSparseCartMatVecIncrScale( sRec->qdot0, sRec->pp, sRec->EFFM, 1.0, theSimulation->alpha, sRec->id );
+		
+		memcpy( sRec->qdot, sRec->qdot0, sizeof(double) * 3 * sRec->theSurface->nv );
+		memset( sRec->qdot_temp, 0, sizeof(double) * 3 * sRec->theSurface->nv );
 	}
-	else
-		AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, r+3*nv );
 	
-	memcpy( qdot, qdot0, sizeof(double) * 3 * nv );
-	
-	memset( qdot_temp, 0, sizeof(double) * 3 * nv );	
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
-		allComplexes[c]->compute_qdot( theSurface, r, qdot0, qdot_temp );			
+		allComplexes[c]->compute_qdot( theSimulation );			
 	}
-#ifdef PARALLEL		
-	ParallelSum( qdot_temp, 3*nv );
+#ifdef PARALLEL
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+		ParallelSum( sRec->qdot_temp, 3*sRec->theSurface->nv );
 #endif
-	if( ! do_gen_q )
-		AltSparseCartMatVecIncrScale( qdot, qdot_temp, EFFM, 1.0, r+3*nv );
-	theSurface->grad( r, g );
+
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+	{
+		if( ! sRec->do_gen_q )
+			AltSparseCartMatVecIncrScale( sRec->qdot, sRec->qdot_temp, sRec->EFFM, 1.0, theSimulation->alpha, sRec->id );
+		sRec->theSurface->grad( sRec->r, sRec->g );
+	}
 
 
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
-		allComplexes[c]->update_dH_dq( theSurface, r, g, qdot, qdot0 );
+		// NEEDS TO BE UPDATED FOR WHICH SURFACE THE PARTICLE IS ON.
+		allComplexes[c]->update_dH_dq( theSimulation );
 	}
 #ifdef PARALLEL
 	// synchronizes particle positions at this point for computing particle-particle interactions. does not synchronize their gradient.
@@ -807,38 +859,42 @@ int temp_main( int argc, char **argv )
 #endif
 			// particle-particle gradient, must be called in this order since save_grad is zero'd in update_dH_dq and added to here.
 #ifndef BOXED
-	PP_G( theSurface, r, allComplexes, ncomplex, g ); 
+	PP_G( theSimulation  ); 
 #else
-	Boxed_PP_G( theSurface, r, allComplexes, ncomplex, g ); 
+	Boxed_PP_G( theSimulation  ); 
 #endif
 
 #ifdef PARALLEL
-	ParallelSum(g,nc);
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+		ParallelSum(sRec->g,sRec->nc);
 #endif
 #ifdef PARALLEL
-	double expec_time[par_info.nprocs];
-	expec_time[par_info.my_id] = 0;
-	for( int f = 0; f < par_info.nf; f++ )
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 	{
-		if( par_info.faces[f] < theSurface->nf_faces ) 
-			expec_time[par_info.my_id] += theSurface->nf_g_q_p;	
-		else
-			expec_time[par_info.my_id] += theSurface->nf_irr_pts;	
+		double expec_time[par_info.nprocs];
+		expec_time[par_info.my_id] = 0;
+		for( int f = 0; f < par_info.nf[sRec->id]; f++ )
+		{
+			if( par_info.faces[sRec->id][f] < sRec->theSurface->nf_faces ) 
+				expec_time[par_info.my_id] += sRec->theSurface->nf_g_q_p;	
+			else
+				expec_time[par_info.my_id] += sRec->theSurface->nf_irr_pts;	
+		}
+		ParallelGather(expec_time,1);
+		double total_work = 0;
+		double max_work = 0;
+		for( int p =0; p < par_info.nprocs;p++ )
+		{
+			total_work += expec_time[p];
+			if( expec_time[p] > max_work )
+				max_work = expec_time[p];
+		}
+		printf("Max work is %lf times more than optimal.\n", par_info.nprocs * max_work / total_work );
 	}
-	ParallelGather(expec_time,1);
-	double total_work = 0;
-	double max_work = 0;
-	for( int p =0; p < par_info.nprocs;p++ )
-	{
-		total_work += expec_time[p];
-		if( expec_time[p] > max_work )
-			max_work = expec_time[p];
-	}
-	printf("Max work is %lf times more than optimal.\n", par_info.nprocs * max_work / total_work );
-
 #endif
-	for( int f = 0; f < theSurface->nt; f++ )
-		theSurface->set_g0_from_f(f);
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+	for( int f = 0; f < sRec->theSurface->nt; f++ )
+		sRec->theSurface->set_g0_from_f(f);
 
 //	theSurface->debugDeformation( r );
 
@@ -925,21 +981,27 @@ int temp_main( int argc, char **argv )
 
 			// leapfrog
 
-			theSurface->put(r);			
+			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+				sRec->theSurface->put(sRec->r);			
 
 			/*********** COMPUTE ENERGY ************/	
-	
+			V=0;
 			VR=0;
-			V = theSurface->energy(r,NULL);
-			double VMEM = V; 
-			memset( g, 0, sizeof(double) * nc );
-		
+			double VMEM = 0;
 			double VP = 0;
+			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+			{
+				V += sRec->theSurface->energy(sRec->r,NULL);
+
+				VMEM += V; 
+				memset( sRec->g, 0, sizeof(double) * sRec->nc );
+			}
+
 			for( int cx = 0; cx < par_info.nc; cx++ )
 			{
 				int c = par_info.complexes[cx];
-				VP += allComplexes[c]->V(theSurface, r );	
-				VP += allComplexes[c]->AttachV(theSurface, r );	
+				VP += allComplexes[c]->V(theSimulation);	
+				VP += allComplexes[c]->AttachV(theSimulation);	
 			}
 
 			V += VP;
@@ -947,6 +1009,7 @@ int temp_main( int argc, char **argv )
                         /*********** END COMPUTE ENERGY ************/	
 
 			/*********** SAVE RESTARTS FOR DEBUGGING ***/
+#if 0 // PRESIMULATION, requires updating
 #ifdef SAVE_RESTARTS
 #ifdef PARALLEL
 			if( ncomplex > 0 ) ParallelSyncComplexes( allComplexes, ncomplex );
@@ -959,26 +1022,31 @@ int temp_main( int argc, char **argv )
 			if( cur_save == NUM_SAVE_BUFFERS )
 				cur_save = 0;
 #endif
+#endif
 			/*********** END SAVE RESTARTS FOR DEBUGGING ***/
 
-			if( block.lipid_mc_period > 0 )
+			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 			{
-				PartialSyncVertices(r);
-				if( global_cntr % block.lipid_mc_period == 0 )
+				if( block.lipid_mc_period > 0 )
 				{
-					theSurface->local_lipidMCMove( r, allComplexes, ncomplex, time_step, 1.0 / temperature );
+					PartialSyncVertices(sRec->r,sRec->id);
+					if( global_cntr % block.lipid_mc_period == 0 )
+					{
+						sRec->theSurface->local_lipidMCMove( sRec->r, allComplexes, ncomplex, time_step, 1.0 / temperature );
+					}
 				}	 
-			}
 			
-			if( block.npt_mc_period > 0 )
-			{
-				if( global_cntr % block.npt_mc_period == 0 )
-					theSurface->area_MC_move( r, allComplexes, ncomplex,  1.0 / temperature, qdot, pp, VOLUME_MOVE, &block );
 			}
 			if( block.cyl_tension_mc_period > 0 )
 			{
 				if( global_cntr % block.cyl_tension_mc_period == 0 )
-					theSurface->area_MC_move( r, allComplexes, ncomplex,  1.0 / temperature, qdot, pp, CYL_TENSION_MOVE, &block );
+					theSimulation->area_MC_move( 1.0 / temperature, CYL_TENSION_MOVE, &block );
+			}
+				
+			if( block.npt_mc_period > 0 )
+			{
+				if( global_cntr % block.npt_mc_period == 0 )
+					theSimulation->area_MC_move( 1.0 / temperature, VOLUME_MOVE, &block );
 			}
 
 			/*********** COMPUTE GRADIENT ******************/
@@ -991,8 +1059,12 @@ int temp_main( int argc, char **argv )
 			double mesh_start = tnow.tv_sec +(1e-6)*tnow.tv_usec;
 
 			// LEAPFROG: gives p-dot at t, we have q(t), p(t-eps/2)
-			theSurface->grad( r, g );
-	
+			
+			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+			{
+				sRec->theSurface->grad( sRec->r, sRec->g );
+
+			}
 			gettimeofday(&tnow,NULL);
 			double mesh_stop = tnow.tv_sec +(1e-6)*tnow.tv_usec;
 			
@@ -1005,7 +1077,7 @@ int temp_main( int argc, char **argv )
 				int c = par_info.complexes[cx];
 
 				allComplexes[c]->prepareForGradient();
-				allComplexes[c]->setrall(theSurface,r);
+				allComplexes[c]->setrall(theSimulation);
 			}
 			if( ncomplex > 0 ) 
 			{
@@ -1014,11 +1086,10 @@ int temp_main( int argc, char **argv )
 				ParallelSyncComplexes( allComplexes, ncomplex );
 #endif
 #ifndef BOXED
-				V += PP_G( theSurface, r, allComplexes, ncomplex, g ); 
+				V += PP_G( theSimulation ); 
 #else
-				V += Boxed_PP_G( theSurface, r, allComplexes, ncomplex, g ); 
+				V += Boxed_PP_G( theSimulation ); 
 #endif			
-//				handleElasticCollisions( theSurface, r, allComplexes, ncomplex,  time_step*AKMA_TIME ); 
 			}
 			/*********** REPORT ENERGY, CHECK FOR FAILURE ****************/
 #ifdef PARALLEL
@@ -1063,8 +1134,9 @@ int temp_main( int argc, char **argv )
 			PV = V;
 
 			/*********** END REPORT, CHECK FOR FAILURE ****************/
-			memset( qdot_temp, 0, sizeof(double) * 3 * nv );	
-			
+
+			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+				memset( sRec->qdot_temp, 0, sizeof(double) * 3 * sRec->theSurface->nv );	
 
 			/* BEGIN complex */
 			gettimeofday(&tnow, NULL);
@@ -1094,34 +1166,34 @@ int temp_main( int argc, char **argv )
 				{
 					memcpy( allComplexes[c]->save_grad, save_grad, sizeof(double)*3*nsites );
 
-					double dt = allComplexes[c]->update_dH_dq( theSurface, r, g, qdot, qdot0, time_remaining, time_step );
+					double dt = allComplexes[c]->update_dH_dq( theSimulation, time_remaining, time_step );
 			
 					if(  do_ld || o < nequil )
 					{					
-						allComplexes[c]->applyLangevinFriction( theSurface, r, dt, gamma_langevin );
-						allComplexes[c]->applyLangevinNoise( theSurface, r, dt,  gamma_langevin, temperature );
+						allComplexes[c]->applyLangevinFriction( theSimulation, dt, gamma_langevin );
+						allComplexes[c]->applyLangevinNoise( theSimulation, dt,  gamma_langevin, temperature );
 					}
 
 					if( !allComplexes[c]->do_bd )
 					{
-						allComplexes[c]->propagate_p( theSurface, r, dt/2 );
-						allComplexes[c]->compute_qdot( theSurface, r, qdot0, qdot_temp, dt/time_step );			
+						allComplexes[c]->propagate_p( theSimulation, dt/2 );
+						allComplexes[c]->compute_qdot( theSimulation, dt/time_step );			
 			
 						// close enough.
-						PT += allComplexes[c]->T(theSurface,r)  * (dt/time_step);
+						PT += allComplexes[c]->T(theSimulation)  * (dt/time_step);
 	
-						allComplexes[c]->propagate_p( theSurface, r, dt/2 );
-						allComplexes[c]->compute_qdot( theSurface, r, qdot0, qdot_temp,  dt/time_step );			
+						allComplexes[c]->propagate_p( theSimulation, dt/2 );
+						allComplexes[c]->compute_qdot( theSimulation,  dt/time_step );			
 					}
 						
-					allComplexes[c]->propagate_surface_q( theSurface, r, dt );
+					allComplexes[c]->propagate_surface_q( theSimulation, dt );
 
 					time_remaining -= dt;
 				}
 			}
 			
 			// has special routines for handling elastic collisions.
-			propagateSolutionParticles( theSurface, r, allComplexes, ncomplex, time_step * AKMA_TIME );
+			propagateSolutionParticles( theSimulation, time_step * AKMA_TIME );
 
 			gettimeofday(&tnow, NULL);
 			double complex_time_stop = tnow.tv_sec + (1e-6) * tnow.tv_usec;
@@ -1134,10 +1206,11 @@ int temp_main( int argc, char **argv )
 			
 			if( do_srd )
 			{
-				theSurface->rebox_system();
+				for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+				sRec->theSurface->rebox_system();
 				double use_dhull = 0;
 
-				double ncol = srd_i->stream_and_collide( r, g, qdot, EFFM, theSurface, M, mlow, mhigh, use_dhull, theForceSet, cur_t*AKMA_TIME, time_step * AKMA_TIME, time_step_collision * AKMA_TIME  );
+				double ncol = srd_i->stream_and_collide( theSimulation, M, mlow, mhigh, use_dhull, cur_t*AKMA_TIME, time_step * AKMA_TIME, time_step_collision * AKMA_TIME  );
 			}
 
 
@@ -1145,114 +1218,126 @@ int temp_main( int argc, char **argv )
 
 			gettimeofday(&tnow,NULL);
 			double misc_time_start = tnow.tv_sec + (1e-6)*tnow.tv_usec;
-#ifdef PARALLEL
-			if( ncomplex == 0 )
-			{
-				if( do_gen_q )
-				{
-
-				}
-				else
-				{
-					PartialSumVertices(g);
-					PartialSyncVertices(qdot_temp);
-				}
-			}
-			else
-			{
-				if( do_gen_q )
-				{
-				}
-				else
-				{
-					ParallelSum(g,nc);
-					ParallelSum( qdot_temp, 3*nv );
-				}
-			}
-#endif
-
-			memcpy( next_pp, pp, sizeof(double) * NQ );
-			if( !block.disable_mesh )
-			{
-				if( do_bd_membrane || do_ld || o < nequil || (switched) )
-				{
-					if( do_gen_q )
-						GenQMatVecIncrScale( next_pp, pp, EFFM, -gamma_langevin*AKMA_TIME*time_step );
-					else
-					{
-#ifdef OLD_LANGEVIN
-						AltSparseCartMatVecIncrScale( next_pp, pp, EFFM, -gamma_langevin*AKMA_TIME * time_step, r+3*nv );
-#else
-						for( int xv = 0; xv < 3*nv; xv++ ) // here, gamma_langevin has units per time.
-							next_pp[xv] -= gamma_langevin*AKMA_TIME * time_step * next_pp[xv];
-#endif
-					}
-				}
-			}
-
-			// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t), report properties for this state (perform Monte Carlo?)
-
-			if( !block.disable_mesh && (!debug || o < nequil) )
-			{
-
-				if( do_gen_q )
-				{
-					memset(del_pp,0,sizeof(double)*NQ);
-					
-					for( int Q = 0; Q < NQ; Q++ )
-					for( int v1 = 0; v1 < nv; v1++ )
-					{
-						del_pp[Q] += gen_transform[Q*3*nv+v1*3+0] * -g[3*v1+0] * AKMA_TIME * time_step/2;
-						del_pp[Q] += gen_transform[Q*3*nv+v1*3+1] * -g[3*v1+1] * AKMA_TIME * time_step/2;
-						del_pp[Q] += gen_transform[Q*3*nv+v1*3+2] * -g[3*v1+2] * AKMA_TIME * time_step/2;
-					}
-
-#ifdef PARALLEL
-					ParallelSum( del_pp, NQ );
-					ParallelBroadcast( del_pp, NQ );
-#endif
-					for( int Q = 0; Q < NQ; Q++ )
-						next_pp[Q] += del_pp[Q];
-				}
-				else
-				{
-					for( int v1 = 0; v1 < nv; v1++ )
-					{
-						next_pp[3*v1+0] += -g[3*v1+0] * AKMA_TIME * time_step/2;
-						next_pp[3*v1+1] += -g[3*v1+1] * AKMA_TIME * time_step/2;
-						next_pp[3*v1+2] += -g[3*v1+2] * AKMA_TIME * time_step/2;
-					}
-				}	
-			}
-			memcpy( pp, next_pp, sizeof(double) * NQ );
-			memset( Qdot0_trial, 0, sizeof(double) * NQ );
-
-			if( do_gen_q )
-				GenQMatVecIncrScale( Qdot0_trial, pp, EFFM, 1.0 );
-			else
-				AltSparseCartMatVecIncrScale( Qdot0_trial, pp, EFFM, 1.0, r+3*nv );
-
 			double T = 0;				
-			for( int Q = 0; Q < NQ; Q++ )
-			{
-				if( o >= nequil && do_gen_q ) { av_Q_T[Q] += pp[Q]*Qdot0_trial[Q] * 0.5; 
-								nav_Q_T[Q] += 1;
-//								printf("av_Q_T[%d] %le\n", Q, av_Q_T[Q]/nav_Q[Q]);
-				}
-				T += pp[Q] * Qdot0_trial[Q] * 0.5;
-			}
-
-			
 			double srd_T = 0;
 			double srd_dof = 0;
-
-			if( do_srd )
+			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 			{
-				double *vp = srd_i->vp;
+				int nv = sRec->theSurface->nv;
+#ifdef PARALLEL
+				if( ncomplex == 0 )
+				{
+					if( sRec->do_gen_q )
+					{
 
-				srd_dof = 3 * srd_i->np;
-				for( int p = 0; p < srd_i->np; p++ )
-					srd_T += 0.5 * srd_i->mass * ( vp[3*p+0]*vp[3*p+0]+vp[3*p+1]*vp[3*p+1]+vp[3*p+2]*vp[3*p+2] ); 
+					}
+					else
+					{
+						PartialSumVertices(sRec->g,sRec->id);
+						PartialSyncVertices(sRec->qdot_temp,sRec->id);
+					}
+				}
+				else
+				{
+					if( sRec->do_gen_q )
+					{
+					}
+					else
+					{
+						ParallelSum(sRec->g,sRec->nc);
+						ParallelSum( sRec->qdot_temp, 3*sRec->theSurface->nv);
+					}
+				}
+#endif
+
+				memcpy( sRec->next_pp, sRec->pp, sizeof(double) * sRec->NQ );
+				if( !block.disable_mesh )
+				{
+					if( do_bd_membrane || do_ld || o < nequil || (switched) )
+					{
+						if( sRec->do_gen_q )
+							GenQMatVecIncrScale( sRec->next_pp, sRec->pp, sRec->EFFM, -gamma_langevin*AKMA_TIME*time_step );
+						else
+						{
+#ifdef OLD_LANGEVIN
+							AltSparseCartMatVecIncrScale( sRec->next_pp, sRec->pp, sRec->EFFM, -gamma_langevin*AKMA_TIME*time_step, theSimulation->alpha, sRec->id );
+#else
+							for( int xv = 0; xv < 3*sRec->theSurface->nv; xv++ ) // here, gamma_langevin has units per time.
+								sRec->next_pp[xv] -= gamma_langevin*AKMA_TIME * time_step * sRec->next_pp[xv];
+#endif
+						}
+						
+					}
+				}
+
+				// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t), report properties for this state (perform Monte Carlo?)
+
+				if( !block.disable_mesh && (!debug || o < nequil) )
+				{
+
+					if( sRec->do_gen_q )
+					{
+						memset(sRec->del_pp,0,sizeof(double)*sRec->NQ);
+						
+						for( int Q = 0; Q < sRec->NQ; Q++ )
+						for( int v1 = 0; v1 <sRec->theSurface->nv; v1++ )
+						{
+							sRec->del_pp[Q] += sRec->gen_transform[Q*3*nv+v1*3+0] * -sRec->g[3*v1+0] * AKMA_TIME * time_step/2;
+							sRec->del_pp[Q] += sRec->gen_transform[Q*3*nv+v1*3+1] * -sRec->g[3*v1+1] * AKMA_TIME * time_step/2;
+							sRec->del_pp[Q] += sRec->gen_transform[Q*3*nv+v1*3+2] * -sRec->g[3*v1+2] * AKMA_TIME * time_step/2;
+						}
+
+#ifdef PARALLEL
+						ParallelSum( sRec->del_pp, sRec->NQ );
+						ParallelBroadcast( sRec->del_pp, sRec->NQ );
+#endif
+						for( int Q = 0; Q < sRec->NQ; Q++ )
+							sRec->next_pp[Q] += sRec->del_pp[Q];
+					}
+					else
+					{
+						for( int v1 = 0; v1 < nv; v1++ )
+						{
+							sRec->next_pp[3*v1+0] += -sRec->g[3*v1+0] * AKMA_TIME * time_step/2;
+							sRec->next_pp[3*v1+1] += -sRec->g[3*v1+1] * AKMA_TIME * time_step/2;
+							sRec->next_pp[3*v1+2] += -sRec->g[3*v1+2] * AKMA_TIME * time_step/2;
+						}
+					}	
+				}
+				memcpy( sRec->pp, sRec->next_pp, sizeof(double) * sRec->NQ );
+				memset( sRec->Qdot0_trial, 0, sizeof(double) * sRec->NQ );
+				
+				int v1 = 0;
+				if( sRec->id == 1 && v1 == 0 )
+					printf("pp %le %le %le\n", sRec->pp[3*v1+0], sRec->pp[3*v1+1], sRec->pp[3*v1+2] );
+
+				if( sRec->do_gen_q )
+					GenQMatVecIncrScale( sRec->Qdot0_trial, sRec->pp, sRec->EFFM, 1.0 );
+				else
+					AltSparseCartMatVecIncrScale( sRec->Qdot0_trial, sRec->pp, sRec->EFFM, 1.0, theSimulation->alpha, sRec->id );
+					
+				if( sRec->id == 1 && v1 == 0 )
+					printf("Qdot0_trial %le %le %le\n", sRec->Qdot0_trial[3*v1+0], sRec->Qdot0_trial[3*v1+1], sRec->Qdot0_trial[3*v1+2] );
+
+				for( int Q = 0; Q < sRec->NQ; Q++ )
+				{
+					if( o >= nequil && sRec->do_gen_q ) { sRec->av_Q_T[Q] += sRec->pp[Q]*sRec->Qdot0_trial[Q] * 0.5; 
+									sRec->nav_Q_T[Q] += 1;
+//								printf("av_Q_T[%d] %le\n", Q, av_Q_T[Q]/nav_Q[Q]);
+					}
+					T += sRec->pp[Q] * sRec->Qdot0_trial[Q] * 0.5;
+				}
+
+				
+
+				if( do_srd )
+				{
+					double *vp = srd_i->vp;
+
+					srd_dof = 3 * srd_i->np;
+					for( int p = 0; p < srd_i->np; p++ )
+						srd_T += 0.5 * srd_i->mass * ( vp[3*p+0]*vp[3*p+0]+vp[3*p+1]*vp[3*p+1]+vp[3*p+2]*vp[3*p+2] ); 
+				}
 			}
 
 
@@ -1266,109 +1351,119 @@ int temp_main( int argc, char **argv )
  * 			 *****************************/
 
 
-			if( !block.disable_mesh && (!debug || o < nequil) )
+			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 			{
-				if( do_bd_membrane || do_ld || o < nequil )
+				if( !block.disable_mesh && (!debug || o < nequil) )
 				{
-#ifdef OLD_LANGEVIN
-					for( int Q = 0; Q < NQ; Q++ )
-						next_pp[Q] += gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
-#else
-					if( do_gen_q )
+					if( do_bd_membrane || do_ld || o < nequil )
 					{
-						for( int Q = 0; Q < NQ; Q++ )
-							next_pp[Q] += gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
+#ifdef OLD_LANGEVIN
+						for( int Q = 0; Q < sRec->NQ; Q++ )
+							sRec->next_pp[Q] += gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
+#else
+						if( sRec->do_gen_q )
+						{
+							for( int Q = 0; Q < sRec->NQ; Q++ )
+								sRec->next_pp[Q] += gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
+						}
+						else
+						{
+
+							for( int Q = 0; Q < 3*sRec->theSurface->nv; Q++ )
+								noise_vec[Q] = gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
+
+							AltSparseCartMatVecIncrScale( sRec->next_pp, noise_vec, sRec->MMat, 1.0, theSimulation->alpha, sRec->id  );
+							
+						}
+#endif
+#ifdef PARALLEL
+						ParallelBroadcast(sRec->next_pp,sRec->NQ );
+#endif
+					}
+
+					// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t+eps/2)
+					if( sRec->do_gen_q )
+					{
+						for( int Q = 0; Q < sRec->NQ; Q++ )
+							sRec->next_pp[Q] += sRec->del_pp[Q];
 					}
 					else
 					{
-
-						for( int Q = 0; Q < 3*nv; Q++ )
-							noise_vec[Q] = gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
-
-						AltSparseCartMatVecIncrScale( next_pp, noise_vec, MMat, 1.0, r+3*nv  );
-						
+						for( int v1 = 0; v1 < sRec->theSurface->nv; v1++ )
+						{
+							sRec->next_pp[3*v1+0] += -sRec->g[3*v1+0] * AKMA_TIME * time_step/2;
+							sRec->next_pp[3*v1+1] += -sRec->g[3*v1+1] * AKMA_TIME * time_step/2;
+							sRec->next_pp[3*v1+2] += -sRec->g[3*v1+2] * AKMA_TIME * time_step/2;
+						}	
 					}
-#endif
-#ifdef PARALLEL
-					ParallelBroadcast(next_pp,NQ);
-#endif
 				}
+				memcpy( sRec->pp, sRec->next_pp, sizeof(double) * sRec->NQ );
+				memset( sRec->qdot0, 0, sizeof(double) * 3 * sRec->theSurface->nv );
 
-				// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t+eps/2)
-				if( do_gen_q )
-				{
-					for( int Q = 0; Q < NQ; Q++ )
-						next_pp[Q] += del_pp[Q];
+				if( sRec->do_gen_q )
+				{	
+					memset( sRec->Qdot0, 0, sizeof(double) * sRec->NQ );
+					GenQMatVecIncrScale( sRec->Qdot0, sRec->pp, sRec->EFFM, 1.0 );
+					MatVec( sRec->gen_transform, sRec->Qdot0, sRec->qdot0, sRec->NQ, 3*sRec->theSurface->nv ); 
 				}
 				else
+					AltSparseCartMatVecIncrScale( sRec->qdot0, sRec->pp, sRec->EFFM, 1.0, theSimulation->alpha, sRec->id );
+
+				memcpy( sRec->qdot, sRec->qdot0, sizeof(double) * 3 * sRec->theSurface->nv );
+
+				if( !sRec->do_gen_q )
+					AltSparseCartMatVecIncrScale( sRec->qdot, sRec->qdot_temp, sRec->EFFM, 1.0, theSimulation->alpha, sRec->id  );
+
+				// LEAPFROG: increment q by eps, we have q(t+eps), p(t+eps/2)
+
+				if( ! debug || o < nequil )
 				{
-					for( int v1 = 0; v1 < nv; v1++ )
+					for( int v1 = 0; v1 < sRec->theSurface->nv; v1++ )
 					{
-						next_pp[3*v1+0] += -g[3*v1+0] * AKMA_TIME * time_step/2;
-						next_pp[3*v1+1] += -g[3*v1+1] * AKMA_TIME * time_step/2;
-						next_pp[3*v1+2] += -g[3*v1+2] * AKMA_TIME * time_step/2;
-					}	
-				}
-			}
-			memcpy( pp, next_pp, sizeof(double) * NQ );
-			memset( qdot0, 0, sizeof(double) * 3 * nv );
+						sRec->r[3*v1+0] += sRec->qdot[3*v1+0] * AKMA_TIME * time_step;
+						sRec->r[3*v1+1] += sRec->qdot[3*v1+1] * AKMA_TIME * time_step;
+						sRec->r[3*v1+2] += sRec->qdot[3*v1+2] * AKMA_TIME * time_step;
+					}
+				}	
 
-			if( do_gen_q )
-			{	
-				memset( Qdot0, 0, sizeof(double) * NQ );
-				GenQMatVecIncrScale( Qdot0, pp, EFFM, 1.0 );
-				MatVec( gen_transform, Qdot0, qdot0, NQ, 3*nv ); 
-			}
-			else
-				AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, r+3*nv );
-
-			memcpy( qdot, qdot0, sizeof(double) * 3 * nv );
-
-			if( !do_gen_q )
-				AltSparseCartMatVecIncrScale( qdot, qdot_temp, EFFM, 1.0, r+3*nv  );
-
-			// LEAPFROG: increment q by eps, we have q(t+eps), p(t+eps/2)
-
-			if( ! debug || o < nequil )
-			{
-				for( int v1 = 0; v1 < nv; v1++ )
+				if( sRec->do_gen_q )
 				{
-					r[3*v1+0] += qdot[3*v1+0] * AKMA_TIME * time_step;
-					r[3*v1+1] += qdot[3*v1+1] * AKMA_TIME * time_step;
-					r[3*v1+2] += qdot[3*v1+2] * AKMA_TIME * time_step;
-				}
-			}	
 
-			if( do_gen_q )
-			{
-
-				for( int Q = 0; Q < NQ; Q++ )
-				{
-					QV[Q] += Qdot0[Q] * AKMA_TIME * time_step;
-					if( o >= nequil )
+					for( int Q = 0; Q < sRec->NQ; Q++ )
 					{
-						av_Q[Q] += QV[Q];
-						av_Q2[Q] += QV[Q]*QV[Q];
-						nav_Q[Q] += 1;
+						sRec->QV[Q] += sRec->Qdot0[Q] * AKMA_TIME * time_step;
+						if( o >= nequil )
+						{
+							sRec->av_Q[Q] += sRec->QV[Q];
+							sRec->av_Q2[Q] += sRec->QV[Q]*sRec->QV[Q];
+							sRec->nav_Q[Q] += 1;
+						}
 					}
 				}
-			}
 #ifdef PARALLEL
-			if( do_gen_q )
-			{
+				if( sRec->do_gen_q )
+				{
 
-			}
-			else
-				PartialSyncVertices(pp);
+				}
+				else
+					PartialSyncVertices(sRec->pp, sRec->id);
 #endif
-
+			}
 
 #ifdef PARALLEL
 			ParallelSum( &PT, 1 );
 #endif
-			double dof = NQ;
-			if( !do_gen_q )
-				dof = 3*nv-3;
+			double dof = 0;
+
+			
+			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+			{
+				double ldof = 0;
+				ldof = sRec->NQ;
+				if( !sRec->do_gen_q )
+					ldof = 3*sRec->theSurface->nv-3;
+				dof += ldof;
+			}
 			double mem_T = 2*T / dof;
 			
 			T += PT;
@@ -1409,14 +1504,14 @@ int temp_main( int argc, char **argv )
 			if( block.record_curvature && o >= nequil  )
 			{
 				for( int c = 0; c < ncomplex; c++ )
-					avc[c] += allComplexes[c]->local_curvature( theSurface, r );
+					avc[c] += allComplexes[c]->local_curvature( theSimulation );
 				navc+=1;
 			}
 
 			if( block.s_q && global_cntr % block.s_q_period == 0 && o >= nequil)
 			{
 				// Update SANS B-histogram.
-				theSurface->sample_B_hist( r, B_hist, &A2dz2_sampled, SANS_SAMPLE_NRM, 100000, sans_max_r, nsans_bins, block.shape_correction );  
+				theSimulation->sample_B_hist( B_hist, &A2dz2_sampled, SANS_SAMPLE_NRM, 100000, sans_max_r, nsans_bins, block.shape_correction );  
 			}
 
 		}
@@ -1461,8 +1556,11 @@ int temp_main( int argc, char **argv )
 		step_rate = block.o_lim / (time_1-time_0+1e-10);
 		
 		if( block.lipid_mc_period > 0 )
-			theSurface->measureLipidCurvature(r, o < nequil );
-
+		{
+			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+				sRec->theSurface->measureLipidCurvature(sRec->r, o < nequil );
+		}
+#if 0 // pre-simulation, change me!
 		if( collect_hk )
 		{
 			theSurface->directFT( lhq, lhq2, r, nmodes, nmodes );
@@ -1520,15 +1618,18 @@ int temp_main( int argc, char **argv )
 
 		
 		}
+#endif
 	
 #ifdef PARALLEL
 		if( ncomplex > 0 ) ParallelSyncComplexes( allComplexes, ncomplex );
 #endif
+
 		if( tFile && par_info.my_id == BASE_TASK )
 		{
-			theSurface->put(r);
+			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+				sRec->theSurface->put(sRec->r);
 			//theSurface->writeLimitStructure(tFile);
-        		theSurface->writeLimitingSurface(tFile, allComplexes, ncomplex,r+3*nv);
+        		theSimulation->writeLimitingSurface(tFile);
 			fflush(tFile);
 	
 			if( do_srd )
@@ -1537,17 +1638,18 @@ int temp_main( int argc, char **argv )
 
 		if( block.write_alpha_period > 0 && alphaFile )
 		{
-			fprintf(alphaFile, "%le %le %le\n", r[3*nv+0], r[3*nv+1], r[3*nv+2] );
+			fprintf(alphaFile, "%le %le %le\n", theSimulation->alpha[0], theSimulation->alpha[1], theSimulation->alpha[2] );
 			fflush(alphaFile);
 		}
 
 	
+#if 0 // pre-simulation, change me!
 		if( block.tachyon && par_info.my_id == BASE_TASK )
 		{
 			theSurface->writeTachyon( block.jobName, block.tachyon_res, block.tachyon_interp, 
 				r, allComplexes, ncomplex, &block, srd_i, block.tachyon_tri_center ); 
 		}
-			
+#endif			
 
 		
 		if( block.hours > 0 )
@@ -1611,14 +1713,16 @@ int temp_main( int argc, char **argv )
 #endif
 	}
 
-	
-	if( tFile ) 
-		fclose(tFile);
-
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+	{
+		if( sRec->tFile ) 
+			fclose(sRec->tFile);
+	}
 #ifdef PARALLEL
 	if( ncomplex > 0 ) ParallelSyncComplexes( allComplexes, ncomplex );
 #endif
 
+#if 0 // pre-simulation change me
 	if( par_info.my_id == BASE_TASK )
 	{
 		char fname[256];
@@ -1645,6 +1749,7 @@ int temp_main( int argc, char **argv )
 
 		fclose(saveFile);
 	}
+#endif
 
 	if( block.record_curvature )
 	{
@@ -1657,6 +1762,7 @@ int temp_main( int argc, char **argv )
 		}
 	}
 
+#if 0 // pre-simulation change me!
 	if( doing_spherical_harmonics || doing_planar_harmonics )
 	{
 		printf("------ Harmonic general variables ------\n");
@@ -1695,10 +1801,12 @@ int temp_main( int argc, char **argv )
 		printf("------ done\n");
 		
 	}
-
+#endif
 	if( block.create_all_atom )
-		theSurface->createAllAtom(  &block );
-
+	{
+		printf("WARNING: creating all atom from the first surface.\n");
+		theSimulation->allSurfaces->theSurface->createAllAtom(  &block );
+	}
 /*	FILE *saveFile = fopen("file.save", "w");
 
 	for( int x = 0; x < theSurface->nv; x++ )
@@ -1710,7 +1818,8 @@ int temp_main( int argc, char **argv )
 
 	fclose(saveFile);
 */
-	clearForceSet(theForceSet);
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+		clearForceSet(sRec->theForceSet);
 	if( do_srd )
 		srd_i->clear();
 
