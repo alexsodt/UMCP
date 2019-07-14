@@ -2056,7 +2056,6 @@ void surface::getSparseEffectiveMass( force_set * theForceSet, int *use_map, int
 			}
 		}
 	}
-
 	
 #ifdef OUTPUT_EM
 	if(  ! used_transform && par_info.nprocs == 1 )

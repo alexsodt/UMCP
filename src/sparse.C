@@ -7,7 +7,6 @@
 #include <sys/time.h>
 #include "sparse.h"
 #include "lapack_we_use.h"
-
 double sp_fac( int n )
 {
 	double x = 1;
@@ -946,7 +945,9 @@ void SparseMatrix::mult(double *compr_A, double *compr_B, int nfast )
 		compr_A[s*nfast] = 0;
 
 		for( int xx = 0; xx < nnz[s]; xx++ )
+		{
 			compr_A[s*nfast] += nzv[s][xx] * compr_B[nzl[s][xx]*nfast];
+		}
 	}
 }
 

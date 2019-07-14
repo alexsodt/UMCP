@@ -197,6 +197,7 @@ int temp_main( int argc, char **argv )
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 	{
 		surface *useSurface =sRec->theSurface;
+		useSurface->surface_id = sRec->id;
 
 		int nc = 3 * useSurface->nv+3;
 		int nv = useSurface->nv;
@@ -1307,18 +1308,12 @@ int temp_main( int argc, char **argv )
 				memcpy( sRec->pp, sRec->next_pp, sizeof(double) * sRec->NQ );
 				memset( sRec->Qdot0_trial, 0, sizeof(double) * sRec->NQ );
 				
-				int v1 = 0;
-				if( sRec->id == 1 && v1 == 0 )
-					printf("pp %le %le %le\n", sRec->pp[3*v1+0], sRec->pp[3*v1+1], sRec->pp[3*v1+2] );
 
 				if( sRec->do_gen_q )
 					GenQMatVecIncrScale( sRec->Qdot0_trial, sRec->pp, sRec->EFFM, 1.0 );
 				else
 					AltSparseCartMatVecIncrScale( sRec->Qdot0_trial, sRec->pp, sRec->EFFM, 1.0, theSimulation->alpha, sRec->id );
 					
-				if( sRec->id == 1 && v1 == 0 )
-					printf("Qdot0_trial %le %le %le\n", sRec->Qdot0_trial[3*v1+0], sRec->Qdot0_trial[3*v1+1], sRec->Qdot0_trial[3*v1+2] );
-
 				for( int Q = 0; Q < sRec->NQ; Q++ )
 				{
 					if( o >= nequil && sRec->do_gen_q ) { sRec->av_Q_T[Q] += sRec->pp[Q]*sRec->Qdot0_trial[Q] * 0.5; 
