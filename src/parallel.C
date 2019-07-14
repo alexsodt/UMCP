@@ -31,7 +31,6 @@ void quietParallel( void )
          }
 
 	if( taskid != BASE_TASK )
-//	if( taskid != 2)
 	{
 		freopen( "/dev/null","w", stdout );
 	}
@@ -1047,11 +1046,8 @@ void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix
 #ifdef PARALLEL
 	FullSyncVertices( vec_in, surface_id );
 //	PartialSyncVertices( vec_in, surface_id );
-	if( surface_id == 1 )
-	{
-		printf("vec_in[0]: %.14le\n", vec_in[0] );
-	}
 #endif
+
 	double *mcopy = (double *)malloc( sizeof(double) * Mat->nsource*3 );
 
 	double *vout  = (double *)malloc( sizeof(double) * Mat->nneed*3 );
@@ -1061,9 +1057,11 @@ void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix
 	Mat->compress_source_vector( vec_in+1, mcopy+1, 3 );
 	Mat->compress_source_vector( vec_in+2, mcopy+2, 3 );
 
+
 	Mat->mult( vout, mcopy, 3 );
 	Mat->mult( vout+1, mcopy+1, 3 );
 	Mat->mult( vout+2, mcopy+2, 3 );
+	
 	
 	for( int c = 0; c < 3; c++ )
 	for( int v = 0; v < Mat->nneed; v++ )
@@ -1072,12 +1070,13 @@ void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix
 	Mat->expand_target_vector( vec_out, vout, 3 );
 	Mat->expand_target_vector( vec_out+1, vout+1, 3 );
 	Mat->expand_target_vector( vec_out+2, vout+2, 3 );
+	
+
 
 #ifdef PARALLEL
 	FullSyncVertices( vec_out, surface_id );
 //	PartialSyncVertices( vec_out );
 #endif
-
 	free(mcopy);
 	free(vout);
 }
