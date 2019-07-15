@@ -91,6 +91,12 @@ class parameterBlock
 	int tachyon_gauss;
 	int tachyon_dull;
 	int tachyon_clear;
+
+	double tachyon_collision_point[3];
+	double tachyon_collision_radius;
+	int tachyon_collision_level;
+	int tachyon_collision_draw_type;
+
 	int movie;
 	int random_seed;
 	int debug;
