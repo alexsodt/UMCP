@@ -513,9 +513,9 @@ int convex_hull( double *pts, int npts, const char *unique ) {
   vertStorage[1] = -10.101;
   vertStorage[2] = -10.101;
 
+  ntri = 0;
   ntri_space = 1;
-  triStorage = (double *)malloc( sizeof(double) * 3 * ntri_space );
-  
+  triStorage = (int *)malloc( sizeof(int) * 10 * ntri_space );
 
   // I guess for now I want: s o Fv TO qvo2.result 
 
@@ -539,17 +539,17 @@ int convex_hull( double *pts, int npts, const char *unique ) {
     qh_checkflags(qh qhull_command, hidden_options);
     qh_initflags(qh qhull_command);
 //    points= qh_readpoints(&numpoints, &dim, &ismalloc);
-    dim = 4;
+    dim = 3;
     numpoints = npts;
 
     points = (coordT *)malloc( sizeof(coordT) * dim * (npts+1) );
 
     for( x = 0; x < npts; x++ )
 	{
-		points[4*x+0] = pts[3*x+0];
-		points[4*x+1] = pts[3*x+1];
-		points[4*x+2] = pts[3*x+2];
-		points[4*x+3] = pts[3*x+0]*pts[3*x+0]+pts[3*x+1]*pts[3*x+1]+pts[3*x+2]*pts[3*x+2];
+		points[3*x+0] = pts[3*x+0];
+		points[3*x+1] = pts[3*x+1];
+		points[3*x+2] = pts[3*x+2];
+//		points[4*x+3] = pts[3*x+0]*pts[3*x+0]+pts[3*x+1]*pts[3*x+1]+pts[3*x+2]*pts[3*x+2];
 	}
 
     if (dim >= 5) {
@@ -563,6 +563,18 @@ int convex_hull( double *pts, int npts, const char *unique ) {
     if (qh VERIFYoutput && !qh FORCEoutput && !qh STOPpoint && !qh STOPcone)
       qh_check_points();
     exitcode= qh_ERRnone;
+
+#if 0
+	int t = 0;
+	for( t = 0; t < ntri; t++ )
+	{
+		printf("zero: %d and", triStorage[10*t+0] );
+		int p = 0;
+		for( p = 0; p < triStorage[10*t+0]; p++ )
+			printf(" %d", triStorage[10*t+1+p] );
+		printf("\n");
+	}
+#endif
   }
   else
   {
