@@ -1511,8 +1511,6 @@ void surface::mode_perturb( double *r,  double mag, int do_cosine ) // cosine is
 
 void surface::load_least_squares_fitting( force_set *theForceSet )
 {
-	double *Amat = (double *)malloc( sizeof(double) * (nv) * (nv) );
-	memset( Amat, 0, sizeof(double) * (nv) * (nv ) );
 
 
 	theForceSet->frc_coef = (double *)malloc( sizeof(double) * maxv * theForceSet->npts );
@@ -1543,175 +1541,9 @@ void surface::load_least_squares_fitting( force_set *theForceSet )
 			theForceSet->frc_coef_list[p*maxv+c] = coef_list[c];
 		}
 
-		for( int c1 = 0; c1 < ncoef; c1++ )
-		for( int c2 = 0; c2 < ncoef; c2++ )
-			Amat[coef_list[c1]*nv+coef_list[c2]] += coefs[c1] * coefs[c2];			
 	}
-
-
-#if 0	
-	printf("A = {\n");
-	for( int i = 0; i < nv; i++ )
-	{
-		printf("{");
-		for( int j = 0; j <  nv; j++ )
-		{
-			printf("%lf", Amat[i*nv+j] );
-			if( j != nv-1 )
-				printf(",");
-		}
-		printf("}");
-		if( i != nv-1 )
-			printf(",\n");
-		else
-			printf("\n");
-	}
-	printf("};\n");
-#endif
-
-	int N = nv;
-	int LDA = nv;
-	int info = 0;
-
-	double *oamat = (double *)malloc( sizeof(double) * nv * nv );
-	memcpy( oamat, Amat, sizeof(double) * nv * nv );
-	
-	int lwork = N*N; 
-	double *work = (double *)malloc( sizeof(double) * lwork );
-	int ipiv[N];
-
-	dgetrf( &N, &N, Amat, &LDA, ipiv, &info );
-	if( info != 0 )
-	{
-		printf("info: %d Failure to invert A (dgetrf).\n", info);
-		exit(1);
-	} 
-	dgetri( &N, Amat, &LDA, ipiv, work, &lwork, &info );
-	
-	if( info != 0 )
-	{
-		printf("info: %d Failure to invert A (dgetri).\n", info);
-		exit(1);
-	} 
-
-#if 0 
-	printf("Ainv = {\n");
-	for( int i = 0; i < nv; i++ )
-	{
-		printf("{");
-		for( int j = 0; j < nv; j++ )
-		{
-			printf("%lf", Amat[i*nv+j] );
-			if( j != nv-1 )
-				printf(",");
-		}
-		printf("}");
-		if( i != nv-1 )
-			printf(",\n");
-		else
-			printf("\n");
-	}
-	printf("};\n");
-#endif
-
-	free(work);
-	free(oamat);	
-
-	theForceSet->frc_inverse = Amat;	
-//	free(Amat);
 }
 
-void surface::test_force_set( force_set *theForceSet )
-{
-	double *r = (double *)malloc( sizeof(double ) * (3*nv+3) );
-	r[3*nv+0] = 1.0;
-	r[3*nv+1] = 1.0;
-	r[3*nv+2] = 1.0;
-
-	get(r);
-
-	FILE *baseFile = fopen( "base.xyz", "w");
-	fprintf(baseFile, "%d\n", theForceSet->npts );
-	fprintf(baseFile, "base file\n" );
-	
-	FILE *targetFile = fopen( "target.xyz", "w");
-	fprintf(targetFile, "%d\n", theForceSet->npts );
-	fprintf(targetFile, "target file\n" );
-	
-	FILE *solutionFile = fopen( "solution.xyz", "w");
-	fprintf(solutionFile, "%d\n", theForceSet->npts );
-	fprintf(solutionFile, "solution file\n" );
-	
-	double *displ = (double *)malloc( sizeof(double) * 3 * nv );
-	double *b = (double *)malloc( sizeof(double) *  3 * nv );
-	memset( displ, 0, sizeof(double ) * 3 * nv );
-	memset( b, 0, sizeof(double ) * 3 * nv );
-	for( int x = 0; x < theForceSet->npts; x++ )
-	{
-		double rp[3];
-		double np[3];
-	
-		int f = theForceSet->face_set[x];
-		double u = theForceSet->uv_set[x*2+0];
-		double v = theForceSet->uv_set[x*2+1];
-
-		evaluateRNRM( f, u, v, rp, np, r );
-		
-		double tx = rp[0];
-		double ty = rp[1];
-		double tz = rp[2];
-
-		double r = sqrt(tx*tx+ty*ty+tz*tz);
-
-		double mag = 50;
-
-//		double displ[3] = { mag*tx * tx * tz/r/r/r, -mag*tz*ty * tx/r/r/r, mag*tz * tz * tz/r/r/r };
-		double displ[3] = { mag*(2*(double)rand()/(double)RAND_MAX-1), 
-				    mag*(2*(double)rand()/(double)RAND_MAX-1),
-				    mag*(2*(double)rand()/(double)RAND_MAX-1) };
-
-		fprintf(baseFile, "C %lf %lf %lf\n", rp[0], rp[1], rp[2] );	
-		fprintf(targetFile, "O %lf %lf %lf\n", rp[0]+displ[0], rp[1]+displ[1], rp[2]+displ[2] );	
-		
-		for( int c = 0; c < theForceSet->frc_ncoef[x]; c++ )
-		{
-			b[theForceSet->frc_coef_list[x*maxv+c]*3+0] += displ[0] * theForceSet->frc_coef[x*maxv+c];
-			b[theForceSet->frc_coef_list[x*maxv+c]*3+1] += displ[1] * theForceSet->frc_coef[x*maxv+c];
-			b[theForceSet->frc_coef_list[x*maxv+c]*3+2] += displ[2] * theForceSet->frc_coef[x*maxv+c];
-		}		
-	}	
-		
-	char trans = 'T';
-	int incrxy = 3;
-	double zero = 0.0;
-	double one = 1.0;
-
-	for( int c = 0; c < 3; c++ )
-		dgemv( &trans, &nv, &nv, &one, theForceSet->frc_inverse, &nv, b+c, &incrxy, &zero, displ+c, &incrxy );
-
-	for( int x = 0; x < nv; x++ )
-	{
-		r[3*x+0] += displ[3*x+0];
-		r[3*x+1] += displ[3*x+1];
-		r[3*x+2] += displ[3*x+2];
-	}
-
-	for( int x = 0; x < theForceSet->npts; x++ )
-	{
-		double rp[3];
-		double np[3];
-	
-		int f = theForceSet->face_set[x];
-		double u = theForceSet->uv_set[x*2+0];
-		double v = theForceSet->uv_set[x*2+1];
-
-		evaluateRNRM( f, u, v, rp, np, r );
-
-		fprintf(solutionFile, "N %lf %lf %lf\n", rp[0], rp[1], rp[2] );	
-	}	
-
-	free(b);
-}
 
 void surface::evaluate_fp( force_set *theForceSet, double *xp, double *r )
 {
@@ -2384,7 +2216,6 @@ void clearForceSet( force_set *theForceSet )
 {
 	free(theForceSet->face_set);
 	free(theForceSet->uv_set);
-	free(theForceSet->frc_inverse);
 	free(theForceSet->frc_coef);
 	free(theForceSet->mass);
 	free(theForceSet->frc_coef_list);

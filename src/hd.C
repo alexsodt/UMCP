@@ -688,11 +688,13 @@ int temp_main( int argc, char **argv )
 	int n_vuse = 0;
 	double *mass_scaling = NULL;
 
-	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
-	if( do_bd_membrane )
-		sub_surface->getSparseRoot( theForceSet, &MMat ); 
-	setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
-
+	if( !block.disable_mesh )
+	{
+		sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
+		if( do_bd_membrane )
+			sub_surface->getSparseRoot( theForceSet, &MMat ); 
+		setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
+	}
 
 
 	double V = sub_surface->energy(r,NULL);
@@ -790,15 +792,18 @@ int temp_main( int argc, char **argv )
 	double prev_TV = 0;
 
 	memset( qdot0, 0, sizeof(double) * 3 * nv );
-	if( do_gen_q )
+
+	if( !block.disable_mesh )
 	{
-		memset( Qdot0, 0, sizeof(double) * NQ );
-		GenQMatVecIncrScale( Qdot0, pp, EFFM, 1.0 );
-		MatVec( gen_transform, Qdot0, qdot0, NQ, 3*nv ); 
+		if( do_gen_q )
+		{
+			memset( Qdot0, 0, sizeof(double) * NQ );
+			GenQMatVecIncrScale( Qdot0, pp, EFFM, 1.0 );
+			MatVec( gen_transform, Qdot0, qdot0, NQ, 3*nv ); 
+		}
+		else
+			AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, r+3*nv );
 	}
-	else
-		AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, r+3*nv );
-	
 	memcpy( qdot, qdot0, sizeof(double) * 3 * nv );
 	
 	memset( qdot_temp, 0, sizeof(double) * 3 * nv );	
@@ -810,7 +815,7 @@ int temp_main( int argc, char **argv )
 #ifdef PARALLEL		
 	ParallelSum( qdot_temp, 3*nv );
 #endif
-	if( ! do_gen_q )
+	if( ! do_gen_q && !block.disable_mesh )
 		AltSparseCartMatVecIncrScale( qdot, qdot_temp, EFFM, 1.0, r+3*nv );
 	sub_surface->grad( r, g );
 
