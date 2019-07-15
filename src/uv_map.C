@@ -2545,6 +2545,7 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 			if( c_vec_1 && c_vec_2 && c_val_1 && c_val_2 )
 			{
 				*c_val_1 = c1;
+				*c_val_2 = c2;
 
 				if( fabs(c) > 1e-10 )
 				{
@@ -2557,9 +2558,30 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 					c_vec_1[0] = vec1[0];
 					c_vec_1[1] = vec1[1];
 					
-					*c_val_2 = c2;
 					
 					double vec2[2] = {  -(-a+d-fac)/(2*c),1.0};
+					
+					len = sqrt(vec2[0]*vec2[0]+vec2[1]*vec2[1]);
+					vec2[0]/=len;
+					vec2[1]/=len;
+					c_vec_2[0] = vec2[0];
+					c_vec_2[1] = vec2[1];
+				}
+				else if( fabs(b) > 1e-10 )
+				{
+					
+					double vec1[2] = { -(b)/(a-d),1.0};
+	
+					double len = sqrt(vec1[0]*vec1[0]+vec1[1]*vec1[1]);
+	
+					vec1[0]/=len;
+					vec1[1]/=len;
+					c_vec_1[0] = vec1[0];
+					c_vec_1[1] = vec1[1];
+					
+					
+					double vec2[2] = { 1, 0};
+	
 					
 					len = sqrt(vec2[0]*vec2[0]+vec2[1]*vec2[1]);
 					vec2[0]/=len;
@@ -2794,9 +2816,10 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 			
 			if( c_vec_1 && c_vec_2 && c_val_1 && c_val_2 )
 			{
+				*c_val_1 = c1;
+				*c_val_2 = c2;
 				if( fabs(c) > 1e-10 )
 				{
-					*c_val_1 = c1;
 					
 					double vec1[2] = { -(-a+d+fac)/(2*c),1.0};
 	
@@ -2807,9 +2830,30 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 					c_vec_1[0] = vec1[0];
 					c_vec_1[1] = vec1[1];
 					
-					*c_val_2 = c2;
 					
 					double vec2[2] = {  -(-a+d-fac)/(2*c),1.0};
+	
+					
+					len = sqrt(vec2[0]*vec2[0]+vec2[1]*vec2[1]);
+					vec2[0]/=len;
+					vec2[1]/=len;
+					c_vec_2[0] = vec2[0];
+					c_vec_2[1] = vec2[1];
+				}
+				else if( fabs(b) > 1e-10 )
+				{
+					
+					double vec1[2] = { -(b)/(a-d),1.0};
+	
+					double len = sqrt(vec1[0]*vec1[0]+vec1[1]*vec1[1]);
+	
+					vec1[0]/=len;
+					vec1[1]/=len;
+					c_vec_1[0] = vec1[0];
+					c_vec_1[1] = vec1[1];
+					
+					
+					double vec2[2] = { 1, 0 };
 	
 					
 					len = sqrt(vec2[0]*vec2[0]+vec2[1]*vec2[1]);

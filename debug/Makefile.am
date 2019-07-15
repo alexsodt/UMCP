@@ -3,29 +3,41 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 EMAIL = alexander.sodt@nih.gov
 
 
-bin_PROGRAMS = hd.dbg makeHexSquare.dbg min.dbg subdivide.dbg scale.dbg icosahedron.dbg makeBud.dbg makeBump.dbg makeHexCylinder.dbg writeBiasPotential.dbg writeCylRTraj.dbg rd.dbg makePore.dbg join.dbg
+bin_PROGRAMS = hd.dbg makeHexSquare.dbg min.dbg subdivide.dbg scale.dbg icosahedron.dbg makeBud.dbg makeBump.dbg makeHexCylinder.dbg writeBiasPotential.dbg writeCylRTraj.dbg rd.dbg makePore.dbg join.dbg frc_sandbox.dbg
 
 AM_CPPFLAGS = -include ../config.h -include ../src/local_config.h $(AM_INCLUDE) 
 AM_CFLAGS = -g
 AM_CXXFLAGS = -g
 
-vpath %.C ../src
-vpath %.c ../src
-vpath %.cpp ../src
-vpath %.h ../src
+SRC_DIR = ../src
 
+vpath %.C $(SRC_DIR)
+vpath %.c $(SRC_DIR)
+vpath %.cpp $(SRC_DIR)
+vpath %.h  $(SRC_DIR)
+vpath %.cu $(SRC_DIR)
+
+.cu.o:
+	$(NVCC) -o $*.o -c $(SRC_DIR)/$*.cu
 
 complex_SRCS = NBAR.C dimer.C crowder.C
 util_SRCS    = mutil.C util.C
 
 interp_SRCS = interpLib.C grad.C pboxing.C irr_kernel.C uv_map.C gauss.C modes.C write_structures.C min_distance.cpp GJK.cpp gjk_gudrun.cpp GJK_min2.cpp functions.cpp NearestSimplexR2.cpp NearestSimplexR.cpp  subdivide3.C fast_mm.C random_global.C height.C pcomplex.C minimize.C gsl_random_globals.C dynamics.C restart.C p_p.C sparse.C global_boxing.C lipid_density.C tachyon.C npt.C lipid_composition.C vpass.C get_regions.C parallel.C input.C l-bfgs.C srd.C alignSet.C compilation_time.C meshCollisionLib.C sans.C spline.C globals.C createAllAtom.C dcd.C pdb.C
 
-rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutines/pirr_pfree_ratio_psF.cpp 
+rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutines/pirr_pfree_ratio_psF.cpp fpr_subroutines/2D.o fpr_subroutines/DDmatrixcreate.cpp fpr_subroutines/DDpsur.cpp fpr_subroutines/TBLnorm.cpp fpr_subroutines/TBLpirr.cpp fpr_subroutines/TBLsur.cpp fpr_subroutines/fpir.cpp fpr_subroutines/fsur.cpp fpr_subroutines/integrator.cpp fpr_subroutines/fnorm.cpp
 
 hull_SRCS = dovoronoi.c clusterv.C
 
+if CUDA
+cuda_SRCS = cuda.cu
+else
+cuda_SRCS =
+endif
+
 rd_dbg_SOURCES        = rd.C $(rd_SRCS) $(hull_SRCS) $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
-hd_dbg_SOURCES        = hd.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
+hd_dbg_SOURCES        = hd.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS)
+frc_sandbox_dbg_SOURCES        = frc_sandbox.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS)
 min_dbg_SOURCES       = min.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
 subdivide_dbg_SOURCES = subdivide.C $(interp_SRCS)  $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
 scale_dbg_SOURCES	  = scale.C  $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
@@ -41,7 +53,8 @@ writeCylRTraj_dbg_SOURCES      = writeCylRTraj.C $(util_SRCS)
 
 
 rd_dbg_LDADD		  = $(AM_LDADD) $(AM_QHULL) -lstdc++ 
-hd_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) -lstdc++
+hd_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
+frc_sandbox_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
 join_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) -lstdc++
 min_dbg_LDADD             = $(AM_LDADD) $(AM_QHULL) -lstdc++
 subdivide_dbg_LDADD       = $(AM_LDADD) $(AM_QHULL) -lstdc++

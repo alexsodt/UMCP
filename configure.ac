@@ -15,6 +15,7 @@ AC_CHECK_FILE("./qhull-2011.1/lib/libqhullstatic.a",
 	[AC_MSG_ERROR("Could not find file qhull-2011.1/lib/libqhullstatic.a. Make this file first")])
 
 AC_ARG_ENABLE(parallel, [AC_HELP_STRING([--parallel],[compile using MPI])], parallel=yes, parallel=no)
+AC_ARG_ENABLE(cuda, [AC_HELP_STRING([--cuda],[Use CUDA GPU for special tasks])], cuda=yes, cuda=no)
 
 if test -z $CXXFLAGS; then
     CXXFLAGS=''
@@ -31,6 +32,12 @@ if test "$parallel" = "yes"; then
 	AC_DEFINE(PARALLEL,1,[Define to compile in parallel.])
 	c_compilers="mpicc $c_compilers"
 	cxx_compilers="mpic++ mpiCC $cxx_compilers"
+fi
+
+if test "a$cuda" = "ayes"; then
+	AC_CHECK_PROG(NVCC, nvcc, nvcc)
+	AC_DEFINE(USE_CUDA,1,[Define to use CUDA GPU for special tasks.])
+	AM_CUDA="-lcudart"
 fi
 
 AC_PROG_CC([$c_compilers])
@@ -52,6 +59,7 @@ AC_CHECK_HEADERS([fftw3.h],
 
 
 AM_CONDITIONAL(MPI, test "$parallel" = "yes" )
+AM_CONDITIONAL(CUDA, test "$cuda" = "yes" )
 
 linearAlgebraString="no"
 usingUnderscore="yes"
@@ -97,6 +105,10 @@ if test "$linearAlgebraString" = "no"; then
 			linearAlgebraString="-latlas -llapack -lblas"])
 		LDFLAGS=$save_LDFLAGS
 	fi
+fi
+
+if test "$linearAlgebraString" = "no"; then
+	AC_MSG_ERROR("Couldn't find a LAPACK/BLAS package to which to link.")
 fi
 
 if test "$usingUnderscore" = "yes"; then
@@ -156,6 +168,7 @@ AC_CHECK_FUNCS([floor gettimeofday memset pow sqrt strcasecmp strchr strncasecmp
 AC_SUBST(AM_LDADD)
 AC_SUBST(AM_INCLUDE)
 AC_SUBST(AM_QHULL)
+AC_SUBST(AM_CUDA)
 
 AC_CONFIG_FILES([Makefile optimized/Makefile debug/Makefile])
 AC_OUTPUT

@@ -197,8 +197,24 @@ class parameterBlock
 
 	// BEGIN section for creating all-atom structures
 
-	char *patchPDB;
+	int addSalt;
+	double innerKCL;
+	double outerKCL;
+
+	char *addProteinPDB;
+	char *addProteinPSF;
+	char *solvatePDB;
+	char *solvatePSF;
+
+	double strainInner;
+	double strainOuter;
+
+	char *innerPatchPDB;
+	char *innerPatchPSF;
+	char *outerPatchPDB;
+	char *outerPatchPSF;
 	char *patchPSF;
+	char *patchPDB;
 	int create_all_atom;
 	int create_flip;
 

@@ -2754,7 +2754,10 @@ int tachyonCollision2( FILE* theFile, double *r1, int nv1, double *r2, double **
 	{
 		double sub1[nvmax*3];
 		memset( sub1, 0, sizeof(double)*nvmax*3);
+		double frc1[nvmax*3];
+		memset( frc1, 0, sizeof(double) * nvmax*3);
 
+		int do_proc1 = 0;
 		int nv_use1 = 12;
 		if( x1 == 0 ) nv_use1 = nv1;
 	

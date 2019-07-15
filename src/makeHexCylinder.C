@@ -229,6 +229,8 @@ int main( int argc, char **argv )
 	double LA = nx_int * special_L;
 	double LB = ny_int * hex_spacing / ASPECT;
 
+	double zscale = LC/LB;
+
 	double Ly_special = hex_spacing / ASPECT;
 
 	int n_special_points = nx_int * ny_int *2;
@@ -454,7 +456,7 @@ int main( int argc, char **argv )
 	fprintf(theLattice, "3d R = %lf\n", R );
 	fprintf(theLattice, "%lf 0.0 0.0\n", 3*R);
 	fprintf(theLattice, "0.0 %lf 0.0\n", 3*R );
-	fprintf(theLattice, "0.0 0.0 %lf\n", PeriodicLengthB );
+	fprintf(theLattice, "0.0 0.0 %lf\n", PeriodicLengthB*zscale );
 
 	int p = 0;
 	for( ; p < npoints; p++ )
@@ -462,7 +464,7 @@ int main( int argc, char **argv )
 		if( pt_map[p] < 0 )
 			continue;
 
-		fprintf(theLattice, "%d %lf %lf %lf %d", pt_map[p], r[3*p+0], r[3*p+1], r[3*p+2] , n_new_bonds[p] );
+		fprintf(theLattice, "%d %lf %lf %lf %d", pt_map[p], r[3*p+0], r[3*p+1], r[3*p+2]*zscale , n_new_bonds[p] );
 
 		for( int b = 0; b < n_new_bonds[p]; b++ )
 			fprintf(theLattice, " %d", pt_map[new_bonds[max_bonds*p+b]] );

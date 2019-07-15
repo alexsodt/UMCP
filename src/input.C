@@ -186,9 +186,29 @@ void setDefaults( parameterBlock *block )
 	block->shape_correction = 0;
 
 	block->on_surface = 0;
+	
+	block->addSalt = 0;
+	block->innerKCL = 0;
+	block->outerKCL = 0;
+
+	block->addProteinPDB   = NULL;
+	block->addProteinPSF   = NULL;
+
+	block->strainInner = 0;
+	block->strainOuter = 0;
+
+	block->innerPatchPDB = NULL;
+	block->innerPatchPSF = NULL;
+	
+	block->outerPatchPDB = NULL;
+	block->outerPatchPSF = NULL;
 
 	block->patchPDB = NULL;
 	block->patchPSF = NULL;
+
+	block->solvatePDB = NULL;
+	block->solvatePSF = NULL;
+
 	block->create_all_atom = 0;
 
 	// request a timestep analysis
@@ -320,6 +340,37 @@ int resolveParameters( parameterBlock *block )
 	{
 		printf("ERROR: LD and SRD are both activated.\n");
 		exit(1);
+	}
+
+
+	if( !block->outerPatchPDB )
+	{
+		if( block->patchPDB )
+		{
+			block->outerPatchPDB = (char *)malloc( sizeof(char) * (1+strlen(block->patchPDB) ) );
+			strcpy( block->outerPatchPDB, block->patchPDB );
+
+			if( block->patchPSF )
+			{
+				block->outerPatchPSF = (char *)malloc( sizeof(char) * (1+strlen(block->patchPSF) ) );
+				strcpy( block->outerPatchPSF, block->patchPSF );
+			}
+		}
+	}
+	
+	if( !block->innerPatchPDB )
+	{
+		if( block->patchPDB )
+		{
+			block->innerPatchPDB = (char *)malloc( sizeof(char) * (1+strlen(block->patchPDB) ) );
+			strcpy( block->innerPatchPDB, block->patchPDB );
+
+			if( block->patchPSF )
+			{
+				block->innerPatchPSF = (char *)malloc( sizeof(char) * (1+strlen(block->patchPSF) ) );
+				strcpy( block->innerPatchPSF, block->patchPSF );
+			}
+		}
 	}
 
 	return warning;
@@ -1190,6 +1241,76 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				printf("Could not interpret input line '%s'.\n", tbuf );
 				ERROR = 1;
 			}	
+		}
+		else if( !strcasecmp( word1, "strainOuter") )
+			block->strainOuter = atof(word2);
+		else if( !strcasecmp( word1, "strainInner") )
+			block->strainInner = atof(word2);
+		else if( !strcasecmp( word1, "innerKCL" ) )
+		{
+			block->addSalt = 1;
+			block->innerKCL = atof( word2 );
+		}
+		else if( !strcasecmp( word1, "outerKCL" ) )
+		{
+			block->addSalt = 1;
+			block->outerKCL = atof( word2 );
+		}
+		else if( !strcasecmp( word1, "outerPatchPDB" ) )
+		{
+			if( block->outerPatchPDB )
+				free(block->outerPatchPDB);
+			block->outerPatchPDB = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->outerPatchPDB, word2 );
+		}
+		else if( !strcasecmp( word1, "outerPatchPSF" ) )
+		{
+			if( block->outerPatchPSF )
+				free(block->outerPatchPSF);
+			block->outerPatchPSF = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->outerPatchPSF, word2 );
+		}
+		else if( !strcasecmp( word1, "addProteinPDB" ) )
+		{
+			if( block->addProteinPDB )
+				free(block->addProteinPDB);
+			block->addProteinPDB = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->addProteinPDB, word2 );
+		}
+		else if( !strcasecmp( word1, "addProteinPSF" ) )
+		{
+			if( block->addProteinPSF )
+				free(block->addProteinPSF);
+			block->addProteinPSF = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->addProteinPSF, word2 );
+		}
+		else if( !strcasecmp( word1, "solvatePDB" ) )
+		{
+			if( block->solvatePDB )
+				free(block->solvatePDB);
+			block->solvatePDB = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->solvatePDB, word2 );
+		}
+		else if( !strcasecmp( word1, "solvatePSF" ) )
+		{
+			if( block->solvatePSF )
+				free(block->solvatePSF);
+			block->solvatePSF = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->solvatePSF, word2 );
+		}
+		else if( !strcasecmp( word1, "innerPatchPDB" ) )
+		{
+			if( block->innerPatchPDB )
+				free(block->innerPatchPDB);
+			block->innerPatchPDB = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->innerPatchPDB, word2 );
+		}
+		else if( !strcasecmp( word1, "innerPatchPSF" ) )
+		{
+			if( block->innerPatchPSF )
+				free(block->innerPatchPSF);
+			block->innerPatchPSF = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->innerPatchPSF, word2 );
 		}
 		else if( !strcasecmp( word1, "patchPDB" ) )
 		{
