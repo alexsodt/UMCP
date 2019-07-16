@@ -1,0 +1,15 @@
+time_step 		1e-11
+jobname			SUV_sans
+mesh			../big.mesh
+do_ld 			yes
+o_lim 			100
+nequil			50
+nsteps			50000
+movie			yes	
+gamma_langevin 		100	
+KA			0.2
+seed			0
+s_q			yes
+s_q_period		50
+betaz			../schemeA6.6.bz
+qvals			../exp.qvals
