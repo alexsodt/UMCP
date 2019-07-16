@@ -25,6 +25,7 @@
 #include "local_cuda.h"
 #endif
 #include "simulation.h"
+#include "meshCollisionLib.h"
 
 #define MM_METHOD_1
 #define BOXED
@@ -169,6 +170,10 @@ int temp_main( int argc, char **argv )
 	int mhigh = 7;
 	theSurface1->generateSubdivisionMatrices( M, mlow, mhigh );
 
+	// parameters from SOPC, table 1 from Rand/Parsegian BBA 988/1989/351-376, orig Ref Rand/Fuller/Parsegian/Rau 1988 v27 20 7711-7722, Table II
+	double collision_alpha = 2.11*2;
+	double collision_v0    = 2.95972e-7; // kcal/mol/A, per A^4
+//	double collision_v0    = 1e-3;
 	surface_record *newSurface = (struct surface_record*)malloc( sizeof(surface_record) );
 	newSurface->theSurface = theSurface1;
 	newSurface->id = 0;
@@ -1072,11 +1077,27 @@ int temp_main( int argc, char **argv )
 
 			// LEAPFROG: gives p-dot at t, we have q(t), p(t-eps/2)
 			
-			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+			
+			// surface-surface collision
+
+			for( surface_record *sRec1 = theSimulation->allSurfaces; sRec1; sRec1 = sRec1->next )
+			for( surface_record *sRec2 = theSimulation->allSurfaces; sRec2; sRec2 = sRec2->next )
 			{
+				if( sRec2->id <= sRec1->id )
+					continue;
+				surfaceSurfaceCollisionForces( 
+					sRec1->theSurface,
+					sRec2->theSurface,
+					sRec1->g,		
+					sRec2->g,
+					collision_alpha,
+					collision_v0,
+					M, mlow, mhigh );
+			}
+			
+			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 				sRec->theSurface->grad( sRec->r, sRec->g );
 
-			}
 			gettimeofday(&tnow,NULL);
 			double mesh_stop = tnow.tv_sec +(1e-6)*tnow.tv_usec;
 			

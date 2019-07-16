@@ -2616,174 +2616,30 @@ int collisionForces( double *r1, int nv1,
 		     double *r2, int nv2, 
 		     double **M, int mlow, int mhigh, 
 		     int level, int max_level,
-		     double *f1, double *f2, double cutoff, double alpha )
-{
-	int pts[3] = { 0, 1, 2};
-
-	double min1[3]={r1[0],r1[1],r1[2]};
-	double max1[3]={r1[0],r1[1],r1[2]};
-	
-	double min2[3]={r2[0],r2[1],r2[2]};
-	double max2[3]={r2[0],r2[1],r2[2]};
-
-	for( int c = 0; c < 3; c++ )
-	{
-		for( int v = 0; v < nv1; v++ )
-		{
-			if( r1[c] < min1[c] )
-				min1[c] = r1[c];
-			if( r1[c] > max1[c] )
-				max1[c] = r1[c];
-		}
-		for( int v = 0; v < nv2; v++ )
-		{
-			if( r2[c] < min2[c] )
-				min2[c] = r2[c];
-			if( r2[c] > max2[c] )
-				max2[c] = r2[c];
-		}
-
-		if( max1[c] + cutoff < min2[c] ||
-		    max2[c] + cutoff < min1[c] )
-			return 0;
-	}	
-
-	if( level == max_level )
-	{
-		double dr[3] = { 
-			(r1[0]+r1[3]+r1[6])/3-(r2[0]+r2[3]+r2[6])/3,
-			(r1[1]+r1[4]+r1[7])/3-(r2[1]+r2[4]+r2[7])/3,
-			(r1[2]+r1[5]+r1[8])/3-(r2[2]+r2[5]+r2[8])/3 
-				};
-		double r = normalize(dr);
-	
-		double pref =  (1.0/alpha) * exp( -r / alpha );
-	
-		// -dvdr, negatives cancel.
-		// center of geom of the first three points
-
-		for( int p = 0; p < 3; p++ )
-		{
-			f1[p*3+0] += pref * dr[0];
-			f1[p*3+1] += pref * dr[1];
-			f1[p*3+2] += pref * dr[2];
-			
-			f2[p*3+0] -= pref * dr[0];
-			f2[p*3+1] -= pref * dr[1];
-			f2[p*3+2] -= pref * dr[2];
-		}
-
-		return 1;
-	}
-
-	int procd=0;
-	
-	int nvmax = 6+mhigh;
-
-	for( int x1 = 0; x1 < 4; x1++ )
-	{
-		double sub1[nvmax*3];
-		memset( sub1, 0, sizeof(double)*nvmax*3);
-		double frc1[nvmax*3];
-		memset( frc1, 0, sizeof(double) * nvmax*3);
-
-		int do_proc1 = 0;
-		int nv_use1 = 12;
-		if( x1 == 0 ) nv_use1 = nv1;
-	
-		double *mat1 = M[nv1-6-mlow]+x1*(nv1 < 12 ? 12 : nv1)*nv1;
-
-		for( int i = 0; i < nv_use1; i++ )
-		{
-			for( int j = 0; j < nv1; j++ )
-			{
-				sub1[i*3+0] += mat1[i*nv1+j] * r1[3*j+0];	
-				sub1[i*3+1] += mat1[i*nv1+j] * r1[3*j+1];	
-				sub1[i*3+2] += mat1[i*nv1+j] * r1[3*j+2];	
-			}
-		}
-
-		for( int x2 = 0; x2 < 4; x2++ )
-		{
-			double sub2[nvmax*3];
-			memset( sub2, 0, sizeof(double)*nvmax*3);
-			double frc2[nvmax*3];
-			memset( frc2, 0, sizeof(double) * nvmax*3);
-
-			int nv_use2 = 12;
-			if( x2 == 0 ) nv_use2 = nv2;
-			double *mat2 = M[nv2-6-mlow]+x2*(nv2 < 12 ? 12 : nv2)*nv2;
-
-			for( int i = 0; i < nv_use2; i++ )
-			{
-				for( int j = 0; j < nv2; j++ )
-				{
-					sub2[i*3+0] += mat2[i*nv2+j] * r2[3*j+0];	
-					sub2[i*3+1] += mat2[i*nv2+j] * r2[3*j+1];	
-					sub2[i*3+2] += mat2[i*nv2+j] * r2[3*j+2];	
-				}
-			}	
-
-			int do_proc = collisionForces( 
-					sub1, nv_use1, 
-					sub2, nv_use2, 
-					M, mlow, mhigh, 
-					level+1, max_level,
-					frc1, frc2, cutoff, alpha ); 
-
-			if( do_proc )
-			{
-				do_proc1 = 1;
-
-				// transform forces back to original
-			
-				for( int i = 0; i < nv_use2; i++ )
-				{
-					for( int j = 0; j < nv2; j++ )
-					{
-						f2[j*3+0] += mat2[i*nv2+j] * frc2[3*i+0];	
-						f2[j*3+1] += mat2[i*nv2+j] * frc2[3*i+1];	
-						f2[j*3+2] += mat2[i*nv2+j] * frc2[3*i+2];	
-					}
-				}	 
-			}
-		}
-		
-		if( do_proc1 )
-		{
-			procd = 1;
-
-			for( int i = 0; i < nv_use1; i++ )
-			{
-				for( int j = 0; j < nv1; j++ )
-				{
-					f1[j*3+0] += mat1[i*nv1+j] * frc1[3*i+0];	
-					f1[j*3+1] += mat1[i*nv1+j] * frc1[3*i+1];	
-					f1[j*3+2] += mat1[i*nv1+j] * frc1[3*i+2];	
-				}
-			}
-		}
-	}
-
-	return procd;
-} 
+		     double *f1, double *f2, double cutoff, double alpha );
 
 void surfaceSurfaceCollisionForces( surface *surface1, surface *surface2, double *grad1, double *grad2, double alpha, double v0, double **M, int mlow, int mhigh )
 {
 	// V = rho1 rho2 v0 exp(-r/alpha)
 	
-	int eval_level = 1; // eval level one: triangle centers.
+	int eval_level = 1;
 	double cutoff = 10 * alpha; // where we neglect exp(-r/alpha)
 
 	// f_mesh: -dv dr_mesh, etc
 
-	
-	for( int t = 0; t < surface1->nt; t++ )
+	for( int fx = 0; fx < par_info.nf[surface1->surface_id]; fx++ )
 	{
+		int f1 = par_info.faces[surface1->surface_id][fx];
+
+		int t;
+		if( f1 < surface1->nf_faces )
+			t = surface1->theFormulas[f1*surface1->nf_g_q_p].tri;
+		else
+			t = surface1->theIrregularFormulas[(f1-surface1->nf_faces)*surface1->nf_irr_pts].tri;
+
 		triangle *tri1 = surface1->theTriangles+t;
 
 		// f is the index into my structures for computing properties.
-		int f1 = tri1->f;
 
 		int *indices1;
 		int val1 = 0;
@@ -2860,14 +2716,17 @@ void surfaceSurfaceCollisionForces( surface *surface1, surface *surface2, double
 				pts2[3*x+2] = surface2->theVertices[indices2[x]].r[2] + pbc2[3*x+2];
 			} 
 
+
+
 			collisionForces( pts1, np1, pts2, np2, M, mlow, mhigh, 0, eval_level,
 				frc1, frc2, cutoff, alpha );
+
 			
 			for( int x = 0; x < np2; x++ )
 			{
-				grad2[indices2[x]*3+0] += frc2[3*x+0];				
-				grad2[indices2[x]*3+1] += frc2[3*x+1];				
-				grad2[indices2[x]*3+2] += frc2[3*x+2];				
+				grad2[indices2[x]*3+0] += v0 * frc2[3*x+0];				
+				grad2[indices2[x]*3+1] += v0 * frc2[3*x+1];				
+				grad2[indices2[x]*3+2] += v0 * frc2[3*x+2];				
 			} 
 						
 //			if(  checkCollision( pts1, np1, pts2, np2, M, mlow, mhigh, 0, USE_MAX_LEVEL ) )
@@ -2876,12 +2735,19 @@ void surfaceSurfaceCollisionForces( surface *surface1, surface *surface2, double
 			
 		for( int x = 0; x < np1; x++ )
 		{
-			grad1[indices1[x]*3+0] += frc1[3*x+0];				
-			grad1[indices1[x]*3+1] += frc1[3*x+1];				
-			grad1[indices1[x]*3+2] += frc1[3*x+2];				
+			grad1[indices1[x]*3+0] += v0 * frc1[3*x+0];				
+			grad1[indices1[x]*3+1] += v0 * frc1[3*x+1];				
+			grad1[indices1[x]*3+2] += v0 * frc1[3*x+2];				
 		} 
 		 
 	}
+	
+	int nv1 = surface1->nv;
+	int nv2 = surface2->nv;
+//	for( int x = 0; x < nv1 && x < nv2; x++ )
+//		printf("S G %le %le %le and %le %le %le\n", grad1[3*x+0], grad1[3*x+1], grad1[3*x+2],
+//			grad2[3*x+0], grad2[3*x+1], grad2[3*x+2] );
+
 }
 
 int collisionForces( double *r1, int nv1, 
@@ -2929,8 +2795,13 @@ int collisionForces( double *r1, int nv1,
 				};
 		double r = normalize(dr);
 	
-		double pref =  (1.0/alpha) * exp( -r / alpha );
+		double dZ0 = 40.0;
+
+		double area1 =  triangle_area( r1, r1+3, r1+6 );
+		double area2 =  triangle_area( r2, r2+3, r2+6 );
+		double pref =   -(1.0/alpha) * exp( -(r-dZ0) / alpha ) * area1 * area2;
 	
+
 		// -dvdr, negatives cancel.
 		// center of geom of the first three points
 
@@ -3036,8 +2907,5 @@ int collisionForces( double *r1, int nv1,
 			}
 		}
 	}
-
 	return procd;
 } 
-
-
