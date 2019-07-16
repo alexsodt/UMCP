@@ -67,7 +67,7 @@ LDFLAGS=$save_LDFLAGS
 if test "$linearAlgebraString" = "no"; then 
 AC_MSG_CHECKING([for vecLib framework.])
 LDFLAGS="$LDFLAGS -framework vecLib"
-AC_LINK_IFELSE([AC_LANG_PROGRAM([], [dsyev()])],[AC_MSG_RESULT(yes) 
+AC_LINK_IFELSE([AC_LANG_PROGRAM([], [dsyev_()])],[AC_MSG_RESULT(yes) 
 		usingMacvecLib="yes"
 		linearAlgebraString="-framework vecLib"], [AC_MSG_RESULT(no)]) 
 LDFLAGS=$save_LDFLAGS

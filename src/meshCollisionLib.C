@@ -2615,6 +2615,144 @@ int collisionForces( double *r1, int nv1,
 		     double *r2, int nv2, 
 		     double **M, int mlow, int mhigh, 
 		     int level, int max_level,
+		     double *f1, double *f2, double cutoff, double alpha );
+
+void surfaceSurfaceCollisionForces( surface *surface1, surface *surface2, double *grad1, double *grad2, double alpha, double v0, double **M, int mlow, int mhigh )
+{
+	// V = rho1 rho2 v0 exp(-r/alpha)
+	
+	int eval_level = 1;
+	double cutoff = 10 * alpha; // where we neglect exp(-r/alpha)
+
+	// f_mesh: -dv dr_mesh, etc
+
+	for( int fx = 0; fx < par_info.nf[surface1->surface_id]; fx++ )
+	{
+		int f1 = par_info.faces[surface1->surface_id][fx];
+
+		int t;
+		if( f1 < surface1->nf_faces )
+			t = surface1->theFormulas[f1*surface1->nf_g_q_p].tri;
+		else
+			t = surface1->theIrregularFormulas[(f1-surface1->nf_faces)*surface1->nf_irr_pts].tri;
+
+		triangle *tri1 = surface1->theTriangles+t;
+
+		// f is the index into my structures for computing properties.
+
+		int *indices1;
+		int val1 = 0;
+		int np1 = 0;
+		int base1 = 0;
+		double *pbc1;
+
+		if( f1 >= surface1->nf_faces )
+		{
+			f1 -= surface1->nf_faces;
+			int formulas_per_face = surface1->nf_irr_pts;
+			indices1 = surface1->theIrregularFormulas[f1*formulas_per_face].cp;
+			pbc1 = surface1->theIrregularFormulas[f1*formulas_per_face].r_pbc;
+			np1 = surface1->theIrregularFormulas[f1*formulas_per_face].ncoor;
+			base1 = surface1->theIrregularFormulas[f1*formulas_per_face].vertex;
+		}
+		else
+		{
+			int formulas_per_face = surface1->nf_g_q_p;
+			indices1 = surface1->theFormulas[f1*formulas_per_face].cp;
+			pbc1 = surface1->theFormulas[f1*formulas_per_face].r_pbc;
+			np1 = surface1->theFormulas[f1*formulas_per_face].ncoor;
+			base1 = surface1->theFormulas[f1*formulas_per_face].vertex;
+		}			
+
+		double pts1[3*np1];
+		double frc1[3*np1];
+		memset( frc1, 0, sizeof(double) * np1*3 );
+		for( int x = 0; x < np1; x++ )
+		{
+			pts1[3*x+0] = surface1->theVertices[indices1[x]].r[0] + pbc1[3*x+0]; 
+			pts1[3*x+1] = surface1->theVertices[indices1[x]].r[1] + pbc1[3*x+1]; 
+			pts1[3*x+2] = surface1->theVertices[indices1[x]].r[2] + pbc1[3*x+2];
+		} 
+
+		for( int t2 = 0; t2 < surface2->nt; t2++ )
+		{
+			triangle *tri2 = surface2->theTriangles+t2;
+
+			// f is the index into my structures for computing properties.
+			int f2 = tri2->f;
+	
+			int *indices2;
+			int val2 = 0;
+			int np2 = 0;
+			int base2 = 0;
+			double *pbc2;
+	
+			if( f2 >= surface2->nf_faces )
+			{
+				f2 -= surface2->nf_faces;
+				int formulas_per_face = surface2->nf_irr_pts;
+				indices2 = surface2->theIrregularFormulas[f2*formulas_per_face].cp;
+				pbc2 = surface2->theIrregularFormulas[f2*formulas_per_face].r_pbc;
+				np2 = surface2->theIrregularFormulas[f2*formulas_per_face].ncoor;
+				base2 = surface2->theIrregularFormulas[f2*formulas_per_face].vertex;
+			}
+			else
+			{
+				int formulas_per_face = surface2->nf_g_q_p;
+				indices2 = surface2->theFormulas[f2*formulas_per_face].cp;
+				pbc2 = surface2->theFormulas[f2*formulas_per_face].r_pbc;
+				np2 = surface2->theFormulas[f2*formulas_per_face].ncoor;
+				base2 = surface2->theFormulas[f2*formulas_per_face].vertex;
+			}			
+
+			double pts2[3*np2];
+			double frc2[3*np2];
+			memset( frc2, 0, sizeof(double) * np2*3 );
+			for( int x = 0; x < np2; x++ )
+			{
+				pts2[3*x+0] = surface2->theVertices[indices2[x]].r[0] + pbc2[3*x+0]; 
+				pts2[3*x+1] = surface2->theVertices[indices2[x]].r[1] + pbc2[3*x+1]; 
+				pts2[3*x+2] = surface2->theVertices[indices2[x]].r[2] + pbc2[3*x+2];
+			} 
+
+
+
+			collisionForces( pts1, np1, pts2, np2, M, mlow, mhigh, 0, eval_level,
+				frc1, frc2, cutoff, alpha );
+
+			
+			for( int x = 0; x < np2; x++ )
+			{
+				grad2[indices2[x]*3+0] += v0 * frc2[3*x+0];				
+				grad2[indices2[x]*3+1] += v0 * frc2[3*x+1];				
+				grad2[indices2[x]*3+2] += v0 * frc2[3*x+2];				
+			} 
+						
+//			if(  checkCollision( pts1, np1, pts2, np2, M, mlow, mhigh, 0, USE_MAX_LEVEL ) )
+//				return 1;
+		}
+			
+		for( int x = 0; x < np1; x++ )
+		{
+			grad1[indices1[x]*3+0] += v0 * frc1[3*x+0];				
+			grad1[indices1[x]*3+1] += v0 * frc1[3*x+1];				
+			grad1[indices1[x]*3+2] += v0 * frc1[3*x+2];				
+		} 
+		 
+	}
+	
+	int nv1 = surface1->nv;
+	int nv2 = surface2->nv;
+//	for( int x = 0; x < nv1 && x < nv2; x++ )
+//		printf("S G %le %le %le and %le %le %le\n", grad1[3*x+0], grad1[3*x+1], grad1[3*x+2],
+//			grad2[3*x+0], grad2[3*x+1], grad2[3*x+2] );
+
+}
+
+int collisionForces( double *r1, int nv1, 
+		     double *r2, int nv2, 
+		     double **M, int mlow, int mhigh, 
+		     int level, int max_level,
 		     double *f1, double *f2, double cutoff, double alpha )
 {
 	int pts[3] = { 0, 1, 2};
@@ -2656,8 +2794,13 @@ int collisionForces( double *r1, int nv1,
 				};
 		double r = normalize(dr);
 	
-		double pref =  (1.0/alpha) * exp( -r / alpha );
+		double dZ0 = 40.0;
+
+		double area1 =  triangle_area( r1, r1+3, r1+6 );
+		double area2 =  triangle_area( r2, r2+3, r2+6 );
+		double pref =   -(1.0/alpha) * exp( -(r-dZ0) / alpha ) * area1 * area2;
 	
+
 		// -dvdr, negatives cancel.
 		// center of geom of the first three points
 
@@ -2763,146 +2906,5 @@ int collisionForces( double *r1, int nv1,
 			}
 		}
 	}
-
 	return procd;
 } 
-
-void surfaceSurfaceCollisionForces( surface *surface1, surface *surface2, double *grad1, double *grad2, double alpha, double v0, double **M, int mlow, int mhigh )
-{
-	// V = rho1 rho2 v0 exp(-r/alpha)
-	
-	int eval_level = 1; // eval level one: triangle centers.
-	double cutoff = 10 * alpha; // where we neglect exp(-r/alpha)
-
-	// f_mesh: -dv dr_mesh, etc
-
-	
-	for( int t = 0; t < surface1->nt; t++ )
-	{
-		triangle *tri1 = surface1->theTriangles+t;
-
-		// f is the index into my structures for computing properties.
-		int f1 = tri1->f;
-
-		int *indices1;
-		int val1 = 0;
-		int np1 = 0;
-		int base1 = 0;
-		double *pbc1;
-
-		if( f1 >= surface1->nf_faces )
-		{
-			f1 -= surface1->nf_faces;
-			int formulas_per_face = surface1->nf_irr_pts;
-			indices1 = surface1->theIrregularFormulas[f1*formulas_per_face].cp;
-			pbc1 = surface1->theIrregularFormulas[f1*formulas_per_face].r_pbc;
-			np1 = surface1->theIrregularFormulas[f1*formulas_per_face].ncoor;
-			base1 = surface1->theIrregularFormulas[f1*formulas_per_face].vertex;
-		}
-		else
-		{
-			int formulas_per_face = surface1->nf_g_q_p;
-			indices1 = surface1->theFormulas[f1*formulas_per_face].cp;
-			pbc1 = surface1->theFormulas[f1*formulas_per_face].r_pbc;
-			np1 = surface1->theFormulas[f1*formulas_per_face].ncoor;
-			base1 = surface1->theFormulas[f1*formulas_per_face].vertex;
-		}			
-
-		double pts1[3*np1];
-		double frc1[3*np1];
-		memset( frc1, 0, sizeof(double) * np1 );
-		for( int x = 0; x < np1; x++ )
-		{
-			pts1[3*x+0] = surface1->theVertices[indices1[x]].r[0] + pbc1[3*x+0]; 
-			pts1[3*x+1] = surface1->theVertices[indices1[x]].r[1] + pbc1[3*x+1]; 
-			pts1[3*x+2] = surface1->theVertices[indices1[x]].r[2] + pbc1[3*x+2];
-		} 
-
-		for( int t2 = 0; t2 < surface2->nt; t2++ )
-		{
-			triangle *tri2 = surface2->theTriangles+t2;
-
-			// f is the index into my structures for computing properties.
-			int f2 = tri2->f;
-	
-			int *indices2;
-			int val2 = 0;
-			int np2 = 0;
-			int base2 = 0;
-			double *pbc2;
-	
-			if( f2 >= surface2->nf_faces )
-			{
-				f2 -= surface2->nf_faces;
-				int formulas_per_face = surface2->nf_irr_pts;
-				indices2 = surface2->theIrregularFormulas[f2*formulas_per_face].cp;
-				pbc2 = surface2->theIrregularFormulas[f2*formulas_per_face].r_pbc;
-				np2 = surface2->theIrregularFormulas[f2*formulas_per_face].ncoor;
-				base2 = surface2->theIrregularFormulas[f2*formulas_per_face].vertex;
-			}
-			else
-			{
-				int formulas_per_face = surface2->nf_g_q_p;
-				indices2 = surface2->theFormulas[f2*formulas_per_face].cp;
-				pbc2 = surface2->theFormulas[f2*formulas_per_face].r_pbc;
-				np2 = surface2->theFormulas[f2*formulas_per_face].ncoor;
-				base2 = surface2->theFormulas[f2*formulas_per_face].vertex;
-			}			
-
-			double pts2[3*np2];
-			double frc2[3*np2];
-			memset( frc2, 0, sizeof(double) * np2 );
-			for( int x = 0; x < np2; x++ )
-			{
-				pts2[3*x+0] = surface2->theVertices[indices2[x]].r[0] + pbc2[3*x+0]; 
-				pts2[3*x+1] = surface2->theVertices[indices2[x]].r[1] + pbc2[3*x+1]; 
-				pts2[3*x+2] = surface2->theVertices[indices2[x]].r[2] + pbc2[3*x+2];
-			} 
-
-			collisionForces( pts1, np1, pts2, np2, M, mlow, mhigh, 0, eval_level,
-				frc1, frc2, cutoff, alpha );
-			
-			for( int x = 0; x < np2; x++ )
-			{
-				grad2[indices2[x]*3+0] += frc2[3*x+0];				
-				grad2[indices2[x]*3+1] += frc2[3*x+1];				
-				grad2[indices2[x]*3+2] += frc2[3*x+2];				
-			} 
-						
-//			if(  checkCollision( pts1, np1, pts2, np2, M, mlow, mhigh, 0, USE_MAX_LEVEL ) )
-//				return 1;
-		}
-			
-		for( int x = 0; x < np1; x++ )
-		{
-			grad1[indices1[x]*3+0] += frc1[3*x+0];				
-			grad1[indices1[x]*3+1] += frc1[3*x+1];				
-			grad1[indices1[x]*3+2] += frc1[3*x+2];				
-		} 
-		 
-	}
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

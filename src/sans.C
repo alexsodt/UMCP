@@ -69,216 +69,200 @@ void Simulation::sample_B_hist( double *B_hist, double *A2dz2_sampled,
 			int sample_type, 
 			int nsamples, double maxr, int nbins, int shape_correction )
 {
+
+	static double av_b_sampled = 0;
+	static double av_b2_sampled = 0;
+	static double n_samples = 0;
+
+	double special_q = 6.494494e-03;
+	static double av_r[3] = {0,0,0};
+	static double av_c[3] = {0,0,0};
+	
+	double local_av_r[3] = {0,0,0};
+	double local_av_c[3] = {0,0,0};
+
+#ifdef DEBUG_PTS
+	FILE *dbgFile = fopen("debug.xyz","w");
+	double max_area = 100000;
+#endif
+	int samples_per_proc = ceil( nsamples/ (double)par_info.nprocs );
+
+#ifdef PARALLEL
+	double *local_sampler = (double *)malloc( sizeof(double) * nbins );
+	memset( local_sampler, 0, sizeof(double) * nbins );
+#endif
+	
+	double PP = 12.0; // approximately.
+
+	// for clarity in accounting for actual volume contribution we use a real value of dz/Ap:
+	double dz = (MAXZ-MINZ)/N_Z_BINS;
+
+	double local_A2dz2_sampled = 0;
+
+	int draw_z = 20;
+
+	int nSurfaces = 0;
+			
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+		nSurfaces++;
+
+	// we will draw points from the surfaces such that we target their total areas.
+	double tarea[nSurfaces*2];
+	memset( tarea, 0, sizeof(double) * nSurfaces * 2);
+	// compute each total area.
+
+	int n_draw = 1000;
+
+	double **draw_pts = (double **)malloc( sizeof(double) * nSurfaces );
+
+	for( int x = 0; x < nSurfaces; x++ )
+		draw_pts[x] = (double *)malloc( sizeof(double) * 4 * n_draw * draw_z );
+ 
 	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
 	{
+		double area0;
+		sRec->theSurface->area( sRec->r, -1, tarea+sRec->id*2, &area0 ); 
+				
 		surface *theSurface = sRec->theSurface;
 		int nt = theSurface->nt;
 		double *rmesh = sRec->r;
+		double total_area = 0;
+		int cur_pt = 0;
+		for( int d = 0; d < n_draw; d++ )
+		{
+			int f1 = rand() % nt;
+			double u1 = rand() / (double)RAND_MAX, v1 = rand() / (double)RAND_MAX;
 
-		static double av_b_sampled = 0;
-		static double av_b2_sampled = 0;
-		static double n_samples = 0;
-
-		double special_q = 6.494494e-03;
-		static double av_r[3] = {0,0,0};
-		static double av_c[3] = {0,0,0};
-		
-		double local_av_r[3] = {0,0,0};
-		double local_av_c[3] = {0,0,0};
-
-#ifdef DEBUG_PTS
-		FILE *dbgFile = fopen("debug.xyz","w");
-		double max_area = 100000;
-#endif
-		int samples_per_proc = ceil( nsamples/ (double)par_info.nprocs );
-
-#ifdef PARALLEL
-		double *local_sampler = (double *)malloc( sizeof(double) * nbins );
-		memset( local_sampler, 0, sizeof(double) * nbins );
-#endif
-		
-
-		double PP = 12.0; // approximately.
-
-		// for clarity in accounting for actual volume contribution we use a real value of dz/Ap:
-		double dz = (MAXZ-MINZ)/N_Z_BINS;
-
-		double local_A2dz2_sampled = 0;
-
-		int draw_z = 20;
-
-		if( sample_type == SANS_SAMPLE_NRM )
-		{	
-			// this is sampling of the full scattering signal using a laterally averaged spline of beta(z)
-			// sampled stochastically. "nsamples" is relevant here.
-
-			// we want to draw points on the surface randomly so we need to know the area of different faces right now:
-//		updateFaceInfoForRandom();
-
-			for( int smpl = 0; smpl < samples_per_proc; smpl++ )
+			while( u1 + v1 >= 1.0 )
 			{
-				// compute two points on the membrane at random.
+				u1 = rand() / (double)RAND_MAX;
+				v1 = rand() / (double)RAND_MAX;
+			}
 				
-				int f1 = rand() % nt;
-				double u1 = rand() / (double)RAND_MAX, v1 = rand() / (double)RAND_MAX;
-				
-				int f2 = rand() % nt;
-				double u2 = rand() / (double)RAND_MAX, v2 = rand() / (double)RAND_MAX;
+			double r1[3], nrm1[3];
 
-				while( u1 + v1 >= 1.0 )
-				{
-					u1 = rand() / (double)RAND_MAX;
-					v1 = rand() / (double)RAND_MAX;
-				}
-				
-				while( u2 + v2 >= 1.0 )
-				{
-					u2 = rand() / (double)RAND_MAX;
-					v2 = rand() / (double)RAND_MAX;
-				}
+			theSurface->evaluateRNRM( f1, u1, v1, r1, nrm1, rmesh); 
 
-//			randomPointOnSurface(&f1,&u1,&v1);
-//			randomPointOnSurface(&f2,&u2,&v2);
+			double w1 = theSurface->g(f1,u1,v1,rmesh);
+			double c1  = 0;
 
-				// drawing points is somewhat expensive so let's do a bunch of z at this value.
-					
-				double r1[3], nrm1[3];
-				double r2[3], nrm2[3];
+			if( shape_correction )
+				c1 = theSurface->c(f1,u1,v1,rmesh);
 
-				theSurface->evaluateRNRM( f1, u1, v1, r1, nrm1, rmesh); 
-				theSurface->evaluateRNRM( f2, u2, v2, r2, nrm2, rmesh); 
+			total_area += w1;
+			for( int nz = 0; nz < draw_z; nz++)
+			{
+				double z1 = MINZ + (MAXZ-MINZ) * rand() / (double)RAND_MAX;
 
-				double w1 = theSurface->g(f1,u1,v1,rmesh);
-				double w2 = theSurface->g(f2,u2,v2,rmesh);
-				double c1  = 0;
-				double c2  = 0;
+				double alpha1 = 1.0;
 
 				if( shape_correction )
 				{
-					c1 = theSurface->c(f1,u1,v1,rmesh);
-                        	c2 = theSurface->c(f2,u2,v2,rmesh);			
+					if( z1 > 0 )
+						alpha1 = exp( -(z1-PP)*c1);
+					else
+						alpha1 = exp( -(z1+PP)*c1);
 				}
-				for( int nz = 0; nz < draw_z; nz++ )
-				{
-					double z1 = MINZ + (MAXZ-MINZ) * rand() / (double)RAND_MAX;
-					double z2 = MINZ + (MAXZ-MINZ) * rand() / (double)RAND_MAX;
 
-					double alpha1 = 1.0;
-					double alpha2 = 1.0;
+				double p1[3] = { r1[0] + z1 * nrm1[0],
+						 r1[1] + z1 * nrm1[1],
+						 r1[2] + z1 * nrm1[2] };
+				
+				double b1 = alpha1*evaluateSpline( z1*alpha1, SANS_SPLINE );
 
-					if( shape_correction )
-					{
-						if( z1 > 0 )
-							alpha1 = exp( -(z1-PP)*c1);
-						else
-							alpha1 = exp( -(z1+PP)*c1);
+				draw_pts[sRec->id][cur_pt*4+0] = p1[0];	
+				draw_pts[sRec->id][cur_pt*4+1] = p1[1];	
+				draw_pts[sRec->id][cur_pt*4+2] = p1[2];	
+				draw_pts[sRec->id][cur_pt*4+3] = b1 * w1 * dz;
 
-						if( z2 > 0 )
-							alpha2 = exp( -(z2-PP)*c2);
-						else
-							alpha2 = exp( -(z2+PP)*c2);
-					}
+				cur_pt++;
+			}
+		}
+		tarea[2*sRec->id+1] = total_area;
+	}	
 
-					double p1[3] = { r1[0] + z1 * nrm1[0],
-							 r1[1] + z1 * nrm1[1],
-							 r1[2] + z1 * nrm1[2] };
-					
-					double p2[3] = { r2[0] + z2 * nrm2[0],
-							 r2[1] + z2 * nrm2[1],
-							 r2[2] + z2 * nrm2[2] };
+#ifdef TOTAL_DRAW
+	// do every single pair we've got. 
+	// not necessarily the "more correct" thing to do, but guaranteed to be positive.
+	for( int s1 = 0; s1 < nSurfaces; s1++ )
+	for( int s2 = s1; s2 < nSurfaces; s2++ )
+	{
+		double *draw1 = draw_pts[s1];
+		double *draw2 = draw_pts[s2];
+		double fac = 1.0;
 
-					double dr[3] = { p1[0]-p2[0],p1[1]-p2[1],p1[2]-p2[2]};
+		if( s1 != s2 )
+			fac = 2.0;
 
-					double rv = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
-
-					int rbin = nbins * rv / maxr;
-
-					double b1 = alpha1*evaluateSpline( z1*alpha1, SANS_SPLINE );
-					double b2 = alpha2*evaluateSpline( z2*alpha2, SANS_SPLINE );
-
-					av_b_sampled += (b1+b2)/2;
-					av_b2_sampled += b1*b2;
-					n_samples += 1;
-
-					// number of volume ``units'' we put into histogram;
-					double vol_squared_weight = (w1) * (w2) * dz * dz / (Ap*dz) / (Ap*dz);				
-					double val = b1 * b2 * vol_squared_weight;
-					(local_A2dz2_sampled) += w1 * w2;
+		for( int p1 = 0; p1 < n_draw * draw_z; p1++ )
+		{
+			for( int p2 = 0; p2 < n_draw * draw_z; p2++ )
+			{
+				double *rp1 = draw1 + p1 * 4;	
+				double *rp2 = draw2 + p2 * 4;	
 		
-					av_r[0] += b1 * cos( p1[0] * special_q) * w1;
-					av_r[1] += b1 * cos( p1[1] * special_q) * w1;
-					av_r[2] += b1 * cos( p1[2] * special_q) * w1;
-					
-					av_c[0] += b1 * sin( p1[0] * special_q) * w1;
-					av_c[1] += b1 * sin( p1[1] * special_q) * w1;
-					av_c[2] += b1 * sin( p1[2] * special_q) * w1;
-					
-					av_r[0] += b2 * cos( p2[0] * special_q) * w2;
-					av_r[1] += b2 * cos( p2[1] * special_q) * w2;
-					av_r[2] += b2 * cos( p2[2] * special_q) * w2;
-					
-					av_c[0] += b2 * sin( p2[0] * special_q) * w2;
-					av_c[1] += b2 * sin( p2[1] * special_q) * w2;
-					av_c[2] += b2 * sin( p2[2] * special_q) * w2;
+				double dr[3] = { rp1[0]-rp2[0],rp1[1]-rp2[1],rp1[2]-rp2[2]};
+	
+				double rv = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
 
-
-#ifdef DEBUG_PTS	
-					if( nz == 0 )
-					{
-						double rn = rand()/(double)RAND_MAX;
-
-						if( rn < w1 / max_area )
-							fprintf(dbgFile, "C %lf %lf %lf %d %lf %lf %lf\n", p1[0], p1[1], p1[2], f1, u1, v1, w1 );
-						if( rn < w2 / max_area )
-							fprintf(dbgFile, "C %lf %lf %lf %d %lf %lf %lf\n", p2[0], p2[1], p2[2], f2, u2, v2, w2 );
-					}
-#endif
-					if( rbin < nbins )
+				int rbin = nbins * rv / maxr;
+					
+				if( rbin < nbins )
+				{
+					double val = fac * rp1[3] * rp2[3] * (tarea[s1*2+0]/tarea[s1*2+1])*(tarea[s2*2+0]/tarea[s2*2+1]);
 #ifdef PARALLEL					
-						local_sampler[rbin] += val;
+					local_sampler[rbin] += val;
 #else
-						B_hist[rbin] += val;
+					B_hist[rbin] += val;
 #endif
 				}
 			}
-		}	
-		else if( sample_type == SANS_SAMPLE_LAT )
-		{
-			// this is sampling of the signal using the local scattering per unit area [the projection of beta(z) onto the surface]
-			
 		}
+	}
+#else
+	int n_pairs = 10000000;
 
-#ifdef DEBUG_PTS
-		fclose(dbgFile);
-		exit(1);
+	for( int p = 0; p < n_pairs; p++ )
+	{
+		int s1 = rand() % nSurfaces;
+		int s2 = rand() % nSurfaces;
+
+		int p1 = rand() % ( n_draw * draw_z );
+		int p2 = rand() % ( n_draw * draw_z );
+
+		double *rp1 = draw_pts[s1] + p1 * 4;	
+		double *rp2 = draw_pts[s2] + p2 * 4;	
+
+		double dr[3] = { rp1[0]-rp2[0],rp1[1]-rp2[1],rp1[2]-rp2[2]};
+
+		double rv = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+
+		int rbin = nbins * rv / maxr;
+			
+		if( rbin < nbins )
+		{
+			double val = rp1[3] * rp2[3] * (tarea[s1*2+0]/tarea[s1*2+1])*(tarea[s2*2+0]/tarea[s2*2+1]);
+#ifdef PARALLEL					
+			local_sampler[rbin] += val;
+#else
+			B_hist[rbin] += val;
 #endif
+		}
+	
+	}
+#endif
+
+	for( int x = 0; x < nSurfaces; x++ )
+		free(draw_pts[x]);
+
+	free(draw_pts);
 
 #ifdef PARALLEL
-		ParallelSum( local_av_r, 3 );
-		ParallelSum( local_av_c, 3 );
-
-		av_r[0] += local_av_r[0];
-		av_r[1] += local_av_r[1];
-		av_r[2] += local_av_r[2];
-		
-		av_c[0] += local_av_c[0];
-		av_c[1] += local_av_c[1];
-		av_c[2] += local_av_c[2];
-
-		printf("Specialq: %le %le %le\n", 
-				av_r[0]*av_r[0]+av_c[0]*av_c[0],
-				av_r[1]*av_r[1]+av_c[1]*av_c[1],
-				av_r[2]*av_r[2]+av_c[2]*av_c[2] );
-
-		ParallelSum( &local_A2dz2_sampled, 1 );
-		ParallelSum( local_sampler, nbins );
-		for( int b = 0; b < nbins; b++ )
-			B_hist[b] += local_sampler[b];
-		free(local_sampler);
+	ParallelSum( local_sampler, nbins );
+	for( int b = 0; b < nbins; b++ )
+		B_hist[b] += local_sampler[b];
+	free(local_sampler);
 #endif
-
-		*A2dz2_sampled += local_A2dz2_sampled;
- 	}
 }
 
 
@@ -355,6 +339,7 @@ void loadBetaZ( const char *fileName, int load_to_spline )
 
 	SolveSpline(load_to_spline);
 
+
 	printf("beta(z) loaded into spline %d.\n", load_to_spline );
 
 	fflush(stdout);
@@ -382,8 +367,6 @@ void writeSq( char *fileName, double *B_hist, double A2dz2_sampled, double sans_
 	// update histogram B0.
 
 	double B0 = 0;
-
-	
 
 	double eps = 1e-3;
 	for( int iq = -1; iq < nq; iq++ )
