@@ -173,6 +173,42 @@ int temp_main( int argc, char **argv )
 	int mhigh = 7;
 	sub_surface->generateSubdivisionMatrices( M, mlow, mhigh );
 	
+	for( int mm = 0; mm < 3; mm++ )
+	{
+		int dim_special = mlow+mm+6;	
+
+		int total = dim_special * 12;
+		if( dim_special > 12 )
+			total = dim_special*dim_special;
+
+		for( int subdiv = 0; subdiv < 4; subdiv++ )
+		{
+			int dim1 = 12;
+			int dim2 = dim_special;
+			
+			if( subdiv == 0 )
+				dim1 = dim_special;
+
+			printf("M%d_%d[%d] = {\n",
+				mlow+mm, subdiv, dim1*dim2 );
+
+			for( int d1 = 0; d1 < dim1; d1++ )
+			{
+				for( int d2 = 0; d2 < dim2; d2++ )
+				{
+					printf(" %.14le", M[mm][d1*dim2+d2+total*subdiv] );
+					if( d1 != dim1-1 || d2 != dim2-1 )
+						printf(",");
+				}
+				printf("\n");
+			}
+	
+			printf("};\n");
+		}		
+		 
+	}	
+
+
 	int nc = 3 * sub_surface->nv+3;
 	int nv = sub_surface->nv;
 	double av_edge_length = 0;
