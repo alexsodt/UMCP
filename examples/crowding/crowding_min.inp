@@ -1,17 +1,17 @@
-time_step 1e-11
+time_step 1e-12
 jobname att300_500_1.0_20
-add crowder nbound 500 outside
+#add crowder nbound 500 outside
 planar_topology no
 mesh cyl300.mesh
 do_bd_particles yes 
 do_ld yes 
 o_lim  100
-nsteps 50000
+nsteps 0
 crowder_r 25
 crowder_bond_k 0.1
 crowder_mass 1e7
 KA	0.2
-gamma_langevin 100
+gamma_langevin 1
 movie yes
 crowder_attraction -1.0
 crowder_attraction_r 20 
@@ -19,4 +19,4 @@ alpha_restraint_k 0
 alpha_restraint_z 0.0
 cyl_tension_mc_period	10
 write_alpha_period 1
-minimize	5
+#nmin 5

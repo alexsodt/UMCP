@@ -21,6 +21,9 @@
 #include "random_global.h"
 #include "sans.h"
 #include "globals.h"
+#ifdef USE_CUDA
+#include "local_cuda.h"
+#endif
 
 #define MM_METHOD_1
 #define BOXED
@@ -28,7 +31,6 @@
 
 #define OLD_LANGEVIN
 
-//#define FIX_MEMBRANE
 //#define MONTE_CARLO_HACK
 
 //#define SAVE_RESTARTS
@@ -90,6 +92,11 @@ int temp_main( int argc, char **argv )
 	quietParallel();
 #endif
 	printCompilationTime();
+
+#ifdef USE_CUDA
+	showCUDAStats();
+#endif
+
 
 	int nprocs = 1;
 	int taskid = 0;
@@ -910,7 +917,8 @@ int temp_main( int argc, char **argv )
 		double last_mesh_time = 0;
 		double last_wait_time = 0;
 		double last_complex_time = 0;
-			
+		
+#if 0	
 		if( debug && par_info.my_id == BASE_TASK )
 		{
 			char fileName[256];
@@ -928,7 +936,7 @@ int temp_main( int argc, char **argv )
 			my_gsl_reseed(new_seed);
 			fclose(debugSave);
 		}
-
+#endif
 		for( int t = 0; t < block.o_lim; t++, cur_t += time_step, global_cntr++ )
 		{
 #ifdef SAVE_RESTARTS
@@ -1355,7 +1363,6 @@ int temp_main( int argc, char **argv )
 				r[3*v1+1] += qdot[3*v1+1] * AKMA_TIME * time_step;
 				r[3*v1+2] += qdot[3*v1+2] * AKMA_TIME * time_step;
 			}
-				
 
 			if( do_gen_q )
 			{
@@ -1394,12 +1401,14 @@ int temp_main( int argc, char **argv )
 			dof += srd_dof;
 			for( int c = 0; c < ncomplex; c++ )
 			{
-#ifdef DISABLE_ON_MEMBRANE_T
-				dof += 3 * (allComplexes[c]->nsites - allComplexes[c]->nattach);
-#else
 				if( ! allComplexes[c]->do_bd ) 
+				{	
+#ifdef DISABLE_ON_MEMBRANE_T
+					dof += 3 * (allComplexes[c]->nsites - allComplexes[c]->nattach);
+#else
 					dof += 3 * allComplexes[c]->nsites - allComplexes[c]->nattach;
 #endif
+				}
 			}
 			double TEMP = 2 * T / dof;
 
@@ -1437,7 +1446,7 @@ int temp_main( int argc, char **argv )
 			if( block.s_q && global_cntr % block.s_q_period == 0 && o >= nequil)
 			{
 				// Update SANS B-histogram.
-				sub_surface->sample_B_hist( r, B_hist, &A2dz2_sampled, SANS_SAMPLE_NRM, 50000, sans_max_r, nsans_bins, block.shape_correction );  
+				sub_surface->sample_B_hist( r, B_hist, &A2dz2_sampled, SANS_SAMPLE_NRM, 100000, sans_max_r, nsans_bins, block.shape_correction );  
 			}
 
 		}

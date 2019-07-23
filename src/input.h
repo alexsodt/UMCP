@@ -84,11 +84,13 @@ class parameterBlock
 	int tachyon_overlay_mesh;
 	int tachyon_interp;
 	int tachyon_tri_center;
+	int tachyon_face_box_spline;
 	int tachyon_res;
 	int tachyon;
 	int tachyon_curvature;
 	int tachyon_gauss;
 	int tachyon_dull;
+	int tachyon_clear;
 	int movie;
 	int random_seed;
 	int debug;
@@ -189,8 +191,24 @@ class parameterBlock
 
 	// BEGIN section for creating all-atom structures
 
-	char *patchPDB;
+	int addSalt;
+	double innerKCL;
+	double outerKCL;
+
+	char *addProteinPDB;
+	char *addProteinPSF;
+	char *solvatePDB;
+	char *solvatePSF;
+
+	double strainInner;
+	double strainOuter;
+
+	char *innerPatchPDB;
+	char *innerPatchPSF;
+	char *outerPatchPDB;
+	char *outerPatchPSF;
 	char *patchPSF;
+	char *patchPDB;
 	int create_all_atom;
 	int create_flip;
 

@@ -6,7 +6,8 @@
 #include "mutil.h"
 #include <math.h>
 
-static double PP = 12.0;
+static double solvation_cutoff = 2.5;
+static double PP = 15.0;
 static int debug_on = 0;
 
 const char *charmm_header =
@@ -70,259 +71,415 @@ void surface::createAllAtom( parameterBlock *block )
 	
 	fprintf(charmmFile, charmm_header );
 
-	FILE *pdbFile;	
-
-	if( !block->patchPDB )
+	struct atom_rec *master_at[2] = {NULL,NULL};
+	int nat[2] = {0,0};
+		
+	int *master_lipid_start[2] = {NULL,NULL};
+	// the index where a lipid's atoms stop
+	int *master_lipid_stop[2] = {NULL,NULL};
+	// the coordinates of that lipid.
+	double *master_lipid_xyz[2] = {NULL,NULL};
+	int *master_leaflet[2] = {NULL,NULL};
+	int master_nlipids[2] = {0,0};
+	double master_Lx[2]={0,0},master_Ly[2]={0,0},master_Lz[2]={0,0},alpha,beta,gamma;
+		
+	if( !block->innerPatchPDB && !block->outerPatchPDB)
 	{
-		printf("Structure building requires a valid pdb file \"patchPDB\"\n");
+		printf("Structure building requires a valid pdb file, \"patchPDB\", \"innerPatchPDB\", or \"outerPatchPDB\"\n");
 		exit(1); 
 	}
+
+	int do_leaflet[2] = { 0,0 };
 	
-	pdbFile = fopen(block->patchPDB,"r");
+	struct atom_rec *protein;
+	int nprotein=0;
+	int proteinIsCRD = 0;
+	int loadProtein = 0;
 
-	if( !pdbFile )
+	char proteinCRDName[256];
+	char proteinPSFName[256];
+
+	double total_charge       = 0;
+	double total_protein_charge       = 0;
+	double total_lipid_charge = 0;
+
+	if( block->addProteinPDB )
 	{
-		printf("Couldn't open file \"%s\"\n", block->patchPDB );
-		exit(1);
-	}
+		FILE *pdbFile = fopen(block->addProteinPDB, "r" );
+		strcpy( proteinCRDName, block->addProteinPDB );		
 
-	if( block->patchPSF )
-	{
-		FILE *psfFile = fopen(block->patchPSF,"r");
-
-		if( !psfFile )
+		if( !pdbFile )
 		{
-			printf("Couldn't open file \"%s\"\n", block->patchPDB );
+			printf("Couldn't open file \"%s\"\n", block->addProteinPDB );
 			exit(1);
 		}
-
-		loadPSF( psfFile );
-	}
-	else
-		loadPSFfromPDB( pdbFile );
-
-	struct atom_rec *at = (struct atom_rec *)malloc( sizeof(struct atom_rec ) * curNAtoms() );
 	
-	rewind(pdbFile);
-	loadPDB( pdbFile, at );	
-
-	fclose(pdbFile);
-
-	double Lx,Ly,Lz,alpha,beta,gamma;
-	
-	if( PBCD( &Lx,&Ly,&Lz,&alpha,&beta,&gamma) )
-	{
-		printf("Couldn't read CRYST1 record from PDB.\n");
-		exit(1);
-	}
-	
-	// the index where a lipid's atoms start
-	int *lipid_start = (int *)malloc( sizeof(int) * curNAtoms() );
-	// the index where a lipid's atoms stop
-	int *lipid_stop  = (int *)malloc( sizeof(int) * curNAtoms() );
-	// the coordinates of that lipid.
-	double *lipid_xyz       = (double *)malloc( sizeof(double) * 3 * curNAtoms() );
-	int *leaflet            = (int *)malloc( sizeof(int) * curNAtoms() );
-	int nlipids = 0;
-
-	char p_segid[256];
-	int pres = -1;
-	int seg_continuity_mode = 0;
-	p_segid[0] = '\0';
-	// fill the index
-
-	nlipids=-1;
-	for( int a = 0; a < curNAtoms(); a++ )
-	{
-		if( !strcasecmp( at[a].resname, "TIP3") ) continue;
-		if( !strcasecmp( at[a].resname, "SOD") ) continue;
-		if( !strcasecmp( at[a].resname, "POT") ) continue;
-		if( !strcasecmp( at[a].resname, "CLA") ) continue;
-
-		if( !strncasecmp( at[a].segid, "GLPA", 4) ||
-	  	    !strncasecmp( at[a].segid, "PRO", 3) )
-			seg_continuity_mode = 1;
-		else
-			seg_continuity_mode = 0;
-
-		if( (!seg_continuity_mode && (at[a].res != pres)) || strcasecmp( at[a].segid, p_segid) )
-		{  
-			nlipids++;
-			// a new residue. is it a lipid, or protein?
-			// for now, assume everything is going in, except water.
+		if( block->addProteinPSF )
+		{
+			FILE *psfFile = fopen(block->addProteinPSF,"r");
 			
-			lipid_start[nlipids] = a;
-			lipid_stop[nlipids] = a;
-				
+			if( !psfFile )
+			{
+				printf("Couldn't open file \"%s\"\n", block->addProteinPSF );
+				exit(1);
+			}
+	
+			loadPSF( psfFile );
+			strcpy( proteinPSFName, block->addProteinPSF );		
 		}
 		else
 		{
-			lipid_stop[nlipids] = a;
+			printf("Loading a protein requires a PSF for the protein.\n");
+			exit(1);
+//			loadPSFfromPDB( pdbFile );
+		}	
+		nprotein = curNAtoms();
+			
+		protein = (struct atom_rec *)malloc( sizeof(struct atom_rec ) * nprotein );
+		rewind(pdbFile);
+		if( !strcasecmp( block->addProteinPDB+strlen(block->addProteinPDB)-3,"crd" ) )
+		{
+			proteinIsCRD = 1;
+			loadCRD( pdbFile, protein);
 		}
-		strcpy( p_segid, at[a].segid ); 
-		pres = at[a].res;
+		else
+			loadPDB( pdbFile, protein);
+		loadProtein = 1;
+		fclose(pdbFile);
+
+		for( int p = 0; p < nprotein; p++ )
+			total_protein_charge += protein[p].charge;
+	
+		printf("Total protein charge: %.14le\n", total_protein_charge );
 	}
 
-	// the last "lipid" doesn't get incremented.
-	nlipids++;
-	
-	if( block->create_flip )
+
+	struct atom_rec *solvate;
+	int nsolvate=0;
+	double solvate_PBC[3] = { -1,-1,-1};
+
+	if( block->solvatePDB )
 	{
+		FILE *pdbFile = fopen(block->solvatePDB, "r" );
+
+		if( !pdbFile )
+		{
+			printf("Couldn't open file \"%s\"\n", block->solvatePDB );
+			exit(1);
+		}
+	
+		if( block->solvatePSF )
+		{
+			FILE *psfFile = fopen(block->solvatePSF,"r");
+			
+			if( !psfFile )
+			{
+				printf("Couldn't open file \"%s\"\n", block->solvatePSF );
+				exit(1);
+			}
+	
+			loadPSF( psfFile );
+		
+		}
+		else
+			loadPSFfromPDB( pdbFile );
+			
+		nsolvate= curNAtoms();
+			
+		solvate = (struct atom_rec *)malloc( sizeof(struct atom_rec ) * nsolvate );
+		rewind(pdbFile);
+		loadPDB( pdbFile, solvate );
+		
+		double alpha,beta,gamma;
+		if( PBCD( solvate_PBC+0,solvate_PBC+1,solvate_PBC+2,&alpha,&beta,&gamma) )
+		{
+			printf("Couldn't read CRYST1 record from solvation PDB.\n");
+			exit(1);
+		}
+	}
+
+
+	for( int pass = 0; pass < 2; pass++ )
+	{
+		FILE *pdbFile;	
+	
+		if( pass == 0 && block->innerPatchPDB )
+		{
+			pdbFile = fopen(block->innerPatchPDB, "r" );
+			do_leaflet[0] = 1;
+
+			if( !pdbFile )
+			{
+				printf("Couldn't open file \"%s\"\n", block->innerPatchPDB );
+				exit(1);
+			}
+
+			if( block->innerPatchPSF )
+			{
+				FILE *psfFile = fopen(block->innerPatchPSF,"r");
+			
+				if( !psfFile )
+				{
+					printf("Couldn't open file \"%s\"\n", block->innerPatchPSF );
+					exit(1);
+				}
+	
+				loadPSF( psfFile );
+			}
+			else
+				loadPSFfromPDB( pdbFile );
+		}
+		else if( pass == 1 && block->outerPatchPDB ) 
+		{
+			do_leaflet[1] = 1;
+			pdbFile = fopen(block->outerPatchPDB, "r" );
+			if( !pdbFile )
+			{
+				printf("Couldn't open file \"%s\"\n", block->outerPatchPDB );
+				exit(1);
+			}
+			if( block->outerPatchPSF )
+			{
+				FILE *psfFile = fopen(block->outerPatchPSF,"r");
+	
+				if( !psfFile )
+				{
+					printf("Couldn't open file \"%s\"\n", block->outerPatchPSF );
+					exit(1);
+				}
+	
+				loadPSF( psfFile );
+			}
+			else
+				loadPSFfromPDB( pdbFile );
+		}
+		else if( block->patchPDB )
+		{
+			do_leaflet[pass] = -1;
+			pdbFile = fopen(block->patchPDB,"r");
+			if( !pdbFile )
+			{
+				printf("Couldn't open file \"%s\"\n", block->patchPDB );
+				exit(1);
+			}
+			if( block->patchPSF )
+			{
+				FILE *psfFile = fopen(block->patchPSF,"r");
+
+				if( !psfFile )
+				{
+					printf("Couldn't open file \"%s\"\n", block->patchPDB );
+					exit(1);
+				}
+
+				loadPSF( psfFile );
+			}
+			else
+				loadPSFfromPDB( pdbFile );
+		}
+		else
+			continue;
+		master_at[pass] = (struct atom_rec *)malloc( sizeof(struct atom_rec ) * curNAtoms() );
+		nat[pass] = curNAtoms();
+
+		struct atom_rec *at = master_at[pass];
+
+
+		rewind(pdbFile);
+		loadPDB( pdbFile, at );	
+	
+		fclose(pdbFile);
+		
+		if( PBCD( master_Lx+pass,master_Ly+pass,master_Lz+pass,&alpha,&beta,&gamma) )
+		{
+			printf("Couldn't read CRYST1 record from PDB.\n");
+			exit(1);
+		}
+		
+		double Lx = master_Lx[pass];
+		double Ly = master_Lx[pass];
+		double Lz = master_Lx[pass];
+
+		// the index where a lipid's atoms start
+		master_lipid_start[pass] = (int *)malloc( sizeof(int) * curNAtoms() );
+		// the index where a lipid's atoms stop
+		master_lipid_stop[pass]  = (int *)malloc( sizeof(int) * curNAtoms() );
+		// the coordinates of that lipid.
+		master_lipid_xyz[pass]       = (double *)malloc( sizeof(double) * 3 * curNAtoms() );
+		master_leaflet[pass]            = (int *)malloc( sizeof(int) * curNAtoms() );
+		master_nlipids[pass] = 0;
+	
+		int *lipid_start = master_lipid_start[pass];
+		int *lipid_stop = master_lipid_stop[pass];
+		double *lipid_xyz = master_lipid_xyz[pass];
+		int *leaflet = master_leaflet[pass];
+		char p_segid[256];
+		int pres = -1;
+		int seg_continuity_mode = 0;
+		p_segid[0] = '\0';
+		// fill the index
+	
+		int nlipids=-1;
 		for( int a = 0; a < curNAtoms(); a++ )
 		{
-			at[a].x = -at[a].x;
-			at[a].z = -at[a].z;
-		}
-	}
-
-	// get the bilayer center.
-
-#define N_BINS_MOLDIST 100
-
-        double best_chi2 = 1e10;
-	double wrapto = 0;
- 
-        double moldist[N_BINS_MOLDIST];
-        memset( moldist, 0, sizeof(double) * N_BINS_MOLDIST );
-
-
-	for( int l = 0; l < nlipids; l++ )
-	{
-		for( int p = lipid_start[l]; p <= lipid_stop[l]; p++ )
-		{
-                      double tz = at[p].z;
-
-                      while( tz < 0 ) tz += Lz;
-                      while( tz >= Lz ) tz -= Lz;
-
-                      int zb = N_BINS_MOLDIST * tz / Lz; // this is right
-                      if( zb < 0 ) zb = 0;
-                      if( zb >= N_BINS_MOLDIST ) zb = N_BINS_MOLDIST-1;
-                      moldist[zb] += 1;
-		}
-	}
-
-         for( int zb = 0; zb < N_BINS_MOLDIST; zb++ )
-         {
-                 double zv = Lz * (zb+0.5) / (double)N_BINS_MOLDIST;
- 
-                  int zlow  = zb- N_BINS_MOLDIST/2;
-                  int zhigh = zlow + N_BINS_MOLDIST;
- 
-                  double Lzhi2 = 0;
-                  for( int iz = zlow; iz < zhigh; iz++ )
-                  {
-                          double dz = Lz * (iz+0.5) / N_BINS_MOLDIST - zv;
- 
-                          int iiz = iz;
-                          while( iiz < 0 ) iiz += N_BINS_MOLDIST;
-                          while( iiz >= N_BINS_MOLDIST ) iiz -= N_BINS_MOLDIST;
- 
-                          Lzhi2 += moldist[iiz] * (dz) * (dz);
-                  }
- 
-                  if( Lzhi2 < best_chi2 )
-                  {
-                          best_chi2 = Lzhi2;
-                          wrapto = zv;
-                  }
-         }
-
-
-
-	// wrap around z periodic dimension
-
-	for( int l = 0; l < nlipids; l++ )
-	{
-		while( at[lipid_start[l]].z - wrapto < -Lz/2 ) at[lipid_start[l]].z += Lz;
-		while( at[lipid_start[l]].z - wrapto > Lz/2 ) at[lipid_start[l]].z -= Lz;
-
-		double lcom_z = 0;
-
-		for( int p = lipid_start[l]; p <= lipid_stop[l]; p++ )
-		{
-			while( at[p].x - at[lipid_start[l]].x < -Lx/2 ) at[p].x += Lx;
-			while( at[p].x - at[lipid_start[l]].x >  Lx/2 ) at[p].x -= Lx;
-			
-			while( at[p].y - at[lipid_start[l]].y < -Ly/2 ) at[p].y += Ly;
-			while( at[p].y - at[lipid_start[l]].y >  Ly/2 ) at[p].y -= Ly;
-			
-			while( at[p].z - at[lipid_start[l]].z < -Lz/2 ) at[p].z += Lz;
-			while( at[p].z - at[lipid_start[l]].z >  Lz/2 ) at[p].z -= Lz;
+			if( !strcasecmp( at[a].resname, "TIP3") ) continue;
+			if( !strcasecmp( at[a].resname, "SOD") ) continue;
+			if( !strcasecmp( at[a].resname, "POT") ) continue;
+			if( !strcasecmp( at[a].resname, "CLA") ) continue;
 	
-			lcom_z += (at[p].z - wrapto);
-		}
-
-		if( lcom_z > 0 )
-			leaflet[l] = 1;
-		else
-			leaflet[l] = -1;
-	} 
-
-	// subtract off wrapto
-
-	for( int a = 0; a < curNAtoms(); a++ )
-		at[a].z -= wrapto;
-
-	// fill lipid positions
-
-	for( int l = 0; l < nlipids; l++ )
-	{
-		lipid_xyz[3*l+0] = 0;	
-		lipid_xyz[3*l+1] = 0;	
-		lipid_xyz[3*l+2] = 0;
+			if( !strncasecmp( at[a].segid, "GLPA", 4) ||
+		  	    !strncasecmp( at[a].segid, "PRO", 3) )
+				seg_continuity_mode = 1;
+			else
+				seg_continuity_mode = 0;
 	
-		for( int p = lipid_start[l]; p <= lipid_stop[l]; p++ )
-		{
-			lipid_xyz[3*l+0] += at[p].x;
-			lipid_xyz[3*l+1] += at[p].y;
-			lipid_xyz[3*l+2] += at[p].z;
+			if( (!seg_continuity_mode && (at[a].res != pres)) || strcasecmp( at[a].segid, p_segid) )
+			{  
+				nlipids++;
+				// a new residue. is it a lipid, or protein?
+				// for now, assume everything is going in, except water.
+				
+				lipid_start[nlipids] = a;
+				lipid_stop[nlipids] = a;
+					
+			}
+			else
+			{
+				lipid_stop[nlipids] = a;
+			}
+			strcpy( p_segid, at[a].segid ); 
+			pres = at[a].res;
 		}
-
-		lipid_xyz[3*l+0] /= (lipid_stop[l] - lipid_start[l] + 1 );
-		lipid_xyz[3*l+1] /= (lipid_stop[l] - lipid_start[l] + 1 );
-		lipid_xyz[3*l+2] /= (lipid_stop[l] - lipid_start[l] + 1 );
-	}
-
-
-	int *lipid_oppo = (int *)malloc( sizeof(int) * nlipids );
-
-
-	for( int l = 0; l < nlipids; l++ )
-	{
-		double best = 1e10;
-
-		lipid_oppo[l] = -1;
-
-		for( int l2 = 0; l2 < nlipids; l2++ )
+	
+		// the last "lipid" doesn't get incremented.
+		nlipids++;
+		
+		if( block->create_flip )
 		{
-			if( leaflet[l2] == leaflet[l] ) continue;
-
-			double dr[3] = { 
-				lipid_xyz[3*l+0] - lipid_xyz[3*l2+0],
-				lipid_xyz[3*l+1] - lipid_xyz[3*l2+1],
-				lipid_xyz[3*l+2] - lipid_xyz[3*l2+2] };
-			while( dr[0] > Lx/2 ) dr[0] -= Lx;
-			while( dr[1] > Ly/2 ) dr[1] -= Ly;
-			while( dr[0] < -Lx/2 ) dr[0] += Lx;
-			while( dr[1] < -Ly/2 ) dr[1] += Ly;
-
-			double r = normalize(dr);
-
-			if( r < best )
-			{	
-				lipid_oppo[l] = l2;
-				best = r;
+			for( int a = 0; a < curNAtoms(); a++ )
+			{
+				at[a].x = -at[a].x;
+				at[a].z = -at[a].z;
 			}
 		}
-
-		if( lipid_oppo[l] == -1 )
+	
+		// get the bilayer center.
+	
+	#define N_BINS_MOLDIST 100
+	
+	        double best_chi2 = 1e10;
+		double wrapto = 0;
+	 
+	        double moldist[N_BINS_MOLDIST];
+	        memset( moldist, 0, sizeof(double) * N_BINS_MOLDIST );
+	
+	
+		for( int l = 0; l < nlipids; l++ )
 		{
-			printf("Couldn't make sense of the bilayer input PDB file.\n");
-			printf("Couldn't find a good lipid on the opposite side of the bilayer.\n");
-			exit(1);
+			for( int p = lipid_start[l]; p <= lipid_stop[l]; p++ )
+			{
+	                      double tz = at[p].z;
+	
+	                      while( tz < 0 ) tz += Lz;
+	                      while( tz >= Lz ) tz -= Lz;
+	
+	                      int zb = N_BINS_MOLDIST * tz / Lz; // this is right
+	                      if( zb < 0 ) zb = 0;
+	                      if( zb >= N_BINS_MOLDIST ) zb = N_BINS_MOLDIST-1;
+	                      moldist[zb] += 1;
+			}
 		}
+	
+	         for( int zb = 0; zb < N_BINS_MOLDIST; zb++ )
+	         {
+	                 double zv = Lz * (zb+0.5) / (double)N_BINS_MOLDIST;
+	 
+	                  int zlow  = zb- N_BINS_MOLDIST/2;
+	                  int zhigh = zlow + N_BINS_MOLDIST;
+	 
+	                  double Lzhi2 = 0;
+	                  for( int iz = zlow; iz < zhigh; iz++ )
+	                  {
+	                          double dz = Lz * (iz+0.5) / N_BINS_MOLDIST - zv;
+	 
+	                          int iiz = iz;
+	                          while( iiz < 0 ) iiz += N_BINS_MOLDIST;
+	                          while( iiz >= N_BINS_MOLDIST ) iiz -= N_BINS_MOLDIST;
+	 
+	                          Lzhi2 += moldist[iiz] * (dz) * (dz);
+	                  }
+	 
+	                  if( Lzhi2 < best_chi2 )
+	                  {
+	                          best_chi2 = Lzhi2;
+	                          wrapto = zv;
+	                  }
+	         }
+	
+	
+	
+		// wrap around z periodic dimension
+	
+		for( int l = 0; l < nlipids; l++ )
+		{
+			while( at[lipid_start[l]].z - wrapto < -Lz/2 ) at[lipid_start[l]].z += Lz;
+			while( at[lipid_start[l]].z - wrapto > Lz/2 ) at[lipid_start[l]].z -= Lz;
+	
+			double lcom_z = 0;
+	
+			for( int p = lipid_start[l]; p <= lipid_stop[l]; p++ )
+			{
+				while( at[p].x - at[lipid_start[l]].x < -Lx/2 ) at[p].x += Lx;
+				while( at[p].x - at[lipid_start[l]].x >  Lx/2 ) at[p].x -= Lx;
+				
+				while( at[p].y - at[lipid_start[l]].y < -Ly/2 ) at[p].y += Ly;
+				while( at[p].y - at[lipid_start[l]].y >  Ly/2 ) at[p].y -= Ly;
+				
+				while( at[p].z - at[lipid_start[l]].z < -Lz/2 ) at[p].z += Lz;
+				while( at[p].z - at[lipid_start[l]].z >  Lz/2 ) at[p].z -= Lz;
+		
+				lcom_z += (at[p].z - wrapto);
+			}
+	
+			if( lcom_z > 0 )
+				leaflet[l] = 1;
+			else
+				leaflet[l] = -1;
+		} 
+	
+		// subtract off wrapto
+	
+		for( int a = 0; a < curNAtoms(); a++ )
+			at[a].z -= wrapto;
+	
+		// fill lipid positions
+	
+		for( int l = 0; l < nlipids; l++ )
+		{
+			lipid_xyz[3*l+0] = 0;	
+			lipid_xyz[3*l+1] = 0;	
+			lipid_xyz[3*l+2] = 0;
+		
+			for( int p = lipid_start[l]; p <= lipid_stop[l]; p++ )
+			{
+				lipid_xyz[3*l+0] += at[p].x;
+				lipid_xyz[3*l+1] += at[p].y;
+				lipid_xyz[3*l+2] += at[p].z;
+			}
+	
+			lipid_xyz[3*l+0] /= (lipid_stop[l] - lipid_start[l] + 1 );
+			lipid_xyz[3*l+1] /= (lipid_stop[l] - lipid_start[l] + 1 );
+			lipid_xyz[3*l+2] /= (lipid_stop[l] - lipid_start[l] + 1 );
+		}
+
+
+		master_nlipids[pass] = nlipids;
 	}
+
+	if( do_leaflet[0] > 0 && do_leaflet[1] == -1 )
+		do_leaflet[1] = 0;
+	else if( do_leaflet[1] > 0 && do_leaflet[0] == -1 )
+		do_leaflet[0] = 0;
 
 	// get regions of the bilayer which we will map collectively attempting to leave a minimum of seams.
 
@@ -334,7 +491,7 @@ void surface::createAllAtom( parameterBlock *block )
 
 	// Expected TOTAL neutral surface area.		
 	// A0*(1 + J * PP + K * PP * PP ) 
-	
+
 	double JZ =0;
 	double KZ =0;
 	double Z = 0;
@@ -356,13 +513,27 @@ void surface::createAllAtom( parameterBlock *block )
 	JZ /= Z;
 	KZ /= Z;
 
-	double area_target_outside = area0 * (1 + JZ * PP + KZ * PP * PP );
-	double area_target_inside  = area0 * (1 - JZ * PP + KZ * PP * PP );
+	double PP_in   = (1-JZ*PP)*PP * exp(-block->strainInner);
+	double PP_out  = (1+JZ*PP)*PP * exp(-block->strainOuter);
+
+	double area_target_outside = area0 * (1 + JZ * PP_out + KZ * PP * PP )* exp(-0.5*block->strainOuter);
+	double area_target_inside  = area0 * (1 - JZ * PP_in + KZ * PP * PP )*exp(-0.5*block->strainInner);
 	printf("Area-midplane: %le Area_NS/PP_outside: %le\n", area0, area_target_outside );
 	printf("Area-midplane: %le Area_NS/PP_inside:  %le\n", area0, area_target_inside  );
 
+	double use_area_lower = master_Lx[0]*master_Ly[0];
+	double use_area_upper = master_Lx[1]*master_Ly[1];
+	
+	int nregions = 0;
+	if( do_leaflet[0] && do_leaflet[1] )
+		nregions = 3*area0 / ( (use_area_lower+use_area_upper)/8);
+	else if( do_leaflet[0] )
+		nregions = 3*area0 / ( (use_area_lower)/4);
+	else	
+		nregions = 3*area0 / ( (use_area_upper)/4);
+		
+
 	// target one fourth of the area?
-	int nregions = 3*area0 / (Lx*Ly/4);
 
 	printf("Using %d regions.\n", nregions );
 
@@ -411,8 +582,6 @@ void surface::createAllAtom( parameterBlock *block )
 
 	int seg_cntr = 1;
 
-	sprintf(cur_filename, "segment_SEG%d.crd", seg_cntr );
-	sprintf(cur_segname, "SEG%d", seg_cntr ); 
 
 	int npairs = 0;
 	int npair_space = 10;
@@ -422,9 +591,23 @@ void surface::createAllAtom( parameterBlock *block )
 	double area_fraction_outside = 1.0;
 	double area_fraction_inside = 1.0;
 
+	const char *out_in[2]= {"IN","OUT"};
+			
+	sprintf(cur_filename, "segment_%s%d.crd", out_in[0], seg_cntr );
+	sprintf(cur_segname, "%s%d", out_in[0], seg_cntr ); 
+
 	int seed = rand();
+
+	int nplaced = 0;
+	int nplacedSpace = 100;
+	double *placed_atoms = (double *)malloc( sizeof(double) * 3 * nplacedSpace );
+
+	double av_P_xy[2] = {0,0};
+	double nav_P[2] = {0,0};
+
 	for( int pass = 0; pass < 2; pass++ )
 	{
+
 		srand(seed); // generate the same random numbers.
 
 		double alpha_outside = 1;
@@ -438,103 +621,103 @@ void surface::createAllAtom( parameterBlock *block )
 		int nlipids_placed = 0;
 		int nlipids_placed_outside = 0;
 		int nlipids_placed_inside = 0;
-		for( int r = 0; r < nregions; r++ )
+		int switched = 0;
+		for( int x_leaflet = 0; x_leaflet < 2; x_leaflet++ )
 		{
-			int N = 0;
-	
-			double tri_cen[3] = {0,0,0};
-	
-			for( int t = 0; t < nt; t++ )
+			if( do_leaflet[x_leaflet] == 0 ) continue;
+			double strain[2] = { block->strainInner, block->strainOuter };
+
+			int *leaflet = master_leaflet[x_leaflet];
+			double *lipid_xyz = master_lipid_xyz[x_leaflet];
+			struct atom_rec *at = master_at[x_leaflet];
+			int *lipid_stop = master_lipid_stop[x_leaflet];
+			int *lipid_start = master_lipid_start[x_leaflet];
+			int nlipids = master_nlipids[x_leaflet];
+			double Lx = master_Lx[x_leaflet];
+			double Ly = master_Ly[x_leaflet];
+			double Lz = master_Lz[x_leaflet];
+			for( int r = 0; r < nregions; r++ )
 			{
-				if( regions_for_face[t] == r )
-				{
-					double rc[3],nc[3];
-					evaluateRNRM( t, 1.0/3.0, 1.0/3.0, rc, nc, rsurf );
-				
-	//				if( r < natom_names )
-	//				printf("%s %lf %lf %lf\n", atom_name[r], rc[0], rc[1], rc[2] );
-	
-					if( N == 0 )
-					{
-						tri_cen[0] += rc[0];
-						tri_cen[1] += rc[1];
-						tri_cen[2] += rc[2];
-					}	
-					else
-					{
-						double dr[3] = { rc[0] - tri_cen[0]/N, rc[1] - tri_cen[1]/N, rc[2] - tri_cen[2]/N };
-						wrapPBC( dr, rsurf+3*nv );
-	
-						tri_cen[0] += tri_cen[0]/N + dr[0];	
-						tri_cen[1] += tri_cen[1]/N + dr[1];	
-						tri_cen[2] += tri_cen[2]/N + dr[2];	
-					}
-	
-					tri_list[N] = t; 
-					N++; 
-				}
-			}
-	
-			tri_cen[0] /= N;
-			tri_cen[1] /= N;
-			tri_cen[2] /= N;
-	
-			double best_chi2 = 1e10;
-			int best_x = 0;
-			for( int xt = 0; xt < N; xt++ )
-			{
-				int f = tri_list[xt];
-	
-				double rc[3],nc[3];
-				evaluateRNRM( f, 1.0/3.0, 1.0/3.0, rc, nc, rsurf );
-	
-				double dr[3] = { rc[0] - tri_cen[0], rc[1] - tri_cen[1], rc[2] - tri_cen[2] };
+				int N = 0;
 		
-				wrapPBC( dr, rsurf+3*nv );
-	
-				double r = normalize(dr);
-	
-				if( f >= nf_faces )
-					r += 1e8;
-	
-				if( r < best_chi2 )
+				double tri_cen[3] = {0,0,0};
+		
+				for( int t = 0; t < nt; t++ )
 				{
-					best_chi2 = r;
-					best_x = xt;
+					if( regions_for_face[t] == r )
+					{
+						double rc[3],nc[3];
+						evaluateRNRM( t, 1.0/3.0, 1.0/3.0, rc, nc, rsurf );
+					
+		//				if( r < natom_names )
+		//				printf("%s %lf %lf %lf\n", atom_name[r], rc[0], rc[1], rc[2] );
+		
+						if( N == 0 )
+						{
+							tri_cen[0] += rc[0];
+							tri_cen[1] += rc[1];
+							tri_cen[2] += rc[2];
+						}	
+						else
+						{
+							double dr[3] = { rc[0] - tri_cen[0]/N, rc[1] - tri_cen[1]/N, rc[2] - tri_cen[2]/N };
+							wrapPBC( dr, rsurf+3*nv );
+		
+							tri_cen[0] += tri_cen[0]/N + dr[0];	
+							tri_cen[1] += tri_cen[1]/N + dr[1];	
+							tri_cen[2] += tri_cen[2]/N + dr[2];	
+						}
+		
+						tri_list[N] = t; 
+						N++; 
+					}
 				}
-			}
-	
-			int f = tri_list[best_x]; 
-	
-			for( int x_leaflet = 0; x_leaflet < 2; x_leaflet++ )
-			{
+		
+				tri_cen[0] /= N;
+				tri_cen[1] /= N;
+				tri_cen[2] /= N;
+		
+				double best_chi2 = 1e10;
+				int best_x = 0;
+				for( int xt = 0; xt < N; xt++ )
+				{
+					int f = tri_list[xt];
+		
+					double rc[3],nc[3];
+					evaluateRNRM( f, 1.0/3.0, 1.0/3.0, rc, nc, rsurf );
+		
+					double dr[3] = { rc[0] - tri_cen[0], rc[1] - tri_cen[1], rc[2] - tri_cen[2] };
+			
+					wrapPBC( dr, rsurf+3*nv );
+		
+					double r = normalize(dr);
+		
+					if( f >= nf_faces )
+						r += 1e8;
+		
+					if( r < best_chi2 )
+					{
+						best_chi2 = r;
+						best_x = xt;
+					}
+				}
+		
+				int f = tri_list[best_x]; 
+
 				// pick a lipid on the upper leaflet to put in the center of the face.
 			
 				double alpha = alpha_outside;
-				if( x_leaflet == 1 )
+				if( x_leaflet == 0 )
 					alpha = alpha_inside;
 				int l_cen = rand() % nlipids;
 	
 				while( leaflet[l_cen] != (x_leaflet ? 1 : -1 ) )
 					l_cen = rand() % nlipids; 
 	
-				int l_opp = lipid_oppo[l_cen];
 			
 				// loop over all lipids. if they are in the face, place them into the coord structure.
 			
 				double upper_cen[3] = { lipid_xyz[3*l_cen+0], lipid_xyz[3*l_cen+1], lipid_xyz[3*l_cen+2] };
-				double lower_shift[3] = { 
-						lipid_xyz[3*l_cen+0] - lipid_xyz[3*l_opp+0],
-						lipid_xyz[3*l_cen+1] - lipid_xyz[3*l_opp+1],
-						lipid_xyz[3*l_cen+2] - lipid_xyz[3*l_opp+2] };
-			
-				while( lower_shift[0] >   Lx/2 ) lower_shift[0] -= Lx;
-				while( lower_shift[0] <  -Lx/2 ) lower_shift[0] += Lx;
-				while( lower_shift[1] >   Ly/2 ) lower_shift[1] -= Ly;
-				while( lower_shift[1] <  -Ly/2 ) lower_shift[1] += Ly;
-				while( lower_shift[2] >   Lz/2 ) lower_shift[2] -= Lz;
-				while( lower_shift[2] <  -Lz/2 ) lower_shift[2] += Lz;
-				
 			
 				// x, y to u, v'
 			
@@ -568,22 +751,22 @@ void surface::createAllAtom( parameterBlock *block )
 					double main_v_cen = spot_v;
 	
 					// everything must be evaluated at this spot to retain the x,y to u/v mapping.
-					int fout = evaluate_at( eval_cen, use_r, f, &spot_u, &spot_v, rsurf, leaflet[l] );
+					int fout = evaluate_at( eval_cen, use_r, f, &spot_u, &spot_v, rsurf, leaflet[l], -strain[x_leaflet] );
 		
 		
 					if( regions_for_face[fout] == r )
 					{
 						nlipids_placed += 1;
 						if( x_leaflet == 0 )
-							nlipids_placed_outside += 1;
-						else
 							nlipids_placed_inside += 1;
+						else
+							nlipids_placed_outside += 1;
 	
 						if( pass == 0 ) continue;	
 
 						int base_res = cur_res; 
 	
-						if( !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) )
+						if( !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) || cur_res > 50 || switched )
 						{	
 							// ALWAYS terminate the current segment, regardless.
 							
@@ -622,15 +805,17 @@ void surface::createAllAtom( parameterBlock *block )
 								npairs++;
 							
 								seg_cntr++;		
-								sprintf(cur_filename, "segment_SEG%d.crd", seg_cntr );
-								sprintf(cur_segname, "SEG%d", seg_cntr ); 
 							}					
+								
+							sprintf(cur_filename, "segment_%s%d.crd", out_in[x_leaflet], seg_cntr );
+							sprintf(cur_segname, "%s%d", out_in[x_leaflet], seg_cntr ); 
 						
 							cur_size = 0;
 							cur_natoms = 0;
 							cur_segment[0] = '\0';
 							cur_atom = 1;
 							cur_res  = 1;
+							switched=0;
 						}
 	
 						double u_cen = spot_u;
@@ -690,13 +875,9 @@ void surface::createAllAtom( parameterBlock *block )
 								exit(1);
 	*/
 							}
-							if( !strcasecmp( cur_segname, "SEG165") && cur_res == 4 && !strcasecmp( at[xa].atname, "O21" ) )
-							{ 
-								printf("target O21 f: %d u: %lf v: %lf use_r: %lf %lf %lf\n",
-										main_f_eval, transp_u, transp_v, use_r[0], use_r[1], use_r[2] );
+							if( at[xa].atname[0] == 'P' )
 								debug_on = 1;
-							}
-							evaluate_at( eval, use_r, main_f_eval, &transp_u, &transp_v, rsurf, leaflet[l] );
+							evaluate_at( eval, use_r, main_f_eval, &transp_u, &transp_v, rsurf, leaflet[l], -strain[x_leaflet] );
 							debug_on = 0;
 	
 							if( !strcasecmp( cur_segname, "SEG165") && cur_res == 4 && !strcasecmp( at[xa].atname, "C21" ) ) 
@@ -742,7 +923,26 @@ void surface::createAllAtom( parameterBlock *block )
 							}
 	
 							printSingleCRD( cur_segment+cur_size, at+xa );
+
+							double rxy = sqrt(at[xa].x*at[xa].x+at[xa].y*at[xa].y);
+							if( at[xa].atname[0] == 'P' )
+							{
+								av_P_xy[x_leaflet] += rxy;
+								nav_P[x_leaflet] += 1;
+							}
 							cur_size += strlen(cur_segment+cur_size);
+
+							if( nplaced == nplacedSpace )
+							{
+								nplacedSpace *= 2;
+								placed_atoms = (double *)realloc( placed_atoms, sizeof(double)*3*nplacedSpace );
+							}
+
+							placed_atoms[3*nplaced+0] = at[xa].x;
+							placed_atoms[3*nplaced+1] = at[xa].y;
+							placed_atoms[3*nplaced+2] = at[xa].z;
+							nplaced++;
+
 							cur_natoms++;
 	//						printSingleCRD( tempFile, at+xa ); 
 							at[xa].segid = tmp;
@@ -754,7 +954,7 @@ void surface::createAllAtom( parameterBlock *block )
 							at[xa].z = zsave;
 		
 							cur_atom++;
-	
+							total_lipid_charge += at[xa].charge;
 						}
 					
 						cur_res++;
@@ -807,24 +1007,32 @@ void surface::createAllAtom( parameterBlock *block )
 							cur_atom = 1;
 							cur_res  = 1;
 							seg_cntr++;		
-							sprintf(cur_filename, "segment_SEG%d.crd", seg_cntr );
-							sprintf(cur_segname, "SEG%d", seg_cntr ); 
+								
+							sprintf(cur_filename, "segment_%s%d.crd", out_in[x_leaflet], seg_cntr );
+							sprintf(cur_segname, "%s%d", out_in[x_leaflet], seg_cntr ); 
 						}	
 					}
 		
 				}
 			}
+			
+			switched = 1;
 		}
+
+		printf("Nlipids placed outside: %d nlipids placed inside: %d\n", nlipids_placed_outside, nlipids_placed_inside);
 		
-		double likely_area_covered_outside = nlipids_placed_outside * Lx * Ly / (nlipids/2);
-		double likely_area_covered_inside = nlipids_placed_inside  * Lx * Ly / (nlipids/2);
+		double likely_area_covered_outside = nlipids_placed_outside * master_Lx[1] * master_Ly[1] / (1e-10 + master_nlipids[1]/2);
+		double likely_area_covered_inside = nlipids_placed_inside  * master_Lx[0] * master_Ly[0] / ( 1e-10 + master_nlipids[0]/2);
 
 		area_fraction_outside = likely_area_covered_outside / area_target_outside;
 		area_fraction_inside = likely_area_covered_inside / area_target_inside;
 
-		printf("PASS %d area percentage: %lf%% outside %lf%% inside.\n", pass, area_fraction_outside, area_fraction_inside );
+		printf("PASS %d area percentage: %lf%% outside %lf%% inside.\n", pass, 100*area_fraction_outside, 100*area_fraction_inside );
 	}
 
+	printf("P_in: %le P_out: %le\n",
+		av_P_xy[0] / nav_P[0], 
+		av_P_xy[1] / nav_P[1] );
 
 	if( cur_size > 0 )
 	{
@@ -862,14 +1070,503 @@ void surface::createAllAtom( parameterBlock *block )
 
 		npairs++;
 	}
+	/* box the lipids and protein */
+	// box the placed atoms.
+
+	struct box
+	{
+		int np;
+		int npSpace;
+		int *plist;
+	};
+
+	double boxl = 20.0;
+
+	int nx = PBC_vec[0][0] / boxl;
+	int ny = PBC_vec[1][1] / boxl;
+	int nz = PBC_vec[2][2] / boxl;
+
+	if( nx > 100 ) nx = 100;
+	if( ny > 100 ) ny = 100;
+	if( nz > 100 ) nz = 100;
+
+	double box_x = PBC_vec[0][0] / nx;
+	double box_y = PBC_vec[1][1] / ny;
+	double box_z = PBC_vec[2][2] / nz;
+
+	box *theBoxes = (box *)malloc( sizeof(box) * nx * ny * nz );
+
+	for( int b = 0; b < nx*ny*nz; b++ )
+	{
+		theBoxes[b].np = 0;
+		theBoxes[b].npSpace = 2;
+		theBoxes[b].plist = (int *)malloc( sizeof(int) * theBoxes[b].npSpace );
+	}
+
+	if( nprotein > 0 )
+	{
+		nplacedSpace += nprotein;
+		placed_atoms = (double *)realloc( placed_atoms, sizeof(double) * 3 * nplacedSpace );
+
+		for( int px = 0; px < nprotein; px++ )
+		{
+			placed_atoms[3*nplaced+0] = protein[px].x;
+			placed_atoms[3*nplaced+1] = protein[px].y;
+			placed_atoms[3*nplaced+2] = protein[px].z;
+
+			nplaced++;
+		}
+	}
+
+
+
+	for( int px = 0; px < nplaced; px++ )
+	{
+		double r[3] = { placed_atoms[3*px+0], placed_atoms[3*px+1], placed_atoms[3*px+2] };
+
+		while( r[0] <  0 ) r[0] += PBC_vec[0][0];
+		while( r[1] <  0 ) r[1] += PBC_vec[1][1];
+		while( r[2] <  0 ) r[2] += PBC_vec[2][2];
+		while( r[0] >  PBC_vec[0][0] ) r[0] -= PBC_vec[0][0];
+		while( r[1] >  PBC_vec[1][1] ) r[1] -= PBC_vec[1][1];
+		while( r[2] >  PBC_vec[2][2] ) r[2] -= PBC_vec[2][2];
+
+		int bx = r[0] * nx / PBC_vec[0][0];
+		int by = r[1] * ny / PBC_vec[1][1];
+		int bz = r[2] * nz / PBC_vec[2][2];
+
+		if( bx >= nx ) bx -= nx;
+		if( bx < 0 ) bx += nx;
+		if( by >= ny ) by -= ny;
+		if( by < 0 ) by += ny;
+		if( bz >= nz ) bz -= nz;
+		if( bz < 0 ) bz += nz;
+
+		int b = bx*ny*nz+by*nz+bz;
+		if( theBoxes[b].np == theBoxes[b].npSpace )
+		{
+			theBoxes[b].npSpace *= 2;
+			theBoxes[b].plist = (int * )realloc( theBoxes[b].plist, sizeof(int) * theBoxes[b].npSpace );
+		}
+
+		theBoxes[b].plist[theBoxes[b].np] = px;
+		theBoxes[b].np += 1;
+	}
+	
+	/* Solvate */
+
+	int wrote_water_psf = 0;
+	char waterFileName[256];
+	char waterPSFName[256];
+	int water_atom = 1;
+	int nK = 0;
+	int nCl = 0;
+	if( nsolvate > 0 )
+	{
+		// we need to loop over a sufficient number of solvent periodic boxes to cover the main PBC cell.
+		
+		int nsolvent_x = ceil(PBC_vec[0][0] / solvate_PBC[0]);
+		int nsolvent_y = ceil(PBC_vec[1][1] / solvate_PBC[1]);
+		int nsolvent_z = ceil(PBC_vec[2][2] / solvate_PBC[2]);
+
+		// we don't want to do solvent PBC loops over the main cell. we only want to keep residues that are inside the box.
+		// make sure the interior coordinates are centered properly.
+
+		// get solvent residue structure in the form of an index.
+		int nsolventRes =0;
+		int *solvent_res_link = (int *)malloc( sizeof(int) * nsolvate );
+		int *solvent_res_size = (int *)malloc( sizeof(int) * nsolvate );
+
+		int pres = -1;
+		for( int a = 0; a < nsolvate; a++ )
+		{
+			if( solvate[a].res != pres )
+			{
+				if( nsolventRes > 0 )
+					solvent_res_size[nsolventRes-1] = a - solvent_res_link[nsolventRes-1];
+				solvent_res_link[nsolventRes] = a;
+				nsolventRes++;
+			}
+
+			pres = solvate[a].res;
+		}
+				
+		solvent_res_size[nsolventRes-1] = nsolvate - solvent_res_link[nsolventRes-1];
+		
+		printf("%d solvent residues.\n", nsolventRes );
+
+		for( int r = 0; r < nsolventRes; r++ )
+		{
+			double com[3] = {0,0,0};
+
+			for( int ax = 0; ax < solvent_res_size[r]; ax++ )
+			{	
+				int a = solvent_res_link[r] + ax;
+				com[0] += solvate[a].x;
+				com[1] += solvate[a].y;
+				com[2] += solvate[a].z;
+			}
+
+			com[0] /= solvent_res_size[r];
+			com[1] /= solvent_res_size[r];
+			com[2] /= solvent_res_size[r];
+			
+			double shift[3] = {0,0,0};
+			while( com[0] + shift[0] < -solvate_PBC[0]/2 ) shift[0] += solvate_PBC[0];
+			while( com[1] + shift[1] < -solvate_PBC[1]/2 ) shift[1] += solvate_PBC[1];
+			while( com[2] + shift[2] < -solvate_PBC[2]/2 ) shift[2] += solvate_PBC[2];
+			while( com[0] + shift[0] > solvate_PBC[0]/2 ) shift[0] -= solvate_PBC[0];
+			while( com[1] + shift[1] > solvate_PBC[1]/2 ) shift[1] -= solvate_PBC[1];
+			while( com[2] + shift[2] > solvate_PBC[2]/2 ) shift[2] -= solvate_PBC[2];
+
+			for( int ax = 0; ax < solvent_res_size[r]; ax++ )
+			{	
+				int a = solvent_res_link[r] + ax;
+
+				solvate[a].x += shift[0];
+				solvate[a].y += shift[1];
+				solvate[a].z += shift[2];
+			}
+		}
+
+
+		double solvation_shift[3] = 
+			{
+				( nsolvent_x * solvate_PBC[0]- PBC_vec[0][0])/2, 
+				( nsolvent_y * solvate_PBC[1]- PBC_vec[1][1])/2, 
+				( nsolvent_z * solvate_PBC[2]- PBC_vec[2][2])/2
+			};	
+		
+		sprintf(waterFileName, "solvate_%s.crd", block->jobName );
+
+		FILE *waterCRD = fopen(waterFileName, "w" );
+		int nprint_solvate = 0;	
+		int water_size = 0;
+		int water_space =4096;
+		char *water_file = (char *)malloc( sizeof(char) * water_space );	 
+		water_file[0] = '\0';
+		char solventSegName[256];
+		sprintf(solventSegName, "WAT");
+		int water_res = 1;
+		for( int sx = 0; sx < nsolvent_x; sx++ )
+		for( int sy = 0; sy < nsolvent_y; sy++ )
+		for( int sz = 0; sz < nsolvent_z; sz++ )
+		{
+			double outer_shift[3] = { 
+				-PBC_vec[0][0]/2 - solvation_shift[0] + sx * solvate_PBC[0],
+				-PBC_vec[1][1]/2 - solvation_shift[1] + sy * solvate_PBC[1],
+				-PBC_vec[2][2]/2 - solvation_shift[2] + sz * solvate_PBC[2] };
+		
+			for( int r = 0; r < nsolventRes; r++ )
+			{	
+				double rcom[3] = {0,0,0};
+		
+				for( int ax = 0; ax < solvent_res_size[r]; ax++ )
+				{
+					int a = solvent_res_link[r] + ax;
+					rcom[0] += solvate[a].x;
+					rcom[1] += solvate[a].y;
+					rcom[2] += solvate[a].z;
+				}	
+
+				rcom[0] /= solvent_res_size[r];
+				rcom[1] /= solvent_res_size[r];
+				rcom[2] /= solvent_res_size[r];
+				
+				rcom[0] += outer_shift[0];
+				rcom[1] += outer_shift[1];
+				rcom[2] += outer_shift[2];
+
+				if( rcom[0] < -PBC_vec[0][0]/2 || rcom[0] >= PBC_vec[0][0]/2 ) continue;
+				if( rcom[1] < -PBC_vec[1][1]/2 || rcom[1] >= PBC_vec[1][1]/2 ) continue;
+				if( rcom[2] < -PBC_vec[2][2]/2 || rcom[2] >= PBC_vec[2][2]/2 ) continue;
+
+
+				int bx = rcom[0] * nx / PBC_vec[0][0];
+				int by = rcom[1] * ny / PBC_vec[1][1];
+				int bz = rcom[2] * nz / PBC_vec[2][2];
+			
+				if( bx >= nx ) bx -= nx;
+				if( bx < 0 ) bx += nx;
+				if( by >= ny ) by -= ny;
+				if( by < 0 ) by += ny;
+				if( bz >= nz ) bz -= nz;
+				if( bz < 0 ) bz += nz;
+	
+				int b = bx*ny*nz+by*nz+bz;
+				int bad_res = 0;
+	
+				for( int dx = -1; dx <= 1; dx++ )
+				for( int dy = -1; dy <= 1; dy++ )
+				for( int dz = -1; dz <= 1; dz++ )
+				{
+					int n_b_x = bx + dx;
+					int n_b_y = by + dy;
+					int n_b_z = bz + dz;
+				
+					if( n_b_x >= nx ) n_b_x -= nx;
+					if( n_b_x < 0 ) n_b_x += nx;
+					if( n_b_y >= ny ) n_b_y -= ny;
+					if( n_b_y < 0 ) n_b_y += ny;
+					if( n_b_z >= nz ) n_b_z -= nz;
+					if( n_b_z < 0 ) n_b_z += nz;
+
+					int nb = n_b_x*ny*nz+n_b_y*nz+n_b_z;
+
+
+					for( int px = 0; px < theBoxes[nb].np; px++ )
+					for( int ax = 0; ax < solvent_res_size[r]; ax++ )
+					{
+						int p = theBoxes[nb].plist[px];
+						int a = solvent_res_link[r]+ax; 
+						double dr[3] = { 
+							placed_atoms[3*p+0] - (solvate[a].x + outer_shift[0]), 
+							placed_atoms[3*p+1] - (solvate[a].y + outer_shift[1]),
+							placed_atoms[3*p+2] - (solvate[a].z + outer_shift[2]) };
+						while( dr[0] < -PBC_vec[0][0]/2 ) dr[0] += PBC_vec[0][0]; 
+						while( dr[1] < -PBC_vec[1][1]/2 ) dr[1] += PBC_vec[1][1]; 
+						while( dr[2] < -PBC_vec[2][2]/2 ) dr[2] += PBC_vec[2][2]; 
+						while( dr[0] >  PBC_vec[0][0]/2 ) dr[0] -= PBC_vec[0][0]; 
+						while( dr[1] >  PBC_vec[1][1]/2 ) dr[1] -= PBC_vec[1][1]; 
+						while( dr[2] >  PBC_vec[2][2]/2 ) dr[2] -= PBC_vec[2][2];
+
+						double dist = normalize(dr);
+
+						if( dist < solvation_cutoff )
+							bad_res = 1; 
+					}
+					if( bad_res ) break;
+				}
+
+				if( !bad_res )
+				{	// add to the pool of water, ha ha.
+					for( int ax = 0; ax < solvent_res_size[r]; ax++ )
+					{
+						int a = solvent_res_link[r] + ax;
+						if( water_size + 1024 > water_space )
+						{	
+							water_space += 1024;
+							water_file = (char *)realloc( water_file, sizeof(char) * water_space );
+						}
+						double savex = solvate[a].x;
+						double savey = solvate[a].y;
+						double savez = solvate[a].z;
+						solvate[a].bead = water_atom;
+						solvate[a].res = water_res;
+						solvate[a].segRes = water_res;
+						solvate[a].x += outer_shift[0];					
+						solvate[a].y += outer_shift[1];					
+						solvate[a].z += outer_shift[2];					
+						char *tseg = solvate[a].segid;
+						solvate[a].segid = solventSegName;
+						printSingleCRD( water_file+water_size, solvate+a );
+						water_size += strlen(water_file+water_size); // move to end of written string.
+						nprint_solvate++;
+						solvate[a].segid = tseg;
+						solvate[a].x = savex;
+						solvate[a].y = savey;
+						solvate[a].z = savez;
+						water_atom++;
+					}
+					water_res++;
+				}
+
+			}
+		}	
+								
+		printCRDHeader( waterCRD, nprint_solvate );
+		fprintf(waterCRD, "%s", water_file );
+		fclose(waterCRD);
+
+		free(water_file);
+		
+		fprintf(charmmFile, 
+		"\n"
+		"open read card unit 10 name \"%s\"\n"
+		"read sequence coor card unit 10\n"
+		"generate %s setup warn first none last none noangle nodihedral\n"
+		"open read unit 10 card name \"%s\"\n"
+		"read coor unit 10 card resid\n"						
+		"\n", waterFileName, solventSegName, waterFileName );
+
+	
+		sprintf(waterPSFName, "%s.psf", solventSegName );
+
+		fprintf(charmmFile, 
+		"open write unit 10 card name \"%s.psf\"\n"
+		"write psf  unit 10 card\n"
+		"delete atom sele atom * * * end\n"
+		, solventSegName );
+
+		wrote_water_psf = 1;
+	
+		free(solvent_res_link);
+		free(solvent_res_size);
+	}
+
+	total_charge = total_protein_charge + total_lipid_charge;
+
+	int wrote_salt = 0;
+
+	if( block->addSalt )
+	{	
+		printf("Total charge: %lf, %lf protein %lf lipid.\n", total_charge, total_protein_charge, total_lipid_charge );
+		// exterior and interior concentrations.
+
+#define SALT_HACK
+
+#ifdef SALT_HACK
+		printf("BUILDING WITHOUT SALT IN THE INTERIOR: a total hack for the Frost project. Remove before release.\n");
+#endif
+		double nwaters = (water_atom/3); 
+		double water_vol_A3 = nwaters * 29; // cubic angstroms.
+		double water_vol_L = water_vol_A3 * (1e-27);
+	
+		// mMole:
+		double nKCl_mMole = block->outerKCL * water_vol_L; 
+		double nKCl = nKCl_mMole * (6.022e20); // atoms per millimole.
+
+		nK = nKCl;
+		nCl = nKCl;
+
+		if( total_charge < 0 )
+			nK += lround(fabs(total_charge));
+		else
+			nCl += lround(fabs(total_charge));
+
+		printf("Adding %d K %d Cl.\n", nK, nCl);
+
+
+		for( int pass = 0; pass < 2; pass++ )
+		{
+			int res = 1;	
+			if( pass == 0 )
+			{
+				if( nK > 0 )
+				{
+					fprintf(charmmFile, "read sequence POT %d\n", nK );
+					fprintf(charmmFile, "generate POT warn\n" );
+				}
+			}
+			else
+			{
+				if( nCl > 0 )
+				{
+					fprintf(charmmFile, "read sequence CLA %d\n", nCl );
+					fprintf(charmmFile, "generate CLA warn\n" );
+				}
+			}
+			for( int tk = 0; tk < (pass == 0 ? nK : nCl); tk++ )
+			{
+				int done = 0;
+	
+				double rp[3];
+	
+				while(!done)
+				{
+					rp[0] = -PBC_vec[0][0]/2 + PBC_vec[0][0] * rand()/(double)RAND_MAX;
+					rp[1] = -PBC_vec[1][1]/2 + PBC_vec[1][1] * rand()/(double)RAND_MAX;
+					rp[2] = -PBC_vec[2][2]/2 + PBC_vec[2][2] * rand()/(double)RAND_MAX; 
+					int bx = rp[0] * nx / PBC_vec[0][0];
+					int by = rp[1] * ny / PBC_vec[1][1];
+					int bz = rp[2] * nz / PBC_vec[2][2];
+				
+					if( bx >= nx ) bx -= nx;
+					if( bx < 0 ) bx += nx;
+					if( by >= ny ) by -= ny;
+					if( by < 0 ) by += ny;
+					if( bz >= nz ) bz -= nz;
+					if( bz < 0 ) bz += nz;
+		
+					int b = bx*ny*nz+by*nz+bz;
+					int bad_res = 0;
+
+#ifdef SALT_HACK
+					double rxy = sqrt(rp[0]*rp[0]+rp[1]*rp[1]);
+					if( rxy < 50. )
+						continue;
+#endif			
+					for( int dx = -1; dx <= 1; dx++ )
+					for( int dy = -1; dy <= 1; dy++ )
+					for( int dz = -1; dz <= 1; dz++ )
+					{
+						int n_b_x = bx + dx;
+						int n_b_y = by + dy;
+						int n_b_z = bz + dz;
+					
+						if( n_b_x >= nx ) n_b_x -= nx;
+						if( n_b_x < 0 ) n_b_x += nx;
+						if( n_b_y >= ny ) n_b_y -= ny;
+						if( n_b_y < 0 ) n_b_y += ny;
+						if( n_b_z >= nz ) n_b_z -= nz;
+						if( n_b_z < 0 ) n_b_z += nz;
+	
+						int nb = n_b_x*ny*nz+n_b_y*nz+n_b_z;
+	
+	
+						for( int px = 0; px < theBoxes[nb].np; px++ )
+						{
+							int p = theBoxes[nb].plist[px];
+							double dr[3] = { 
+								placed_atoms[3*p+0] - rp[0], 
+								placed_atoms[3*p+1] - rp[1],
+								placed_atoms[3*p+2] - rp[2] };
+							while( dr[0] < -PBC_vec[0][0]/2 ) dr[0] += PBC_vec[0][0]; 
+							while( dr[1] < -PBC_vec[1][1]/2 ) dr[1] += PBC_vec[1][1]; 
+							while( dr[2] < -PBC_vec[2][2]/2 ) dr[2] += PBC_vec[2][2]; 
+							while( dr[0] >  PBC_vec[0][0]/2 ) dr[0] -= PBC_vec[0][0]; 
+							while( dr[1] >  PBC_vec[1][1]/2 ) dr[1] -= PBC_vec[1][1]; 
+							while( dr[2] >  PBC_vec[2][2]/2 ) dr[2] -= PBC_vec[2][2];
+	
+							double dist = normalize(dr);
+	
+							if( dist < solvation_cutoff )
+								bad_res = 1; 
+						}
+						if( bad_res ) break;
+					}
+	
+					if( !bad_res )
+						done = 1;
+				}
+			
+				fprintf(charmmFile, "coor set xdir %lf ydir %lf zdir %lf select resid %d end\n",
+					rp[0], rp[1], rp[2], res );
+				res++;
+			}
+	
+			if( pass == 0 )
+			{
+				if( nK > 0 )
+				{
+					fprintf(charmmFile, "write psf card name pot.psf\n");
+					fprintf(charmmFile, "write coor card name pot.crd\n");
+					fprintf(charmmFile, "delete atom sele atom * * * end\n");
+				}
+			}	
+			else
+			{
+				if( nCl > 0 )
+				{
+					fprintf(charmmFile, "write psf card name cla.psf\n");
+					fprintf(charmmFile, "write coor card name cla.crd\n");
+					fprintf(charmmFile, "delete atom sele atom * * * end\n");
+				}
+			}
+		}
+		wrote_salt = 1;	
+	}
+
 
 	for( int p = 0; p < npairs; p++ )
 	{
 		fprintf(charmmFile, "open unit 10 card read name \"%s\"\n", pairs[p].PSFfileName );
+
 		if( p == 0 )
 			fprintf(charmmFile, "read psf card unit 10\n" );	
 		else
 			fprintf(charmmFile, "read psf card append unit 10\n" );	
+
 		fprintf(charmmFile, "close unit 10\n" );	
 		fprintf(charmmFile, "open unit 10 card read name \"%s\"\n", pairs[p].CRDfileName );	
 		fprintf(charmmFile, "read coor card unit 10 resid\n" );	
@@ -878,26 +1575,78 @@ void surface::createAllAtom( parameterBlock *block )
 		
 	}
 
+	if( wrote_water_psf  )
+	{
+		fprintf(charmmFile, "open unit 10 card read name \"%s\"\n", waterPSFName );
+		fprintf(charmmFile, "read psf card append unit 10\n" );	
+		fprintf(charmmFile, "close unit 10\n" );	
+		fprintf(charmmFile, "open unit 10 card read name \"%s\"\n", waterFileName );	
+		fprintf(charmmFile, "read coor card unit 10 resid\n" );
+		fprintf(charmmFile, "close unit 10\n" );
+		fprintf(charmmFile, "\n");	
+			
+	}
+
+	if( loadProtein )
+	{
+		fprintf(charmmFile, "open unit 10 card read name \"%s\"\n", proteinPSFName );
+		fprintf(charmmFile, "read psf card append unit 10\n" );	
+		fprintf(charmmFile, "close unit 10\n" );	
+		fprintf(charmmFile, "open unit 10 card read name \"%s\"\n", proteinCRDName );	
+		if( proteinIsCRD )
+			fprintf(charmmFile, "read coor card unit 10 resid\n" );
+		else
+			fprintf(charmmFile, "read coor pdb unit 10 resid\n" );
+	
+		fprintf(charmmFile, "close unit 10\n" );
+		fprintf(charmmFile, "\n");	
+	}
+
+	if( wrote_salt )
+	{
+		if( nK>0)
+		{
+			fprintf(charmmFile, "open unit 10 card read name pot.psf\n");
+			fprintf(charmmFile, "read psf card append unit 10\n" );	
+			fprintf(charmmFile, "close unit 10\n" );	
+			fprintf(charmmFile, "open unit 10 card read name pot.crd\n" );	
+			fprintf(charmmFile, "read coor card unit 10 resid\n" );
+			fprintf(charmmFile, "close unit 10\n" );
+			fprintf(charmmFile, "\n");	
+		}
+
+		if( nCl > 0 )
+		{
+			fprintf(charmmFile, "open unit 10 card read name cla.psf\n");
+			fprintf(charmmFile, "read psf card append unit 10\n" );	
+			fprintf(charmmFile, "close unit 10\n" );	
+			fprintf(charmmFile, "open unit 10 card read name cla.crd\n" );	
+			fprintf(charmmFile, "read coor card unit 10 resid\n" );
+			fprintf(charmmFile, "close unit 10\n" );
+			fprintf(charmmFile, "\n");	
+		}
+	}
 	fprintf(charmmFile, charmm_footer );
 
 	free(regions_for_face);
 	free(tri_list);
 	free(rsurf);
+	
+	// free up boxing info	
+	for( int b = 0; b < nx*ny*nz; b++ )
+		free(theBoxes[b].plist);
+	free(theBoxes);
 }
 
 
-int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf, int leaflet )
+int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf, int leaflet, double strain)
 {
-	double r_cen[3];	
-	double r_nrm[3];
-	double gmetric[4];
-	double gmat_u, gmat_v;
-	double drdu[3], drdv[3];
+	double drdu[3]={0,0,0}, drdv[3]={0,0,0};
 	
 	double u_cen = *u;
 	double v_cen = *v;
 
-	double transp_cen[3], transp_nrm[3];
+	double transp_cen[3]={0,0,0}, transp_nrm[3]={0,0,1};
 
 	if( f >= nf_faces )	
 	{
@@ -907,9 +1656,9 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 	evaluateRNRM( f, u_cen, v_cen, transp_cen, transp_nrm, rsurf ); 
 
 	double eval_in[3] = { 
-		transp_cen[0] + transp_nrm[0] * dr[2], 
-		transp_cen[1] + transp_nrm[1] * dr[2], 
-		transp_cen[2] + transp_nrm[2] * dr[2] 
+		transp_cen[0] + transp_nrm[0] * dr[2]*exp(strain), 
+		transp_cen[1] + transp_nrm[1] * dr[2]*exp(strain), 
+		transp_cen[2] + transp_nrm[2] * dr[2]*exp(strain) 
 		};
 	ru( f, u_cen, v_cen,  rsurf, drdu ); 
 	rv( f, u_cen, v_cen,  rsurf, drdv ); 
@@ -940,7 +1689,7 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 	
 	// get curvature information
 
-	double c1, c2;
+	double c1=0, c2=0;
 	double cvec1[2], cvec2[2];
 
 	double ctot = c(f,u_cen,v_cen,rsurf,cvec1,cvec2,&c1,&c2);
@@ -954,11 +1703,10 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 			     cvec2[0] * drdu[1] + cvec2[1] * drdv[1],
 			     cvec2[0] * drdu[2] + cvec2[1] * drdv[2] };
 	
-	
-
 	double vdp  = vec_c1[0] * vec_c2[0] + vec_c1[1] * vec_c2[1] + vec_c1[2] * vec_c2[2];
 	double lv1 = normalize(vec_c1);
 	double lv2 = normalize(vec_c2);
+
 
 /*
 	// this is u-prime and v-prime:	
@@ -974,12 +1722,19 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 
 	double dc1 = dr[0] / lv1;
 	double dc2 = dr[1] / lv2;
-	double du,dv;
+	double du=0,dv=0;
 	double z_scaled = dr[2];	
 
 	if( leaflet == 1 && fabs(dr[2]-PP) < 1 )
 	{
 	}
+
+	if( debug_on && leaflet == 1 )
+	{
+		printf("z: %lf PP: %lf\n", dr[2], PP );
+	}
+
+	double use_PP = exp(strain)*PP;
 
 	if( leaflet == 1 )
 	{
@@ -987,8 +1742,8 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 //		double scale2 =  (1 + c2 * (PP-dr[2]));
 
 		// these are scalings needed for displacement at the bilayer midplane to get the proper distances at the neutral surface (PP)
-		double scale1 = (1- c1 * (PP-dr[2]))/(1+c1*PP);
-		double scale2 = (1- c2 * (PP-dr[2]))/(1+c2*PP);
+		double scale1 = (1- c1 * (use_PP-dr[2]))/(1+c1*use_PP);
+		double scale2 = (1- c2 * (use_PP-dr[2]))/(1+c2*use_PP);
 
 		// if scale1 is less than 1, it means that the z length has shrunk (the x dimension is larger at the midplane and so the particle's midplane displacement must be scaled down).
 
@@ -999,29 +1754,29 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 		dc1 *= scale1;
 		dc2 *= scale2;
 
-		double z =dr[2];
-		double scale = (1+c1*PP) * (1+c2*PP);
-		z_scaled = scale * PP - (PP -z) * (1+(PP-z)*c1)*(1+(PP-z)*c2);
+		double z =dr[2]*exp(strain);
+		double scale = (1+c1*use_PP) * (1+c2*use_PP);
+		z_scaled = scale * use_PP - (use_PP -z) * (1+(use_PP-z)*c1)*(1+(use_PP-z)*c2);
 	
 		du = cvec1[0] * dc1 + cvec2[0] * dc2; 
 		dv = cvec1[1] * dc1 + cvec2[1] * dc2; 
 	}
 	else
 	{
-		//double scale1= (1 - c1 * (-PP-dr[2]));
-		//double scale2= (1 - c2 * (-PP-dr[2]));
-		double scale1 = (1+ c1 * (-PP-dr[2]))/(1-c1*(-PP));
-		double scale2 = (1+ c2 * (-PP-dr[2]))/(1-c2*(-PP));
+		//double scale1= (1 - c1 * (-use_PP-dr[2]));
+		//double scale2= (1 - c2 * (-use_PP-dr[2]));
+		double scale1 = (1+ c1 * (-use_PP-dr[2]))/(1-c1*(-use_PP));
+		double scale2 = (1+ c2 * (-use_PP-dr[2]))/(1-c2*(-use_PP));
 		
 
 		double lat_scale = scale1*scale2;
 		dc1 *= scale1;
 		dc2 *= scale2;
 		//z_scaled = dr[2] * (1+c1*dr[2]) * (1+c2*dr[2]);
-		double z =dr[2];
-		double scale = (1+c1*PP) * (1+c2*PP);
-		//z_scaled = -scale * PP - (-PP -z) * scale1 * scale2;
-		z_scaled = -scale * PP - (-PP -z) * (1-(-PP-z)*c1)*(1-(-PP-z)*c2);
+		double z =dr[2]*exp(strain);
+		double scale = (1-c1*use_PP) * (1-c2*use_PP);
+		//z_scaled = -scale * use_PP - (-use_PP -z) * scale1 * scale2;
+		z_scaled = -scale * use_PP - (-use_PP -z) * (1-(-use_PP-z)*c1)*(1-(-use_PP-z)*c2);
 	
 		du = cvec1[0] * dc1 + cvec2[0] * dc2; 
 		dv = cvec1[1] * dc1 + cvec2[1] * dc2; 
@@ -1037,8 +1792,8 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 	int fp = f;
 	int done = 0;
 
-	double rp[3];
-	double np[3];
+	double rp[3] = { transp_cen[0], transp_cen[1], transp_cen[2] };
+	double np[3] = { transp_nrm[0], transp_nrm[1], transp_nrm[2] };
 	int eval_trip = 0;
 
 	while( ! done )
@@ -1077,11 +1832,14 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 		fp = f2;
 	}	
 
-
-	if( debug_on )
-		printf("leaflet: %d dr: %le %le %le c: %le %le f_orig: %d uorig: %le vorig: %le du: %le dv: %le eval at %d %le %le\n", leaflet, dr[0], dr[1], dr[2], c1, c2, ucen_orig, vcen_orig, f_orig, du_orig, dv_orig, fp, u_cen, v_cen  );
+//	if( debug_on )
+//		printf("leaflet: %d dr: %le %le %le c: %le %le f_orig: %d uorig: %le vorig: %le du: %le dv: %le eval at %d %le %le\n", leaflet, dr[0], dr[1], dr[2], c1, c2, ucen_orig, vcen_orig, f_orig, du_orig, dv_orig, fp, u_cen, v_cen  );
 	
 
+	if( debug_on && leaflet == 1 )
+	{
+		printf("eval_z: %lf use_PP: %lf\n", z_scaled, use_PP );
+	}
 
 	eval[0] = rp[0] + np[0] * z_scaled; 
 	eval[1] = rp[1] + np[1] * z_scaled; 

@@ -12,7 +12,8 @@ inter-complex particle-particle interactions
 #include "units.h"
 #include "mutil.h"
 
-#define TOMMY
+//#define DISABLE_POINT_GRADIENT_DEBUG
+
 //#define DISABLE_PP
 //#define DISABLE_ELASTIC
 int enable_elastic_interior = 1;
@@ -319,10 +320,12 @@ double PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, int nc
 							{
 								if( ourp[c1] )
 								{
+#ifndef DISABLE_POINT_GRADIENT_DEBUG
 								theSurface->pointGradient( allComplexes[c1]->grad_fs[p1], 
 										allComplexes[c1]->grad_puv[2*p1+0], 
 										allComplexes[c1]->grad_puv[2*p1+1],
 											rsurf, mesh_grad, allComplexes[c1]->save_grad+2*p1, f1, null_f ); 
+#endif
 								}
 							}
 							else
@@ -339,10 +342,12 @@ double PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, int nc
 							{
 								if( ourp[c2] )
 								{
+#ifndef DISABLE_POINT_GRADIENT_DEBUG
 									theSurface->pointGradient( allComplexes[c2]->grad_fs[p2], 
 										allComplexes[c2]->grad_puv[2*p2+0], 
 										allComplexes[c2]->grad_puv[2*p2+1],
 											rsurf, mesh_grad, allComplexes[c2]->save_grad+2*p2, f2, null_f ); 
+#endif
 								}
 							}
 							else
@@ -498,9 +503,7 @@ double Boxed_PP_V( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 							double r4 = r2*r2;
 							double r6 = r2*r4;
 
-#ifdef TOMMY
 							v += (eps + 4.0 * eps * (r4-r2));
-#endif
 						}
 					}
 					else if( sigma1 > 0 && sigma2 > 0 )
@@ -708,10 +711,8 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 							double r4 = r2*r2;
 							double r6 = r2*r4;
 
-#ifdef TOMMY
 							v += (eps + 4.0 * eps * (r4-r2)) * local_fac;
 							dvdr += 4 * eps * (-4 * r4 + 2 * r2)/r;
-#endif
 						}
 					}
 					else if( sigma1 > 0 && sigma2 > 0 )
@@ -739,10 +740,12 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 						{
 							if( ourp[c1] )
 							{
+#ifndef DISABLE_POINT_GRADIENT_DEBUG
 							theSurface->pointGradient( allComplexes[c1]->grad_fs[p1], 
 									allComplexes[c1]->grad_puv[2*p1+0], 
 									allComplexes[c1]->grad_puv[2*p1+1],
 										rsurf, mesh_grad, allComplexes[c1]->save_grad+2*p1, f1, null_f ); 
+#endif
 							}
 						}
 						else
@@ -759,10 +762,12 @@ double Boxed_PP_G( surface *theSurface, double *rsurf, pcomplex **allComplexes, 
 						{
 							if( ourp[c2] )
 							{
+#ifndef DISABLE_POINT_GRADIENT_DEBUG
 								theSurface->pointGradient( allComplexes[c2]->grad_fs[p2], 
 									allComplexes[c2]->grad_puv[2*p2+0], 
 									allComplexes[c2]->grad_puv[2*p2+1],
 										rsurf, mesh_grad, allComplexes[c2]->save_grad+2*p2, f2, null_f ); 
+#endif
 							}
 						}
 						else
@@ -1045,7 +1050,6 @@ double handleElasticCollisions( surface *theSurface, double *rsurf, pcomplex **a
 	ParallelSum(&n_not_ok, 1);
 #endif
 	
-	printf("NNOT: %lf\n", n_not_ok );
 	free(nearlist);
 	free(ourp);
 	free(complex_for_id);
