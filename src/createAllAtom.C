@@ -1774,7 +1774,7 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 		dc2 *= scale2;
 		//z_scaled = dr[2] * (1+c1*dr[2]) * (1+c2*dr[2]);
 		double z =dr[2]*exp(strain);
-		double scale = (1+c1*use_PP) * (1+c2*use_PP);
+		double scale = (1-c1*use_PP) * (1-c2*use_PP);
 		//z_scaled = -scale * use_PP - (-use_PP -z) * scale1 * scale2;
 		z_scaled = -scale * use_PP - (-use_PP -z) * (1-(-use_PP-z)*c1)*(1-(-use_PP-z)*c2);
 	

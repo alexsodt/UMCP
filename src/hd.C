@@ -1401,12 +1401,14 @@ int temp_main( int argc, char **argv )
 			dof += srd_dof;
 			for( int c = 0; c < ncomplex; c++ )
 			{
-#ifdef DISABLE_ON_MEMBRANE_T
-				dof += 3 * (allComplexes[c]->nsites - allComplexes[c]->nattach);
-#else
 				if( ! allComplexes[c]->do_bd ) 
+				{	
+#ifdef DISABLE_ON_MEMBRANE_T
+					dof += 3 * (allComplexes[c]->nsites - allComplexes[c]->nattach);
+#else
 					dof += 3 * allComplexes[c]->nsites - allComplexes[c]->nattach;
 #endif
+				}
 			}
 			double TEMP = 2 * T / dof;
 

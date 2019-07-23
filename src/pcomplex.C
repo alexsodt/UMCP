@@ -1596,6 +1596,8 @@ double pcomplex::T( surface *theSurface, double *rsurf )
 {
 	double T = 0;
 
+	if( do_bd ) return 0;
+
 	for( int s = 0; s < nattach; s++ )
 	{
 		int f = fs[s];
