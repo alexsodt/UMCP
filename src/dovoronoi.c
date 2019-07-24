@@ -513,6 +513,7 @@ int convex_hull( double *pts, int npts, const char *unique ) {
   vertStorage[1] = -10.101;
   vertStorage[2] = -10.101;
 
+  ntri = 0;
   ntri_space = 1;
   triStorage = (int *)malloc( sizeof(int) * 10 * ntri_space );
 
@@ -563,6 +564,7 @@ int convex_hull( double *pts, int npts, const char *unique ) {
       qh_check_points();
     exitcode= qh_ERRnone;
 
+#if 0
 	int t = 0;
 	for( t = 0; t < ntri; t++ )
 	{
@@ -572,6 +574,7 @@ int convex_hull( double *pts, int npts, const char *unique ) {
 			printf(" %d", triStorage[10*t+1+p] );
 		printf("\n");
 	}
+#endif
   }
   else
   {

@@ -696,11 +696,13 @@ int temp_main( int argc, char **argv )
 	int n_vuse = 0;
 	double *mass_scaling = NULL;
 
-	sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
-	if( do_bd_membrane )
-		sub_surface->getSparseRoot( theForceSet, &MMat ); 
-	setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
-
+	if( !block.disable_mesh )
+	{
+		sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
+		if( do_bd_membrane )
+			sub_surface->getSparseRoot( theForceSet, &MMat ); 
+		setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
+	}
 
 
 	double V = sub_surface->energy(r,NULL);
@@ -798,15 +800,18 @@ int temp_main( int argc, char **argv )
 	double prev_TV = 0;
 
 	memset( qdot0, 0, sizeof(double) * 3 * nv );
-	if( do_gen_q )
+
+	if( !block.disable_mesh )
 	{
-		memset( Qdot0, 0, sizeof(double) * NQ );
-		GenQMatVecIncrScale( Qdot0, pp, EFFM, 1.0 );
-		MatVec( gen_transform, Qdot0, qdot0, NQ, 3*nv ); 
+		if( do_gen_q )
+		{
+			memset( Qdot0, 0, sizeof(double) * NQ );
+			GenQMatVecIncrScale( Qdot0, pp, EFFM, 1.0 );
+			MatVec( gen_transform, Qdot0, qdot0, NQ, 3*nv ); 
+		}
+		else
+			AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, r+3*nv );
 	}
-	else
-		AltSparseCartMatVecIncrScale( qdot0, pp, EFFM, 1.0, r+3*nv );
-	
 	memcpy( qdot, qdot0, sizeof(double) * 3 * nv );
 	
 	memset( qdot_temp, 0, sizeof(double) * 3 * nv );	
@@ -818,7 +823,7 @@ int temp_main( int argc, char **argv )
 #ifdef PARALLEL		
 	ParallelSum( qdot_temp, 3*nv );
 #endif
-	if( ! do_gen_q )
+	if( ! do_gen_q && !block.disable_mesh )
 		AltSparseCartMatVecIncrScale( qdot, qdot_temp, EFFM, 1.0, r+3*nv );
 	sub_surface->grad( r, g );
 
@@ -898,6 +903,17 @@ int temp_main( int argc, char **argv )
 
 	int global_cntr = 0;
 	struct timeval tnow;
+
+
+	int BOND_BINS = 100;
+	double bond_histogram[BOND_BINS];
+	double bond_target = 25;
+	double bond_range  = 10;
+	double bond_min = bond_target - bond_range;
+	double bond_max = bond_target + bond_range;
+	memset( bond_histogram, 0, sizeof(double) * BOND_BINS );
+	
+
 	while( !done )
 	{
 
@@ -968,7 +984,24 @@ int temp_main( int argc, char **argv )
 				int c = par_info.complexes[cx];
 				VP += allComplexes[c]->V(sub_surface, r );	
 				VP += allComplexes[c]->AttachV(sub_surface, r );	
+
+				double dr[3] = { 
+					allComplexes[c]->rall[0] - allComplexes[c]->rall[3],
+					allComplexes[c]->rall[1] - allComplexes[c]->rall[4],
+					allComplexes[c]->rall[2] - allComplexes[c]->rall[5] };
+				double rv = normalize(dr);
+
+				int bin = BOND_BINS * (rv-bond_min)/(bond_max-bond_min);
+				if( o >= nequil && bin >= 0 && bin < BOND_BINS )
+					bond_histogram[bin] += 1;
 			}
+			if( o >= nequil && t == 0 )
+			{
+				for( int b = 0; b < BOND_BINS; b++ )
+					printf("%le %le\n", bond_min+(b+0.5)*(bond_max-bond_min)/BOND_BINS, bond_histogram[b] );
+			}
+			
+
 
 			V += VP;
 			

@@ -82,6 +82,13 @@ void setDefaults( parameterBlock *block )
 
 	block->disable_mesh = 0;
 
+	block->tachyon_collision_draw_type = 0;
+	block->tachyon_collision_point[0] = 0;
+	block->tachyon_collision_point[1] = 0;
+	block->tachyon_collision_point[2] = 0;
+	block->tachyon_collision_radius = -1;
+	block->tachyon_collision_level = 3;
+
 	block->tachyon_face_box_spline = -1;
 	block->tachyon_dull = 0;
 	block->tachyon_clear = 0;
@@ -1128,6 +1135,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->tachyon_view_z = atof( word2 );
 		else if( !strcasecmp( word1, "tachyon_interp" ) )
 			block->tachyon_interp = atoi( word2 );
+		else if( !strcasecmp( word1, "tachyon_collision_level" ) )
+			block->tachyon_collision_level = atoi( word2 );
+		else if( !strcasecmp( word1, "tachyon_collision_radius" ) )
+			block->tachyon_collision_radius = atof( word2 );
+		else if( !strcasecmp( word1, "tachyon_collision_draw_type" ) )
+			block->tachyon_collision_draw_type = atoi( word2 );
+		else if( !strcasecmp( word1, "tachyon_collision_x" ) )
+			block->tachyon_collision_point[0] = atof( word2 );
+		else if( !strcasecmp( word1, "tachyon_collision_y" ) )
+			block->tachyon_collision_point[1] = atof( word2 );
+		else if( !strcasecmp( word1, "tachyon_collision_z" ) )
+			block->tachyon_collision_point[2] = atof( word2 );
 		else if( !strcasecmp( word1, "sphere" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
