@@ -360,8 +360,6 @@ void writeSq( char *fileName, double *B_hist, double A2dz2_sampled, double sans_
 	}
 
 	double dr = sans_max_r/nsans_bins;
-//	for( int ir = 0; ir < nsans_bins; ir++ )
-//		fprintf(theFile, "%le %le\n", (ir+0.5)*dr, B_hist[ir] );
 
 
 	// update histogram B0.
