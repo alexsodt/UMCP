@@ -1462,7 +1462,7 @@ void printParamBlock( parameterBlock *block )
 	printf("\tKA:        %lf kcal/mol/A^2\n", block->KA );
 	printf("\tkc:        %lf kcal/mol\n", block->kc );
 	printf("Random seed: %d\n", block->random_seed );
-	printf("Timestep:    %lf seconds.\n", block->time_step );
+	printf("Timestep:    %le seconds.\n", block->time_step );
 
 	if( block->do_ld )
 	{
