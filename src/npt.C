@@ -18,11 +18,13 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 	static double N_RCONTRACTIONS_PREVENTED = 0; // dAlpha < 0
 	static double NCONTRACT_COL_FRCD = 0; // dAlpha > 0
 	static double NEXPAND_COL_FRCD = 0; // dAlpha < 0
-	
+	static double exp_dE = 0;
+	static double n_exp_dE = 0;
 
 #ifdef PARALLEL
 	ParallelSyncComplexes( allComplexes, ncomplex );
 #endif
+	double EP = 0;
 	double E0 = 0;
 	double MEME0 = energy(r,NULL);
 	E0 += MEME0;
@@ -32,32 +34,31 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 		int c = par_info.complexes[cx];
 
 		double dE = allComplexes[c]->V(this, r );
+		dE += allComplexes[c]->AttachV( this, r );
+		EP += dE;
 		E0 += dE;
-		E0 += allComplexes[c]->AttachV( this, r );
 	}
 
 	E0 += Boxed_PP_V( this, r, allComplexes, ncomplex );
 	
 	ParallelSum(&E0,1);
+	ParallelSum(&EP,1);
 
 	double d_complex = 0;
 			
 	double npt_KE0 = evaluate_T( qdot, pp, NULL, NULL, r+3*nv );
 	double PT = 0;
+
+	double n_bd_sol_p = 0;
+
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
 		PT += allComplexes[c]->T(this,r);
 
-		double dr[3] = {
-			allComplexes[c]->rall[0] - allComplexes[c]->rall[3],
-			allComplexes[c]->rall[1] - allComplexes[c]->rall[4],
-			allComplexes[c]->rall[2] - allComplexes[c]->rall[5]};
-		double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
-
-		d_complex += r;				
+		if( allComplexes[c]->do_bd )
+			n_bd_sol_p += allComplexes[c]->nsites - allComplexes[c]->nattach;
 	}
-	d_complex /= par_info.nc;
 
 #ifdef PARALLEL
 	ParallelSum( &PT, 1 );
@@ -158,6 +159,7 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 		}
 	}
 	double E1=0;
+	double EP1 = 0;
 	double MEME1 = energy(r,NULL);
 	E1 += MEME1;
 	ParallelSum(&MEME1,1);		
@@ -167,13 +169,20 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 		int c = par_info.complexes[cx];
 
 		double dE = allComplexes[c]->V(this, r );
+		dE += allComplexes[c]->AttachV( this, r );
 		E1 += dE;
-		E1 += allComplexes[c]->AttachV( this, r );
+		EP1 += dE;
 	}
 
 	E1 += Boxed_PP_V( this, r, allComplexes, ncomplex );
 	
 	ParallelSum(&E1,1);
+	ParallelSum(&EP1,1);
+
+	exp_dE += EP1-EP;
+	n_exp_dE+=1;
+
+//	printf("<dE>: %le inst %le\n", exp_dE/n_exp_dE, EP1-EP );
 
 	// reciprocal relationship for scaling factor through effective mass matrix which is inverse of position-position dot product.
 	for( int x = 0; x < nv; x++ )
@@ -182,7 +191,7 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 		qdot[3*x+1] /= scale_fac[1]*scale_fac[1];
 		qdot[3*x+2] /= scale_fac[2]*scale_fac[2];
 	}
-	
+
 	double npt_KE1 = evaluate_T( qdot, pp, NULL, NULL, r+3*nv );
 	PT = 0;
 	for( int cx = 0; cx < par_info.nc; cx++ )
@@ -225,7 +234,15 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 
 //	printf("dE: %.14le dKE: %.14le dAlpha: %.14le cur_alpha_x: %le\n", E1-E0, npt_KE1-npt_KE0, dAlpha, r[3*nv+0]*dAlpha );
 
-	double pr = exp(-beta*( (E1-E0) + (npt_KE1-npt_KE0) ));
+	double d_virtual_KE_BD = 0;
+
+	// each cartesian KE has distribution exp(-m v^2 /2 kT)
+
+	d_virtual_KE_BD += n_bd_sol_p * (-1.0/beta)*log(scale_fac[0]); 
+	d_virtual_KE_BD += n_bd_sol_p * (-1.0/beta)*log(scale_fac[1]); 
+	d_virtual_KE_BD += n_bd_sol_p * (-1.0/beta)*log(scale_fac[2]); 
+
+	double pr = exp(-beta*( (E1-E0) + (npt_KE1-npt_KE0) + d_virtual_KE_BD ));
 	if( nElastic1 > nElastic0 + 0.5)
 	{
 		if( dAlpha > 1 ) // contraction prevented ... R -> R / dalpha, prevented ... cylinder ``expands''
@@ -255,20 +272,24 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 #endif
 	if( decision )
 	{
-//		printf("ACCEPTED dKE_mesh: %le dKE_p: %le dV_mesh: %le dV_p: %le dCOMP: %le dAlpha: %le\n",
-//			npt_KE1_mesh-npt_KE0_mesh,	
-//			npt_KE1_p - npt_KE0_p,
-//			MEME1-MEME0,
-//			E1-E0-(MEME1-MEME0), d_complex, dAlpha );		
+#if 0
+		printf("ACCEPTED dKE_mesh: %le dKE_p: %le dV_mesh: %le dV_p: %le dAlpha: %le\n",
+			npt_KE1_mesh-npt_KE0_mesh,	
+			npt_KE1_p - npt_KE0_p + d_virtual_KE_BD,
+			MEME1-MEME0,
+			E1-E0-(MEME1-MEME0),  dAlpha );		
+#endif
 		nacc++;
 	}
 	else
 	{
-//		printf("REJECTED dKE_mesh: %le dKE_p: %le dV_mesh: %le dV_p: %le dCOMP: %le dAlpha: %le\n",
-//			npt_KE1_mesh-npt_KE0_mesh,	
-//			npt_KE1_p - npt_KE0_p,
-//			MEME1-MEME0,
-//			E1-E0-(MEME1-MEME0), d_complex, dAlpha );		
+#if 0
+		printf("REJECTED dKE_mesh: %le dKE_p: %le dV_mesh: %le dV_p: %le dAlpha: %le\n",
+			npt_KE1_mesh-npt_KE0_mesh,	
+			npt_KE1_p - npt_KE0_p + d_virtual_KE_BD,
+			MEME1-MEME0,
+			E1-E0-(MEME1-MEME0), dAlpha );		
+#endif
 		r[3*nv+0] /= scale_fac[0];
 		r[3*nv+1] /= scale_fac[1];
 		r[3*nv+2] /= scale_fac[2];

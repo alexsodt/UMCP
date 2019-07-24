@@ -2968,7 +2968,7 @@ fi
 $as_echo "#define PARALLEL 1" >>confdefs.h
 
 	c_compilers="mpicc $c_compilers"
-	cxx_compilers="mpic++ mpicxx mpiCC $cxx_compilers"
+	cxx_compilers="mpic++ mpicxx $cxx_compilers"
 fi
 
 if test "a$cuda" = "ayes"; then
@@ -4753,7 +4753,7 @@ fi
 
 linearAlgebraString="no"
 usingUnderscore="yes"
-usingLapack="no"
+
 save_LDFLAGS=$LDFLAGS
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Accelerate framework." >&5
 $as_echo_n "checking for Accelerate framework.... " >&6; }
@@ -4813,129 +4813,147 @@ fi
 
 if test "$linearAlgebraString" = "no"; then
 # test for ATLAS linear algebra, optional.
-	LDFLAGS="$save_LDFLAGS -latlas -llapack -lcblas -lblas -lgfortran"
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ATLAS/lapack/ptf77blas, no underscore." >&5
-$as_echo_n "checking for ATLAS/lapack/ptf77blas, no underscore.... " >&6; }
-	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for dsyev in -llapack" >&5
+$as_echo_n "checking for dsyev in -llapack... " >&6; }
+if ${ac_cv_lib_lapack_dsyev+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-llapack  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char dsyev ();
 int
 main ()
 {
-dsyev()
+return dsyev ();
   ;
   return 0;
 }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-		usingLapack="yes"
-		usingATLAS="yes"
-		linearAlgebraString="-latlas -llapack -lcblas -blas"
+  ac_cv_lib_lapack_dsyev=yes
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
+  ac_cv_lib_lapack_dsyev=no
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ATLAS/lapack/ptf77blas, trailing underscore." >&5
-$as_echo_n "checking for ATLAS/lapack/ptf77blas, trailing underscore.... " >&6; }
-	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_lapack_dsyev" >&5
+$as_echo "$ac_cv_lib_lapack_dsyev" >&6; }
+if test "x$ac_cv_lib_lapack_dsyev" = xyes; then :
+
+		usingLapack="yes"
+		usingUnderscore="no"
+		linearAlgebraString="-llapack -lblas"
+fi
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for dsyev_ in -llapack" >&5
+$as_echo_n "checking for dsyev_ in -llapack... " >&6; }
+if ${ac_cv_lib_lapack_dsyev_+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-llapack  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char dsyev_ ();
 int
 main ()
 {
-dsyev_()
+return dsyev_ ();
   ;
   return 0;
 }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
+  ac_cv_lib_lapack_dsyev_=yes
+else
+  ac_cv_lib_lapack_dsyev_=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_lapack_dsyev_" >&5
+$as_echo "$ac_cv_lib_lapack_dsyev_" >&6; }
+if test "x$ac_cv_lib_lapack_dsyev_" = xyes; then :
+
 		usingLapack="yes"
 		usingUnderscore="yes"
-		usingATLAS="yes"
-		linearAlgebraString="-latlas -llapack -lcblas -lblas"
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
+		linearAlgebraString="-llapack -lblas"
 fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
 
-	if test "$usingATLAS" = "no"; then
-		LDFLAGS="$save_LDFLAGS -llapack -lcblas -lblas -lgfortran"
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for lapack/ptf77blas, no underscore." >&5
-$as_echo_n "checking for lapack/ptf77blas, no underscore.... " >&6; }
-		cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
 
-int
-main ()
-{
-dsyev()
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-			usingLapack="yes"
-			linearAlgebraString="-llapack -lcblas -blas"
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for lapack/ptf77blas, trailing underscore." >&5
-$as_echo_n "checking for lapack/ptf77blas, trailing underscore.... " >&6; }
-		cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
+	atlasTest="dgemm"
 
-int
-main ()
-{
-dsyev_()
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-			usingLapack="yes"
-			usingUnderscore="yes"
-			linearAlgebraString="-llapack -lcblas -lblas"
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-		LDFLAGS=$save_LDFLAGS
+	if test "$usingUnderscore" = "yes"; then
+		atlasTest=$atlasTest"_"
 	fi
 
-	if test "$usingLapack" = "no"; then
-		as_fn_error $? "\"Couldn't find lapack/BLAS to link against.\"" "$LINENO" 5
-        fi
+	if test "$usingLapack" = "yes"; then
+		LDFLAGS="$LDFLAGS -llapack -lblas"
+		as_ac_Lib=`$as_echo "ac_cv_lib_atlas_$atlasTest" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $atlasTest in -latlas" >&5
+$as_echo_n "checking for $atlasTest in -latlas... " >&6; }
+if eval \${$as_ac_Lib+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-latlas  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
 
-#	atlasTest="dgemm"
-#	if test "$usingUnderscore" = "yes"; then
-#		atlasTest=$atlasTest"_"
-#	fi
-#
-#	if test "$usingLapack" = "yes"; then
-#		LDFLAGS="$LDFLAGS -llapack -lblas"
-#		AC_CHECK_LIB(atlas,$atlasTest,[
-#			usingATLAS="yes"
-#			linearAlgebraString="-latlas -llapack -lblas"])
-#		LDFLAGS=$save_LDFLAGS
-#	fi
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char $atlasTest ();
+int
+main ()
+{
+return $atlasTest ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  eval "$as_ac_Lib=yes"
+else
+  eval "$as_ac_Lib=no"
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+eval ac_res=\$$as_ac_Lib
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_Lib"\" = x"yes"; then :
+
+			usingATLAS="yes"
+			linearAlgebraString="-latlas -llapack -lblas"
+fi
+
+		LDFLAGS=$save_LDFLAGS
+	fi
 fi
 
 if test "$linearAlgebraString" = "no"; then

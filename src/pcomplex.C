@@ -16,7 +16,7 @@
 
 extern double kc;
 static double default_particle_area = 65;
-double lipid_DC = 1e9; //Angstrom^2/s
+double lipid_DC = 1e10; //Angstrom^2/s
 double solution_DC = 1e10; //Angstrom^2/s
 
 // For doing Newtonian/Langevin dynamics:
@@ -2343,7 +2343,6 @@ void pcomplex::unpackF( double *io )
 
 void propagateSolutionParticles( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex, double dt )
 {
-
 	static double ncol = 0;
 	static int icntr=0;
 	double *alphas = rsurf + 3*theSurface->nv;
@@ -2351,7 +2350,7 @@ void propagateSolutionParticles( surface *theSurface, double *rsurf, pcomplex **
 
 	for( int c = 0; c < ncomplex; c++ )
 	{
-		if( allComplexes[c]->do_bd )
+		if( allComplexes[c]->do_bd  )
 		{
 			for( int s = allComplexes[c]->nattach; s < allComplexes[c]->nsites; s++ )
 			{ // DC is in seconds, same with dt.  AKMA_TIME converts.
