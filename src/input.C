@@ -454,7 +454,16 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 
 			if( buffer[0] == '\0' )
 				continue;
+			
+			tbuf = buffer;
+			const char *p = tbuf;
+			while( *p == '\t' || *p == ' ' ) p += 1;
 
+			if( *p == '#' ) 
+			{
+				continue;
+			}
+				
 			int nr = sscanf( buffer, "%s %s", word1, word2 );
 	
 			if( !strcasecmp( word1, "lipid" ) ) continue; //special case handled in lipid_composition.C
@@ -465,15 +474,7 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}
 
-			tbuf = buffer;
 		
-			const char *p = tbuf;
-			while( *p == '\t' || *p == ' ' ) p += 1;
-
-			if( *p == '#' ) 
-			{
-				continue;
-			}
 		}
 		else if( pass == COMMAND_LINE_PASS )
 		{
