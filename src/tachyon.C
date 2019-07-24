@@ -586,7 +586,7 @@ updir[0], updir[1], updir[2],
 forced_light_dir[0]+updir[0]*0.3, forced_light_dir[1]+updir[1]*0.3, forced_light_dir[2]+updir[2]*0.3, 
 forced_light_dir[0], forced_light_dir[1], forced_light_dir[2], 
 forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light_dir[2]-updir[2]*0.3, 
-//-updir[0], -updir[1], -updir[2], 
+-updir[0], -updir[1], -updir[2], 
 (do_planar ? -1.0 : 1.0), (do_planar ? -0.5 : 0.5), bg[0], bg[1], bg[2] );
 	
 		int num = grid_uv * (grid_uv+1)/2;
@@ -916,7 +916,7 @@ forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light
 				off += allComplexes[c]->nsites;
 			}
 
-			if( params->tachyon_collision_radius > 0 )
+/*			if( params->tachyon_collision_radius > 0 )
 			{
 				double *vertex_data = NULL;
 				int *ptr_to_data = (int *)malloc( sizeof(int) * nt );
@@ -948,7 +948,7 @@ forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light
 					"Ambient 0.1 Diffuse 0.1 Specular 0.0 Opacity 1.0\n"
 					 "Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", pcolor[0], pcolor[1], pcolor[2] );
 			}
-
+*/
 			if( params->tachyon_face_box_spline >= 0 )
 			{
 				// draw the box spline for a particular face.

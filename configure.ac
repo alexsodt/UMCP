@@ -14,6 +14,7 @@ AC_CHECK_FILE("./qhull-2011.1/lib/libqhullstatic.a",
 	[AC_MSG_NOTICE("Found qhull library. Assuming this is built for the proper architecture")],
 	[AC_MSG_ERROR("Could not find file qhull-2011.1/lib/libqhullstatic.a. Make this file first")])
 
+
 AC_ARG_ENABLE(parallel, [AC_HELP_STRING([--parallel],[compile using MPI])], parallel=yes, parallel=no)
 AC_ARG_ENABLE(cuda, [AC_HELP_STRING([--cuda],[Use CUDA GPU for special tasks])], cuda=yes, cuda=no)
 
@@ -32,6 +33,7 @@ if test "$parallel" = "yes"; then
 	AC_DEFINE(PARALLEL,1,[Define to compile in parallel.])
 	c_compilers="mpicc $c_compilers"
 	cxx_compilers="mpic++ mpicxx $cxx_compilers"
+fi
 
 if test "a$cuda" = "ayes"; then
 	AC_CHECK_PROG(NVCC, nvcc, nvcc)

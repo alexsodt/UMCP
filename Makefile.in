@@ -300,7 +300,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = foreign subdir-objects
 EMAIL = alexander.sodt@nih.gov
-SUBDIRS = optimized debug examples/test
+SUBDIRS = optimized debug
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 

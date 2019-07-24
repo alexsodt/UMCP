@@ -31,10 +31,10 @@ else
 cuda_SRCS =
 endif
 
-rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutines/pirr_pfree_ratio_psF.cpp fpr_subroutines/2D.o fpr_subroutines/DDmatrixcreate.cpp fpr_subroutines/DDpsur.cpp fpr_subroutines/TBLnorm.cpp fpr_subroutines/TBLpirr.cpp fpr_subroutines/TBLsur.cpp fpr_subroutines/fpir.cpp fpr_subroutines/fsur.cpp fpr_subroutines/integrator.cpp fpr_subroutines/fnorm.cpp
+#rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutines/pirr_pfree_ratio_psF.cpp fpr_subroutines/2D.o fpr_subroutines/DDmatrixcreate.cpp fpr_subroutines/DDpsur.cpp fpr_subroutines/TBLnorm.cpp fpr_subroutines/TBLpirr.cpp fpr_subroutines/TBLsur.cpp fpr_subroutines/fpir.cpp fpr_subroutines/fsur.cpp fpr_subroutines/integrator.cpp fpr_subroutines/fnorm.cpp
 hull_SRCS = dovoronoi.c clusterv.C
 
-rd_opt_SOURCES        = rd.C $(rd_SRCS) $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
+#rd_opt_SOURCES        = rd.C $(rd_SRCS) $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
 hd_opt_SOURCES        = hd.C $(interp_SRCS) $(complex_SRCS) $(hull_SRCS) $(util_SRCS) $(cuda_SRCS) 
 frc_sandbox_opt_SOURCES        = frc_sandbox.C $(interp_SRCS) $(complex_SRCS) $(hull_SRCS) $(util_SRCS) $(cuda_SRCS) 
 min_opt_SOURCES       = min.C $(interp_SRCS) $(complex_SRCS) $(hull_SRCS) $(util_SRCS)
@@ -50,7 +50,7 @@ writeBiasPotential_opt_SOURCES = writeBiasPotential.C $(util_SRCS)
 writeCylRTraj_opt_SOURCES      = writeCylRTraj.C $(util_SRCS) 
 
 hd_opt_LDFLAGS		  = $(AM_LDFLAGS) 
-rd_opt_LDADD		  = $(AM_LDADD) $(AM_QHULL) -lstdc++ 
+#rd_opt_LDADD		  = $(AM_LDADD) $(AM_QHULL) -lstdc++ 
 hd_opt_LDADD              = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
 frc_sandbox_opt_LDADD     = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
 min_opt_LDADD             = $(AM_LDADD) $(AM_QHULL) -lstdc++

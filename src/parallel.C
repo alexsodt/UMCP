@@ -168,7 +168,13 @@ void setupParallel( Simulation *theSimulation )
 
 		par_info.proc_for_vert[sRec->id] = (int *)malloc( sizeof(int) * sRec->theSurface->nv ); 
 	}
-	
+
+	if( theSimulation->ncomplex > 0 )		
+		par_info.complexes = (int *)malloc( sizeof(int) * theSimulation->ncomplex );
+	else	
+		par_info.complexes = NULL;
+	par_info.nc = 0;
+
 	// real parallel partition
 
 	int ierr=0;
@@ -191,7 +197,7 @@ void setupParallel( Simulation *theSimulation )
 	int ncomplex = theSimulation->ncomplex;
 	pcomplex **allComplexes = theSimulation->allComplexes;
 
-	if( par_info.nprocs == 1 )
+	if( par_info.nprocs == 1 && 0 )
 	{
 		for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 		{
@@ -211,7 +217,6 @@ void setupParallel( Simulation *theSimulation )
 				par_info.verts[id][v] = v;
 		}
 			
-		par_info.complexes = (int *)malloc( sizeof(int) * ncomplex );
 		for( int c = 0; c < ncomplex; c++ )
 			par_info.complexes[c] = c;
 		par_info.nc = ncomplex;
@@ -365,7 +370,6 @@ void setupParallel( Simulation *theSimulation )
 
 
 		}
-
 
 		for( int c = 0; c < ncomplex; c++ )
 		{

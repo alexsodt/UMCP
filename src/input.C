@@ -477,14 +477,6 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 	
 			if( !strcasecmp( word1, "lipid" ) ) continue; //special case handled in lipid_composition.C
 			
-			const char *p = tbuf;
-			while( *p == '\t' || *p == ' ' ) p += 1;
-
-			if( *p == '#' ) 
-			{
-				continue;
-			}
-
 			if( nr != 2 )
 			{
 				printf("Could not interpret input line '%s'.\n", buffer );

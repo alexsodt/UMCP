@@ -18,13 +18,10 @@ void Simulation::area_MC_move( double beta, int move_type, parameterBlock *block
 	static double N_RCONTRACTIONS_PREVENTED = 0; // dAlpha < 0
 	static double NCONTRACT_COL_FRCD = 0; // dAlpha > 0
 	static double NEXPAND_COL_FRCD = 0; // dAlpha < 0
-	static double exp_dE = 0;
-	static double n_exp_dE = 0;
 
 #ifdef PARALLEL
 	ParallelSyncComplexes( allComplexes, ncomplex );
 #endif
-	double EP = 0;
 	double E0 = 0;
 	double MEME0 = 0;
 	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
@@ -43,7 +40,6 @@ void Simulation::area_MC_move( double beta, int move_type, parameterBlock *block
 	E0 += Boxed_PP_V( this );
 	
 	ParallelSum(&E0,1);
-	ParallelSum(&EP,1);
 
 	double d_complex = 0;
 			
@@ -182,12 +178,8 @@ void Simulation::area_MC_move( double beta, int move_type, parameterBlock *block
 	E1 += Boxed_PP_V( this );
 	
 	ParallelSum(&E1,1);
-	ParallelSum(&EP1,1);
 
-	exp_dE += EP1-EP;
-	n_exp_dE+=1;
 
-//	printf("<dE>: %le inst %le\n", exp_dE/n_exp_dE, EP1-EP );
 
 	// reciprocal relationship for scaling factor through effective mass matrix which is inverse of position-position dot product.
 	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
