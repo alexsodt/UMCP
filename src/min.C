@@ -9,6 +9,7 @@
 #include "l-bfgs.h"
 #include "m_triangles.h"
 #include "parallel.h"
+#include "simulation.h"
 //#define SKIP_OPT
 
 #define FIX_VOLUME
@@ -71,7 +72,10 @@ int main( int argc, char **argv )
 	theSurface->loadLattice( argv[1], 0. );
 
 	theSurface->generatePlan();
-	
+
+	Simulation *theSimulation = (Simulation *)malloc( sizeof(Simulation) );
+	surface_record *sRec = (surface_record *)malloc( sizeof(surface_record ) );
+
 	double *r = (double *)malloc( sizeof(double) * (3 * theSurface->nv+3) );
 	double *g = (double *)malloc( sizeof(double) * (3 * theSurface->nv+3) );
 	theSurface->get(r);
@@ -79,6 +83,23 @@ int main( int argc, char **argv )
 	r[theSurface->nv*3+1] = 1.0;
 	r[theSurface->nv*3+2] = 1.0;
 	theSurface->setg0(r);
+
+	sRec->theSurface = theSurface;
+	sRec->r = r;
+	sRec->g = g;
+	sRec->next = NULL;
+
+	theSimulation->allSurfaces = sRec;
+	theSimulation->alpha[0] = 1.0;
+	theSimulation->alpha[1] = 1.0;
+	theSimulation->alpha[2] = 1.0;
+	
+	for( int x = 0; x < 3; x++ )
+	for( int y = 0; y < 3; y++ )
+		theSimulation->PBC_vec[x][y] = theSurface->PBC_vec[x][y];
+	theSimulation->ncomplex =0;
+	theSimulation->allComplexes = NULL;
+	setupParallel(theSimulation);
 
 	KA = 1.215;
 

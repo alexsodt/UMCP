@@ -60,6 +60,7 @@ void surface::readLipidComposition( FILE *inputFile )
 	}
 	nlipids = nlipid_space;
 
+#if 0
 	if( !inputFile )
 	{	// load all POPC (eventually). now load it in as a composition.
 		bilayerComp.nlipidTypes = 1;	
@@ -83,6 +84,7 @@ void surface::readLipidComposition( FILE *inputFile )
 	}
 	else
 	{
+#endif
 		char *buffer = (char *)malloc( sizeof(char) * 4096 );
 	
 	
@@ -133,8 +135,9 @@ void surface::readLipidComposition( FILE *inputFile )
 					memset( theTriangles[t].composition.outerLeaflet, 0, sizeof(double) * bilayerComp.nlipidTypes );
 				}
 			}
-			rewind( inputFile );
-			while( !feof(inputFile) )
+			if( inputFile )
+				rewind( inputFile );
+			while( inputFile && !feof(inputFile) )
 			{
 				getLine( inputFile, buffer );
 		
@@ -258,8 +261,9 @@ void surface::readLipidComposition( FILE *inputFile )
 			}
 		}
 		free(buffer);
+#if 0
 	}
-
+#endif
 	for( int t = 0; t < nt; t++ )
 	{
 		double po=0,pi=0;

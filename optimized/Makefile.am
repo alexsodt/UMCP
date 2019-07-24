@@ -3,7 +3,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 EMAIL = alexander.sodt@nih.gov
 
 
-bin_PROGRAMS = hd.opt makeHexSquare.opt min.opt subdivide.opt scale.opt icosahedron.opt makeBud.opt makeBump.opt makeHexCylinder.opt  writeBiasPotential.opt writeCylRTraj.opt rd.opt makePore.opt
+bin_PROGRAMS = hd.opt makeHexSquare.opt min.opt subdivide.opt scale.opt icosahedron.opt makeBud.opt makeBump.opt makeHexCylinder.opt  writeBiasPotential.opt writeCylRTraj.opt  makePore.opt
 
 AM_CPPFLAGS = -include ../config.h -include ../src/local_config.h $(AM_INCLUDE) 
 AM_CFLAGS = -O2
