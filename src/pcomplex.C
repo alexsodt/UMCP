@@ -446,6 +446,10 @@ double pcomplex::update_dH_dq( Simulation *theSimulation, double time_step, doub
 
 		double pg[2*nattach];
 		memset( pg, 0, sizeof(double) * 2 * nattach );
+<<<<<<< HEAD
+=======
+	
+>>>>>>> a8b8f84eaae5cf58ed3ba373ad3c5fb415fd6d14
 		grad( theSimulation, surfacer_g, surfacen_g );
 		if( debug == DEBUG_OFF || debug == DEBUG_NO_T )
 			AttachG( theSimulation, pg ); 
@@ -1663,7 +1667,11 @@ void pcomplex::evaluate_momentum( surface *theSurface, double *rsurf, double *po
 	}
 }
 
+<<<<<<< HEAD
 double pcomplex::T( Simulation *theSimulation, int subp)
+=======
+double pcomplex::T( Simulation *theSimulation )
+>>>>>>> a8b8f84eaae5cf58ed3ba373ad3c5fb415fd6d14
 {
 	double T = 0;
 
@@ -1671,7 +1679,10 @@ double pcomplex::T( Simulation *theSimulation, int subp)
 
 	for( int s = 0; s < nattach; s++ )
 	{
+<<<<<<< HEAD
 		if( subp != -1 && s!= subp) continue;
+=======
+>>>>>>> a8b8f84eaae5cf58ed3ba373ad3c5fb415fd6d14
 		surface_record *sRec = theSimulation->fetch(sid[s]);
 		surface *theSurface = sRec->theSurface;
 		double *rsurf = sRec->r;
@@ -2326,10 +2337,14 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 					pos1_at_c[0] - pos2_at_c[0],
 					pos1_at_c[1] - pos2_at_c[1],
 					pos1_at_c[2] - pos2_at_c[2] };
+<<<<<<< HEAD
 			double len = length3(dr_at_c);
 			if( len > 1.1 * (allComplexes[c1]->sigma[p1] + allComplexes[c2]->sigma[p2]) )
 				theSimulation->wrapPBC( dr_at_c, alphas );
 
+=======
+			theSimulation->wrapPBC( dr_at_c, alphas );
+>>>>>>> a8b8f84eaae5cf58ed3ba373ad3c5fb415fd6d14
 			normalize(dr_at_c);
 			// solve for dKE
 		

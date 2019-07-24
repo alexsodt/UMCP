@@ -337,8 +337,6 @@ int temp_main( int argc, char **argv )
 
 	double time_step = block.time_step; // one nanosecond.
 	double time_step_collision = block.time_step_collision; // one nanosecond.
-	
-	
 	int nsurfaces = 0;
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 		nsurfaces++;
