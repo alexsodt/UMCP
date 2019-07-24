@@ -71,7 +71,7 @@ struct pcomplex
 	virtual int nparams( void );
 	virtual void orient( surface *theSurface, double *rsurf ) { }
 
-	virtual void refresh( surface *theSurface, double *rsurf );
+	virtual void refresh( Simulation *theSimulation  );
 	virtual double V( Simulation *theSimulation );
 	virtual double grad( Simulation *theSimulation, double *surface_g, double *particle_g ); 
 	virtual void fd_grad_debug(surface *theSurface, double *rsurf ); 
@@ -110,7 +110,7 @@ struct pcomplex
 	void applyLangevinNoise( Simulation *theSimulation, double dt, double gamma, double temperature );
 	int saveComplex( char *buffer, int *buflen, int bufLenMax );
 	void saveComplex( FILE * theFile );
-	void loadComplex( FILE * theFile, surface *theSurface, double *rsurf );
+	void loadComplex( FILE * theFile, Simulation *theSimulation, int load_to );
 	double AttachV( Simulation *theSimulation );
 	double AttachG( Simulation *theSimulation, double *pg );
 	void evaluate_momentum( surface *theSurface, double *rsurf, double *pout );
@@ -150,8 +150,8 @@ struct NBAR : pcomplex
 	int getNBonds( void );
 	void putBonds( int *bond_list );
 
-	double V(surface *theSurface, double *rsurf);
-	double grad( surface *theSurface, double *rsurf, double *surface_g, double *particle_g );
+	double V( Simulation *theSimulation );
+	double grad( Simulation *theSimulation, double *surface_g, double *particle_g );
 
 	void move_inside(void);
 	void move_outside(void);	

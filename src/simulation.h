@@ -36,6 +36,11 @@ typedef struct surface_record
 	double *qdot0;
 	int nc;
 
+	// for minimization
+	int temp_min_offset;
+	double *temp_r;
+	double *temp_g;
+
 	// for harmonic modes
 	int NQ;
 	double *gen_transform;
@@ -112,6 +117,10 @@ typedef struct Simulation
 	void area_MC_move( double beta, int move_type, parameterBlock *block );
 	void writeLimitingSurfacePSF(FILE *theFile );
 	void writeLimitingSurface( FILE *tpsf );
+	void minimize( int freeze_membrane  );
+	void saveRestart( FILE *theFile, int seed ); 
+	void saveRestart( char **buf, int seed);
+	void loadRestart( FILE *loadFile, int *seed );
 } Simulation;
 
 

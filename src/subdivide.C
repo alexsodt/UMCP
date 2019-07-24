@@ -104,27 +104,6 @@ int main( int argc, char **argv )
 	r[3*nv+1] = 1.;
 	r[3*nv+2] = 1.;
 	sub_surface->setg0(r);
-
-	double en = sub_surface->energy(r,NULL);
-	
-/*
-	if( argc > 2 )
-	{		
-		FILE *loadFile = fopen(argv[2],"r");
-		char buffer[4096];
-		for( int x = 0; x < sub_surface->nv; x++ )
-		{
-			getLine( loadFile, buffer );
-			int nr = sscanf( buffer, "%lf %lf %lf",	
-				r+3*x, r+3*x+1, r+3*x+2 );
-		}
-		getLine(loadFile,buffer);// alpha
-		sscanf( buffer, "%lf %lf %lf",
-			r+3*nv+0,r+3*nv+1,r+3*nv+2 );
-		fclose(loadFile);
-	}
-*/
-	printf("en: %.14le\n", en );
 	double eps = 1e-6;
 
 	
