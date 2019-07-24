@@ -905,15 +905,6 @@ int temp_main( int argc, char **argv )
 	struct timeval tnow;
 
 
-	int BOND_BINS = 100;
-	double bond_histogram[BOND_BINS];
-	double bond_target = 25;
-	double bond_range  = 10;
-	double bond_min = bond_target - bond_range;
-	double bond_max = bond_target + bond_range;
-	memset( bond_histogram, 0, sizeof(double) * BOND_BINS );
-	
-
 	while( !done )
 	{
 
@@ -985,22 +976,7 @@ int temp_main( int argc, char **argv )
 				VP += allComplexes[c]->V(sub_surface, r );	
 				VP += allComplexes[c]->AttachV(sub_surface, r );	
 
-				double dr[3] = { 
-					allComplexes[c]->rall[0] - allComplexes[c]->rall[3],
-					allComplexes[c]->rall[1] - allComplexes[c]->rall[4],
-					allComplexes[c]->rall[2] - allComplexes[c]->rall[5] };
-				double rv = normalize(dr);
-
-				int bin = BOND_BINS * (rv-bond_min)/(bond_max-bond_min);
-				if( o >= nequil && bin >= 0 && bin < BOND_BINS )
-					bond_histogram[bin] += 1;
 			}
-			if( o >= nequil && t == 0 )
-			{
-				for( int b = 0; b < BOND_BINS; b++ )
-					printf("%le %le\n", bond_min+(b+0.5)*(bond_max-bond_min)/BOND_BINS, bond_histogram[b] );
-			}
-			
 
 
 			V += VP;
