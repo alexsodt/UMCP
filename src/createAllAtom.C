@@ -46,6 +46,7 @@ struct crd_psf_pair
 };
 
 
+
 void surface::createAllAtom( parameterBlock *block )
 {
 	double *rsurf = (double *)malloc( sizeof(double) * 3 * (1 + nv) );
@@ -1855,4 +1856,7 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 	*v = v_cen;
 
 	return fp;
-}		
+}
+
+
+		

@@ -44,4 +44,12 @@ void copyFrameNewCoords( FILE *theFile1, FILE *theFile2, double *coords );
 void cacheDCDHeader( FILE *theFile1 );
 void uncacheDCDHeader( FILE *theFile1 );
 
+typedef struct
+{
+	int len;
+	int *atoms;
+} cycle;
+
+int fetchPSFCycles( cycle **outCycles );
+
 #endif

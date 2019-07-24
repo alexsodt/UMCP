@@ -80,7 +80,9 @@ bin_PROGRAMS = hd.dbg$(EXEEXT) makeHexSquare.dbg$(EXEEXT) \
 	min.dbg$(EXEEXT) subdivide.dbg$(EXEEXT) scale.dbg$(EXEEXT) \
 	icosahedron.dbg$(EXEEXT) makeBud.dbg$(EXEEXT) \
 	makeBump.dbg$(EXEEXT) makeHexCylinder.dbg$(EXEEXT) \
-	writeBiasPotential.dbg$(EXEEXT) writeCylRTraj.dbg$(EXEEXT)
+	writeBiasPotential.dbg$(EXEEXT) writeCylRTraj.dbg$(EXEEXT) \
+	rd.dbg$(EXEEXT) makePore.dbg$(EXEEXT) join.dbg$(EXEEXT) \
+	frc_sandbox.dbg$(EXEEXT)
 subdir = debug
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/depcomp
@@ -94,6 +96,18 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
+am__frc_sandbox_dbg_SOURCES_DIST = frc_sandbox.C interpLib.C grad.C \
+	pboxing.C irr_kernel.C uv_map.C gauss.C modes.C \
+	write_structures.C min_distance.cpp GJK.cpp gjk_gudrun.cpp \
+	GJK_min2.cpp functions.cpp NearestSimplexR2.cpp \
+	NearestSimplexR.cpp subdivide3.C fast_mm.C random_global.C \
+	height.C pcomplex.C minimize.C gsl_random_globals.C dynamics.C \
+	restart.C p_p.C sparse.C global_boxing.C lipid_density.C \
+	tachyon.C npt.C lipid_composition.C vpass.C get_regions.C \
+	parallel.C input.C l-bfgs.C srd.C alignSet.C \
+	compilation_time.C meshCollisionLib.C sans.C spline.C \
+	globals.C createAllAtom.C dcd.C pdb.C dovoronoi.c clusterv.C \
+	NBAR.C dimer.C crowder.C mutil.C util.C cuda.cu
 am__objects_1 = interpLib.$(OBJEXT) grad.$(OBJEXT) pboxing.$(OBJEXT) \
 	irr_kernel.$(OBJEXT) uv_map.$(OBJEXT) gauss.$(OBJEXT) \
 	modes.$(OBJEXT) write_structures.$(OBJEXT) \
@@ -108,56 +122,105 @@ am__objects_1 = interpLib.$(OBJEXT) grad.$(OBJEXT) pboxing.$(OBJEXT) \
 	tachyon.$(OBJEXT) npt.$(OBJEXT) lipid_composition.$(OBJEXT) \
 	vpass.$(OBJEXT) get_regions.$(OBJEXT) parallel.$(OBJEXT) \
 	input.$(OBJEXT) l-bfgs.$(OBJEXT) srd.$(OBJEXT) \
-	alignSet.$(OBJEXT) compilation_time.$(OBJEXT)
-am__objects_2 = NBAR.$(OBJEXT) dimer.$(OBJEXT) crowder.$(OBJEXT)
-am__objects_3 = mutil.$(OBJEXT) util.$(OBJEXT)
-am_hd_dbg_OBJECTS = hd.$(OBJEXT) $(am__objects_1) $(am__objects_2) \
-	$(am__objects_3)
-hd_dbg_OBJECTS = $(am_hd_dbg_OBJECTS)
+	alignSet.$(OBJEXT) compilation_time.$(OBJEXT) \
+	meshCollisionLib.$(OBJEXT) sans.$(OBJEXT) spline.$(OBJEXT) \
+	globals.$(OBJEXT) createAllAtom.$(OBJEXT) dcd.$(OBJEXT) \
+	pdb.$(OBJEXT)
+am__objects_2 = dovoronoi.$(OBJEXT) clusterv.$(OBJEXT)
+am__objects_3 = NBAR.$(OBJEXT) dimer.$(OBJEXT) crowder.$(OBJEXT)
+am__objects_4 = mutil.$(OBJEXT) util.$(OBJEXT)
+@CUDA_TRUE@am__objects_5 = cuda.$(OBJEXT)
+am_frc_sandbox_dbg_OBJECTS = frc_sandbox.$(OBJEXT) $(am__objects_1) \
+	$(am__objects_2) $(am__objects_3) $(am__objects_4) \
+	$(am__objects_5)
+frc_sandbox_dbg_OBJECTS = $(am_frc_sandbox_dbg_OBJECTS)
 am__DEPENDENCIES_1 =
-hd_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1)
-am_icosahedron_dbg_OBJECTS = icosahedron.$(OBJEXT) $(am__objects_3)
+frc_sandbox_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+am__hd_dbg_SOURCES_DIST = hd.C interpLib.C grad.C pboxing.C \
+	irr_kernel.C uv_map.C gauss.C modes.C write_structures.C \
+	min_distance.cpp GJK.cpp gjk_gudrun.cpp GJK_min2.cpp \
+	functions.cpp NearestSimplexR2.cpp NearestSimplexR.cpp \
+	subdivide3.C fast_mm.C random_global.C height.C pcomplex.C \
+	minimize.C gsl_random_globals.C dynamics.C restart.C p_p.C \
+	sparse.C global_boxing.C lipid_density.C tachyon.C npt.C \
+	lipid_composition.C vpass.C get_regions.C parallel.C input.C \
+	l-bfgs.C srd.C alignSet.C compilation_time.C \
+	meshCollisionLib.C sans.C spline.C globals.C createAllAtom.C \
+	dcd.C pdb.C dovoronoi.c clusterv.C NBAR.C dimer.C crowder.C \
+	mutil.C util.C cuda.cu
+am_hd_dbg_OBJECTS = hd.$(OBJEXT) $(am__objects_1) $(am__objects_2) \
+	$(am__objects_3) $(am__objects_4) $(am__objects_5)
+hd_dbg_OBJECTS = $(am_hd_dbg_OBJECTS)
+hd_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+am_icosahedron_dbg_OBJECTS = icosahedron.$(OBJEXT) $(am__objects_4)
 icosahedron_dbg_OBJECTS = $(am_icosahedron_dbg_OBJECTS)
 icosahedron_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1)
-am__objects_4 = dovoronoi.$(OBJEXT) clusterv.$(OBJEXT)
-am_makeBud_dbg_OBJECTS = makeBud.$(OBJEXT) $(am__objects_4) \
-	$(am__objects_3)
+am_join_dbg_OBJECTS = join.$(OBJEXT) $(am__objects_1) $(am__objects_3) \
+	$(am__objects_4) $(am__objects_2) getCylinderMesh.$(OBJEXT)
+join_dbg_OBJECTS = $(am_join_dbg_OBJECTS)
+join_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+am_makeBud_dbg_OBJECTS = makeBud.$(OBJEXT) $(am__objects_2) \
+	$(am__objects_4)
 makeBud_dbg_OBJECTS = $(am_makeBud_dbg_OBJECTS)
 makeBud_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-am_makeBump_dbg_OBJECTS = makeBump.$(OBJEXT) $(am__objects_4) \
-	$(am__objects_3)
+am_makeBump_dbg_OBJECTS = makeBump.$(OBJEXT) $(am__objects_2) \
+	$(am__objects_4)
 makeBump_dbg_OBJECTS = $(am_makeBump_dbg_OBJECTS)
 makeBump_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am_makeHexCylinder_dbg_OBJECTS = makeHexCylinder.$(OBJEXT) \
-	$(am__objects_4) $(am__objects_3)
+	$(am__objects_2) $(am__objects_4)
 makeHexCylinder_dbg_OBJECTS = $(am_makeHexCylinder_dbg_OBJECTS)
 makeHexCylinder_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am_makeHexSquare_dbg_OBJECTS = makeHexSquare.$(OBJEXT) \
-	$(am__objects_4) $(am__objects_3)
+	$(am__objects_2) $(am__objects_4)
 makeHexSquare_dbg_OBJECTS = $(am_makeHexSquare_dbg_OBJECTS)
 makeHexSquare_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
+am_makePore_dbg_OBJECTS = makePore.$(OBJEXT) $(am__objects_2) \
+	$(am__objects_4) getCylinderMesh.$(OBJEXT)
+makePore_dbg_OBJECTS = $(am_makePore_dbg_OBJECTS)
+makePore_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am_min_dbg_OBJECTS = min.$(OBJEXT) $(am__objects_1) $(am__objects_2) \
-	$(am__objects_3)
+	$(am__objects_3) $(am__objects_4)
 min_dbg_OBJECTS = $(am_min_dbg_OBJECTS)
-min_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1)
+min_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+am__dirstamp = $(am__leading_dot)dirstamp
+am__objects_6 = fpr_subroutines/Faddeeva.$(OBJEXT) \
+	fpr_subroutines/passocF.$(OBJEXT) \
+	fpr_subroutines/pirr_pfree_ratio_psF.$(OBJEXT) \
+	fpr_subroutines/DDmatrixcreate.$(OBJEXT) \
+	fpr_subroutines/DDpsur.$(OBJEXT) \
+	fpr_subroutines/TBLnorm.$(OBJEXT) \
+	fpr_subroutines/TBLpirr.$(OBJEXT) \
+	fpr_subroutines/TBLsur.$(OBJEXT) \
+	fpr_subroutines/fpir.$(OBJEXT) fpr_subroutines/fsur.$(OBJEXT) \
+	fpr_subroutines/integrator.$(OBJEXT) \
+	fpr_subroutines/fnorm.$(OBJEXT)
+am_rd_dbg_OBJECTS = rd.$(OBJEXT) $(am__objects_6) $(am__objects_2) \
+	$(am__objects_1) $(am__objects_3) $(am__objects_4)
+rd_dbg_OBJECTS = $(am_rd_dbg_OBJECTS)
+rd_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_scale_dbg_OBJECTS = scale.$(OBJEXT) $(am__objects_1) \
-	$(am__objects_2) $(am__objects_3)
+	$(am__objects_2) $(am__objects_3) $(am__objects_4)
 scale_dbg_OBJECTS = $(am_scale_dbg_OBJECTS)
-scale_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1)
+scale_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_subdivide_dbg_OBJECTS = subdivide.$(OBJEXT) $(am__objects_1) \
-	$(am__objects_2) $(am__objects_3)
+	$(am__objects_2) $(am__objects_3) $(am__objects_4)
 subdivide_dbg_OBJECTS = $(am_subdivide_dbg_OBJECTS)
-subdivide_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1)
+subdivide_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am_writeBiasPotential_dbg_OBJECTS = writeBiasPotential.$(OBJEXT) \
-	$(am__objects_3)
+	$(am__objects_4)
 writeBiasPotential_dbg_OBJECTS = $(am_writeBiasPotential_dbg_OBJECTS)
 writeBiasPotential_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am_writeCylRTraj_dbg_OBJECTS = writeCylRTraj.$(OBJEXT) \
-	$(am__objects_3)
+	$(am__objects_4)
 writeCylRTraj_dbg_OBJECTS = $(am_writeCylRTraj_dbg_OBJECTS)
 writeCylRTraj_dbg_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
@@ -202,16 +265,19 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(hd_dbg_SOURCES) $(icosahedron_dbg_SOURCES) \
+SOURCES = $(frc_sandbox_dbg_SOURCES) $(hd_dbg_SOURCES) \
+	$(icosahedron_dbg_SOURCES) $(join_dbg_SOURCES) \
 	$(makeBud_dbg_SOURCES) $(makeBump_dbg_SOURCES) \
 	$(makeHexCylinder_dbg_SOURCES) $(makeHexSquare_dbg_SOURCES) \
-	$(min_dbg_SOURCES) $(scale_dbg_SOURCES) \
-	$(subdivide_dbg_SOURCES) $(writeBiasPotential_dbg_SOURCES) \
-	$(writeCylRTraj_dbg_SOURCES)
-DIST_SOURCES = $(hd_dbg_SOURCES) $(icosahedron_dbg_SOURCES) \
-	$(makeBud_dbg_SOURCES) $(makeBump_dbg_SOURCES) \
-	$(makeHexCylinder_dbg_SOURCES) $(makeHexSquare_dbg_SOURCES) \
-	$(min_dbg_SOURCES) $(scale_dbg_SOURCES) \
+	$(makePore_dbg_SOURCES) $(min_dbg_SOURCES) $(rd_dbg_SOURCES) \
+	$(scale_dbg_SOURCES) $(subdivide_dbg_SOURCES) \
+	$(writeBiasPotential_dbg_SOURCES) $(writeCylRTraj_dbg_SOURCES)
+DIST_SOURCES = $(am__frc_sandbox_dbg_SOURCES_DIST) \
+	$(am__hd_dbg_SOURCES_DIST) $(icosahedron_dbg_SOURCES) \
+	$(join_dbg_SOURCES) $(makeBud_dbg_SOURCES) \
+	$(makeBump_dbg_SOURCES) $(makeHexCylinder_dbg_SOURCES) \
+	$(makeHexSquare_dbg_SOURCES) $(makePore_dbg_SOURCES) \
+	$(min_dbg_SOURCES) $(rd_dbg_SOURCES) $(scale_dbg_SOURCES) \
 	$(subdivide_dbg_SOURCES) $(writeBiasPotential_dbg_SOURCES) \
 	$(writeCylRTraj_dbg_SOURCES)
 am__can_run_installinfo = \
@@ -241,6 +307,7 @@ CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
+AM_CUDA = @AM_CUDA@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AM_INCLUDE = @AM_INCLUDE@
 AM_LDADD = @AM_LDADD@
@@ -279,6 +346,7 @@ LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 MPIRUN = @MPIRUN@
+NVCC = @NVCC@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
@@ -341,27 +409,39 @@ EMAIL = alexander.sodt@nih.gov
 AM_CPPFLAGS = -include ../config.h -include ../src/local_config.h $(AM_INCLUDE) 
 AM_CFLAGS = -g
 AM_CXXFLAGS = -g
+SRC_DIR = ../src
 complex_SRCS = NBAR.C dimer.C crowder.C
 util_SRCS = mutil.C util.C
-interp_SRCS = interpLib.C grad.C pboxing.C irr_kernel.C uv_map.C gauss.C modes.C write_structures.C min_distance.cpp GJK.cpp gjk_gudrun.cpp GJK_min2.cpp functions.cpp NearestSimplexR2.cpp NearestSimplexR.cpp  subdivide3.C fast_mm.C random_global.C height.C pcomplex.C minimize.C gsl_random_globals.C dynamics.C restart.C p_p.C sparse.C global_boxing.C lipid_density.C tachyon.C npt.C lipid_composition.C vpass.C get_regions.C parallel.C input.C l-bfgs.C srd.C alignSet.C compilation_time.C
+interp_SRCS = interpLib.C grad.C pboxing.C irr_kernel.C uv_map.C gauss.C modes.C write_structures.C min_distance.cpp GJK.cpp gjk_gudrun.cpp GJK_min2.cpp functions.cpp NearestSimplexR2.cpp NearestSimplexR.cpp  subdivide3.C fast_mm.C random_global.C height.C pcomplex.C minimize.C gsl_random_globals.C dynamics.C restart.C p_p.C sparse.C global_boxing.C lipid_density.C tachyon.C npt.C lipid_composition.C vpass.C get_regions.C parallel.C input.C l-bfgs.C srd.C alignSet.C compilation_time.C meshCollisionLib.C sans.C spline.C globals.C createAllAtom.C dcd.C pdb.C
+rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutines/pirr_pfree_ratio_psF.cpp fpr_subroutines/2D.o fpr_subroutines/DDmatrixcreate.cpp fpr_subroutines/DDpsur.cpp fpr_subroutines/TBLnorm.cpp fpr_subroutines/TBLpirr.cpp fpr_subroutines/TBLsur.cpp fpr_subroutines/fpir.cpp fpr_subroutines/fsur.cpp fpr_subroutines/integrator.cpp fpr_subroutines/fnorm.cpp
 hull_SRCS = dovoronoi.c clusterv.C
-hd_dbg_SOURCES = hd.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
-min_dbg_SOURCES = min.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
-subdivide_dbg_SOURCES = subdivide.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
-scale_dbg_SOURCES = scale.C  $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
+@CUDA_FALSE@cuda_SRCS = 
+@CUDA_TRUE@cuda_SRCS = cuda.cu
+rd_dbg_SOURCES = rd.C $(rd_SRCS) $(hull_SRCS) $(interp_SRCS) $(complex_SRCS) $(util_SRCS)
+hd_dbg_SOURCES = hd.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS)
+frc_sandbox_dbg_SOURCES = frc_sandbox.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS)
+min_dbg_SOURCES = min.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
+subdivide_dbg_SOURCES = subdivide.C $(interp_SRCS)  $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
+scale_dbg_SOURCES = scale.C  $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
 icosahedron_dbg_SOURCES = icosahedron.C $(util_SRCS)
+join_dbg_SOURCES = join.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(hull_SRCS) getCylinderMesh.C
 makeBud_dbg_SOURCES = makeBud.C $(hull_SRCS) $(util_SRCS)
+makePore_dbg_SOURCES = makePore.C $(hull_SRCS) $(util_SRCS) getCylinderMesh.C
 makeBump_dbg_SOURCES = makeBump.C $(hull_SRCS) $(util_SRCS)
 makeHexCylinder_dbg_SOURCES = makeHexCylinder.C $(hull_SRCS) $(util_SRCS)
 makeHexSquare_dbg_SOURCES = makeHexSquare.C $(hull_SRCS) $(util_SRCS)
 writeBiasPotential_dbg_SOURCES = writeBiasPotential.C $(util_SRCS)
 writeCylRTraj_dbg_SOURCES = writeCylRTraj.C $(util_SRCS) 
-hd_dbg_LDADD = $(AM_LDADD) -lstdc++
-min_dbg_LDADD = $(AM_LDADD) -lstdc++
-subdivide_dbg_LDADD = $(AM_LDADD) -lstdc++
-scale_dbg_LDADD = $(AM_LDADD) -lstdc++
+rd_dbg_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++ 
+hd_dbg_LDADD = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
+frc_sandbox_dbg_LDADD = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
+join_dbg_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
+min_dbg_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
+subdivide_dbg_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
+scale_dbg_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
 icosahedron_dbg_LDADD = $(AM_LDADD) -lstdc++
 makeBud_dbg_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
+makePore_dbg_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
 makeBump_dbg_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
 makeHexCylinder_dbg_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
 makeHexSquare_dbg_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
@@ -370,7 +450,7 @@ writeCylRTraj_dbg_LDADD = $(AM_LDADD) $(AM_QHULL) -lstdc++
 all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .C .c .cpp .o .obj
+.SUFFIXES: .C .c .cpp .cu .o .obj
 $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -444,6 +524,10 @@ uninstall-binPROGRAMS:
 clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
 
+frc_sandbox.dbg$(EXEEXT): $(frc_sandbox_dbg_OBJECTS) $(frc_sandbox_dbg_DEPENDENCIES) $(EXTRA_frc_sandbox_dbg_DEPENDENCIES) 
+	@rm -f frc_sandbox.dbg$(EXEEXT)
+	$(AM_V_CXXLD)$(CXXLINK) $(frc_sandbox_dbg_OBJECTS) $(frc_sandbox_dbg_LDADD) $(LIBS)
+
 hd.dbg$(EXEEXT): $(hd_dbg_OBJECTS) $(hd_dbg_DEPENDENCIES) $(EXTRA_hd_dbg_DEPENDENCIES) 
 	@rm -f hd.dbg$(EXEEXT)
 	$(AM_V_CXXLD)$(CXXLINK) $(hd_dbg_OBJECTS) $(hd_dbg_LDADD) $(LIBS)
@@ -451,6 +535,10 @@ hd.dbg$(EXEEXT): $(hd_dbg_OBJECTS) $(hd_dbg_DEPENDENCIES) $(EXTRA_hd_dbg_DEPENDE
 icosahedron.dbg$(EXEEXT): $(icosahedron_dbg_OBJECTS) $(icosahedron_dbg_DEPENDENCIES) $(EXTRA_icosahedron_dbg_DEPENDENCIES) 
 	@rm -f icosahedron.dbg$(EXEEXT)
 	$(AM_V_CXXLD)$(CXXLINK) $(icosahedron_dbg_OBJECTS) $(icosahedron_dbg_LDADD) $(LIBS)
+
+join.dbg$(EXEEXT): $(join_dbg_OBJECTS) $(join_dbg_DEPENDENCIES) $(EXTRA_join_dbg_DEPENDENCIES) 
+	@rm -f join.dbg$(EXEEXT)
+	$(AM_V_CXXLD)$(CXXLINK) $(join_dbg_OBJECTS) $(join_dbg_LDADD) $(LIBS)
 
 makeBud.dbg$(EXEEXT): $(makeBud_dbg_OBJECTS) $(makeBud_dbg_DEPENDENCIES) $(EXTRA_makeBud_dbg_DEPENDENCIES) 
 	@rm -f makeBud.dbg$(EXEEXT)
@@ -468,9 +556,49 @@ makeHexSquare.dbg$(EXEEXT): $(makeHexSquare_dbg_OBJECTS) $(makeHexSquare_dbg_DEP
 	@rm -f makeHexSquare.dbg$(EXEEXT)
 	$(AM_V_CXXLD)$(CXXLINK) $(makeHexSquare_dbg_OBJECTS) $(makeHexSquare_dbg_LDADD) $(LIBS)
 
+makePore.dbg$(EXEEXT): $(makePore_dbg_OBJECTS) $(makePore_dbg_DEPENDENCIES) $(EXTRA_makePore_dbg_DEPENDENCIES) 
+	@rm -f makePore.dbg$(EXEEXT)
+	$(AM_V_CXXLD)$(CXXLINK) $(makePore_dbg_OBJECTS) $(makePore_dbg_LDADD) $(LIBS)
+
 min.dbg$(EXEEXT): $(min_dbg_OBJECTS) $(min_dbg_DEPENDENCIES) $(EXTRA_min_dbg_DEPENDENCIES) 
 	@rm -f min.dbg$(EXEEXT)
 	$(AM_V_CXXLD)$(CXXLINK) $(min_dbg_OBJECTS) $(min_dbg_LDADD) $(LIBS)
+fpr_subroutines/$(am__dirstamp):
+	@$(MKDIR_P) fpr_subroutines
+	@: > fpr_subroutines/$(am__dirstamp)
+fpr_subroutines/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) fpr_subroutines/$(DEPDIR)
+	@: > fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+fpr_subroutines/Faddeeva.$(OBJEXT): fpr_subroutines/$(am__dirstamp) \
+	fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+fpr_subroutines/passocF.$(OBJEXT): fpr_subroutines/$(am__dirstamp) \
+	fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+fpr_subroutines/pirr_pfree_ratio_psF.$(OBJEXT):  \
+	fpr_subroutines/$(am__dirstamp) \
+	fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+fpr_subroutines/DDmatrixcreate.$(OBJEXT):  \
+	fpr_subroutines/$(am__dirstamp) \
+	fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+fpr_subroutines/DDpsur.$(OBJEXT): fpr_subroutines/$(am__dirstamp) \
+	fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+fpr_subroutines/TBLnorm.$(OBJEXT): fpr_subroutines/$(am__dirstamp) \
+	fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+fpr_subroutines/TBLpirr.$(OBJEXT): fpr_subroutines/$(am__dirstamp) \
+	fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+fpr_subroutines/TBLsur.$(OBJEXT): fpr_subroutines/$(am__dirstamp) \
+	fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+fpr_subroutines/fpir.$(OBJEXT): fpr_subroutines/$(am__dirstamp) \
+	fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+fpr_subroutines/fsur.$(OBJEXT): fpr_subroutines/$(am__dirstamp) \
+	fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+fpr_subroutines/integrator.$(OBJEXT): fpr_subroutines/$(am__dirstamp) \
+	fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+fpr_subroutines/fnorm.$(OBJEXT): fpr_subroutines/$(am__dirstamp) \
+	fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+
+rd.dbg$(EXEEXT): $(rd_dbg_OBJECTS) $(rd_dbg_DEPENDENCIES) $(EXTRA_rd_dbg_DEPENDENCIES) 
+	@rm -f rd.dbg$(EXEEXT)
+	$(AM_V_CXXLD)$(CXXLINK) $(rd_dbg_OBJECTS) $(rd_dbg_LDADD) $(LIBS)
 
 scale.dbg$(EXEEXT): $(scale_dbg_OBJECTS) $(scale_dbg_DEPENDENCIES) $(EXTRA_scale_dbg_DEPENDENCIES) 
 	@rm -f scale.dbg$(EXEEXT)
@@ -490,6 +618,7 @@ writeCylRTraj.dbg$(EXEEXT): $(writeCylRTraj_dbg_OBJECTS) $(writeCylRTraj_dbg_DEP
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
+	-rm -f fpr_subroutines/*.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
@@ -502,16 +631,21 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/alignSet.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/clusterv.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/compilation_time.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/createAllAtom.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/crowder.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dcd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dimer.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dovoronoi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dynamics.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fast_mm.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/frc_sandbox.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/functions.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gauss.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/getCylinderMesh.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/get_regions.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gjk_gudrun.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/global_boxing.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/globals.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/grad.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gsl_random_globals.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hd.Po@am__quote@
@@ -520,6 +654,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/input.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/interpLib.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/irr_kernel.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/join.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/l-bfgs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lipid_composition.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lipid_density.Po@am__quote@
@@ -527,6 +662,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/makeBump.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/makeHexCylinder.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/makeHexSquare.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/makePore.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/meshCollisionLib.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/min.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/min_distance.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/minimize.Po@am__quote@
@@ -537,10 +674,14 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parallel.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pboxing.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pcomplex.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pdb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/random_global.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/restart.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sans.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scale.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sparse.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/spline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/srd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/subdivide.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/subdivide3.Po@am__quote@
@@ -551,6 +692,18 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/writeBiasPotential.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/writeCylRTraj.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/write_structures.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@fpr_subroutines/$(DEPDIR)/DDmatrixcreate.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@fpr_subroutines/$(DEPDIR)/DDpsur.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@fpr_subroutines/$(DEPDIR)/Faddeeva.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@fpr_subroutines/$(DEPDIR)/TBLnorm.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@fpr_subroutines/$(DEPDIR)/TBLpirr.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@fpr_subroutines/$(DEPDIR)/TBLsur.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@fpr_subroutines/$(DEPDIR)/fnorm.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@fpr_subroutines/$(DEPDIR)/fpir.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@fpr_subroutines/$(DEPDIR)/fsur.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@fpr_subroutines/$(DEPDIR)/integrator.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@fpr_subroutines/$(DEPDIR)/passocF.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@fpr_subroutines/$(DEPDIR)/pirr_pfree_ratio_psF.Po@am__quote@
 
 .C.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -715,6 +868,8 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
+	-rm -f fpr_subroutines/$(DEPDIR)/$(am__dirstamp)
+	-rm -f fpr_subroutines/$(am__dirstamp)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
@@ -724,7 +879,7 @@ clean: clean-am
 clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-am
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ./$(DEPDIR) fpr_subroutines/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -770,7 +925,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ./$(DEPDIR) fpr_subroutines/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -805,10 +960,17 @@ uninstall-am: uninstall-binPROGRAMS
 	uninstall-binPROGRAMS
 
 
-vpath %.C ../src
-vpath %.c ../src
-vpath %.cpp ../src
-vpath %.h ../src
+vpath %.C $(SRC_DIR)
+vpath %.c $(SRC_DIR)
+vpath %.cpp $(SRC_DIR)
+vpath %.h  $(SRC_DIR)
+vpath %.cu $(SRC_DIR)
+
+.cu.o:
+	$(NVCC) -o $*.o -c $(SRC_DIR)/$*.cu
+
+compilation_time.o: .FORCE
+.PHONY: .FORCE
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

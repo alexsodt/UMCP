@@ -218,5 +218,6 @@ struct elasticCrowder : pcomplex
 };
 
 void propagateSolutionParticles( surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex, double dt );
+pcomplex *loadComplex( const char *name );
 
 #endif

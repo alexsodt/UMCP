@@ -235,7 +235,7 @@ int collision( surface *surface1, surface *surface2, double **M, int mlow, int m
 
 
 bool minimum_distance( double *r1, int nv1, double *r2, double radius, int do_quick_abort );
-int checkCollision2( double *r1, int nv1, double *r2, double **M, int mlow, int mhigh, int level, int max_level, double radius, 
+int checkSphereHullCollision( double *r1, int nv1, double *r2, double **M, int mlow, int mhigh, int level, int max_level, double radius, 
 		double factor, 
 		double cur_u, double cur_v,
 		double *col_u, 	
@@ -362,7 +362,7 @@ int checkCollision2( double *r1, int nv1, double *r2, double **M, int mlow, int 
 		
 		}
 
-			if( checkCollision2( sub1, nv_use1, r2, M, mlow, mhigh, level+1, max_level, radius,
+			if( checkSphereHullCollision( sub1, nv_use1, r2, M, mlow, mhigh, level+1, max_level, radius,
 				new_factor, new_u, new_v, col_u, col_v ) )
 				return 1;	
 	}
@@ -846,7 +846,7 @@ bool surface::withinRadius( double *pt_in, int *col_f, double *col_u, double *co
 						if( !disable_PBC_z )
 							while( usep[2] - pts1[2] > Lz/2 ) usep[2] -= Lz;
 
-                        			if(  checkCollision2( pts1, np1, usep, M, mlow, mhigh, 0, USE_MAX_LEVEL, trial_R,
+                        			if(  checkSphereHullCollision( pts1, np1, usep, M, mlow, mhigh, 0, USE_MAX_LEVEL, trial_R,
                                 			1.0, 1e-6, 1e-6, col_u, col_v ) )
                         			{
                                 			*col_f =tri1->f;
@@ -1883,7 +1883,7 @@ void surface::nearPointOnBoxedSurface( double *pt_in, int *col_f, double *col_u,
 						if( !disable_PBC_z ) 
 							while( usep[2] - pts1[2] > Lz/2 ) usep[2] -= Lz;
 
-                        			if(  checkCollision2( pts1, np1, usep, M, mlow, mhigh, 0, USE_MAX_LEVEL, trial_R,
+                        			if(  checkSphereHullCollision( pts1, np1, usep, M, mlow, mhigh, 0, USE_MAX_LEVEL, trial_R,
                                 			1.0, 1e-6, 1e-6, col_u, col_v ) )
                         			{
                                 			*col_f =tri1->f;
@@ -2612,142 +2612,72 @@ void  surface::buildFaceData(  double **vertex_data_in, int *pointer_to_data, in
 	*vertex_data_in = data;
 }
 
-int tachyonCollision2( FILE* theFile, double *r1, int nv1, double *r2, double **M, int mlow, int mhigh, int level, int max_level, double radius, 
-		double factor, 
-		double cur_u, double cur_v,
-		double *col_u, 	
-		double *col_v, double scale, int draw_type )
+int collisionForces( double *r1, int nv1, 
+		     double *r2, int nv2, 
+		     double **M, int mlow, int mhigh, 
+		     int level, int max_level,
+		     double *f1, double *f2, double cutoff, double alpha )
 {
 	int pts[3] = { 0, 1, 2};
 
-	bool min = minimum_distance( r1, nv1, r2, radius, level!=max_level );
+	double min1[3]={r1[0],r1[1],r1[2]};
+	double max1[3]={r1[0],r1[1],r1[2]};
+	
+	double min2[3]={r2[0],r2[1],r2[2]};
+	double max2[3]={r2[0],r2[1],r2[2]};
 
-	if( !min ) {
-		return 0;
-	}
+	for( int c = 0; c < 3; c++ )
+	{
+		for( int v = 0; v < nv1; v++ )
+		{
+			if( r1[c] < min1[c] )
+				min1[c] = r1[c];
+			if( r1[c] > max1[c] )
+				max1[c] = r1[c];
+		}
+		for( int v = 0; v < nv2; v++ )
+		{
+			if( r2[c] < min2[c] )
+				min2[c] = r2[c];
+			if( r2[c] > max2[c] )
+				max2[c] = r2[c];
+		}
+
+		if( max1[c] + cutoff < min2[c] ||
+		    max2[c] + cutoff < min1[c] )
+			return 0;
+	}	
 
 	if( level == max_level )
 	{
-		// get the convex hull and print it.
-				
-				convex_hull( r1, nv1, "tachyon_qhull");
-				extern int ntri;
-				extern int *triStorage;
-
-				double random_color[3] = { 
-					1,
-					0,
-					0 };
-
-//				random_color[rand()%3] = rand() / (double)RAND_MAX;
-//				random_color[rand()%3] = rand() / (double)RAND_MAX;
-
-				double convex_hull_spec = 0.0;
-				double convex_hull_opacity = 1.0;
-				double dr[3] = { (r1[3*0+0]-r1[3*1+0]), (r1[3*0+1]-r1[3*1+1]), (r1[3*0+2]-r1[3*1+2]) };
-				double rad = normalize(dr)/100;
+		double dr[3] = { 
+			(r1[0]+r1[3]+r1[6])/3-(r2[0]+r2[3]+r2[6])/3,
+			(r1[1]+r1[4]+r1[7])/3-(r2[1]+r2[4]+r2[7])/3,
+			(r1[2]+r1[5]+r1[8])/3-(r2[2]+r2[5]+r2[8])/3 
+				};
+		double r = normalize(dr);
 	
-				if( draw_type == 0 )
-				{
-					for( int v = 0; v < 3; v++ )
-					{
-						fprintf(theFile, "Sphere\n");
-						fprintf(theFile, "Center %lf %lf %lf\n", r1[3*v+0]*scale, r1[3*v+1]*scale, r1[3*v+2]*scale ); 
-						fprintf(theFile, "Rad %lf\n", rad * scale );
+		double pref =  (1.0/alpha) * exp( -r / alpha );
+	
+		// -dvdr, negatives cancel.
+		// center of geom of the first three points
 
-						fprintf(theFile, "Texture\n"
-							"Ambient 0.1 Diffuse 0.1 Specular 0.0 Opacity 1.0\n"
-					 		"Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", 0.0, 0.0, 0.0 );
-					}
-					fprintf(theFile, "Tri\n");
-						fprintf(theFile, "V0 %lf %lf %lf\n", r1[3*0+0]*scale, r1[3*0+1]*scale, r1[3*0+2]*scale  );
-						fprintf(theFile, "V1 %lf %lf %lf\n", r1[3*1+0]*scale, r1[3*1+1]*scale, r1[3*1+2]*scale  );
-						fprintf(theFile, "V2 %lf %lf %lf\n", r1[3*2+0]*scale, r1[3*2+1]*scale, r1[3*2+2]*scale  );
-						fprintf(theFile, "Texture\n"
-								"Ambient 0.3 Diffuse 0.5 Specular %lf Opacity %lf\n"
-								 "Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", convex_hull_spec, convex_hull_opacity, random_color[0], random_color[1], random_color[2]  );
-						fprintf(theFile, "FCylinder\n");
-		fprintf(theFile, "Base %lf %lf %lf\n", r1[3*0+0]*scale, r1[3*0+1]*scale, r1[3*0+2]*scale );
-		fprintf(theFile, "Apex %lf %lf %lf\n", r1[3*1+0]*scale, r1[3*1+1]*scale, r1[3*1+2]*scale );
-						fprintf(theFile, "Rad %lf\n", rad * scale );
-						fprintf(theFile, "Texture\n"
-							"Ambient 0.1 Diffuse 0.1 Specular 0.0 Opacity 1.0\n"
-					 		"Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", 0.0, 0.0, 0.0 );
-						
-						fprintf(theFile, "FCylinder\n");
-		fprintf(theFile, "Base %lf %lf %lf\n", r1[3*0+0]*scale, r1[3*0+1]*scale, r1[3*0+2]*scale );
-		fprintf(theFile, "Apex %lf %lf %lf\n", r1[3*2+0]*scale, r1[3*2+1]*scale, r1[3*2+2]*scale );
-						fprintf(theFile, "Rad %lf\n", rad * scale );
-						fprintf(theFile, "Texture\n"
-							"Ambient 0.1 Diffuse 0.1 Specular 0.0 Opacity 1.0\n"
-					 		"Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", 0.0, 0.0, 0.0 );
-						
-						fprintf(theFile, "FCylinder\n");
-		fprintf(theFile, "Base %lf %lf %lf\n", r1[3*1+0]*scale, r1[3*1+1]*scale, r1[3*1+2]*scale );
-		fprintf(theFile, "Apex %lf %lf %lf\n", r1[3*2+0]*scale, r1[3*2+1]*scale, r1[3*2+2]*scale );
-						fprintf(theFile, "Rad %lf\n", rad * scale );
-						fprintf(theFile, "Texture\n"
-							"Ambient 0.1 Diffuse 0.1 Specular 0.0 Opacity 1.0\n"
-					 		"Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", 0.0, 0.0, 0.0 );
-				}
-				else
-				{
-					double pt_rad = 1;
+		for( int p = 0; p < 3; p++ )
+		{
+			f1[p*3+0] += pref * dr[0];
+			f1[p*3+1] += pref * dr[1];
+			f1[p*3+2] += pref * dr[2];
+			
+			f2[p*3+0] -= pref * dr[0];
+			f2[p*3+1] -= pref * dr[1];
+			f2[p*3+2] -= pref * dr[2];
+		}
 
-
-					// dots at corner.
-					for( int v = 0; v < nv1; v++ )
-					{
-						fprintf(theFile, "Sphere\n");
-						fprintf(theFile, "Center %lf %lf %lf\n", r1[3*v+0]*scale, r1[3*v+1]*scale, r1[3*v+2]*scale ); 
-						fprintf(theFile, "Rad %lf\n", rad * scale );
-
-						fprintf(theFile, "Texture\n"
-							"Ambient 0.1 Diffuse 0.1 Specular 0.0 Opacity 1.0\n"
-					 		"Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", 0.0, 0.0, 0.0 );
-					}
-
-					for( int t = 0; t < ntri; t++ )
-					{
-						fprintf(theFile, "Tri\n");
-							fprintf(theFile, "V0 %lf %lf %lf\n", r1[3*triStorage[10*t+1]+0]*scale, r1[3*triStorage[10*t+1]+1]*scale, r1[3*triStorage[10*t+1]+2]*scale  );
-							fprintf(theFile, "V1 %lf %lf %lf\n", r1[3*triStorage[10*t+2]+0]*scale, r1[3*triStorage[10*t+2]+1]*scale, r1[3*triStorage[10*t+2]+2]*scale  );
-							fprintf(theFile, "V2 %lf %lf %lf\n", r1[3*triStorage[10*t+3]+0]*scale, r1[3*triStorage[10*t+3]+1]*scale, r1[3*triStorage[10*t+3]+2]*scale  );
-							fprintf(theFile, "Texture\n"
-									"Ambient 0.3 Diffuse 0.5 Specular %lf Opacity %lf\n"
-									 "Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", convex_hull_spec, convex_hull_opacity, random_color[0], random_color[1], random_color[2]  );
-						
-						fprintf(theFile, "FCylinder\n");
-		fprintf(theFile, "Base %lf %lf %lf\n", r1[3*triStorage[10*t+1]+0]*scale, r1[3*triStorage[10*t+1]+1]*scale, r1[3*triStorage[10*t+1]+2]*scale );
-		fprintf(theFile, "Apex %lf %lf %lf\n", r1[3*triStorage[10*t+2]+0]*scale, r1[3*triStorage[10*t+2]+1]*scale, r1[3*triStorage[10*t+2]+2]*scale );
-						fprintf(theFile, "Rad %lf\n", rad * scale );
-						fprintf(theFile, "Texture\n"
-							"Ambient 0.1 Diffuse 0.1 Specular 0.0 Opacity 1.0\n"
-					 		"Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", 0.0, 0.0, 0.0 );
-						
-						fprintf(theFile, "FCylinder\n");
-		fprintf(theFile, "Base %lf %lf %lf\n", r1[3*triStorage[10*t+1]+0]*scale, r1[3*triStorage[10*t+1]+1]*scale, r1[3*triStorage[10*t+1]+2]*scale );
-		fprintf(theFile, "Apex %lf %lf %lf\n", r1[3*triStorage[10*t+3]+0]*scale, r1[3*triStorage[10*t+3]+1]*scale, r1[3*triStorage[10*t+3]+2]*scale );
-						fprintf(theFile, "Rad %lf\n", rad * scale );
-						fprintf(theFile, "Texture\n"
-							"Ambient 0.1 Diffuse 0.1 Specular 0.0 Opacity 1.0\n"
-					 		"Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", 0.0, 0.0, 0.0 );
-						
-						fprintf(theFile, "FCylinder\n");
-		fprintf(theFile, "Base %lf %lf %lf\n", r1[3*triStorage[10*t+2]+0]*scale, r1[3*triStorage[10*t+2]+1]*scale, r1[3*triStorage[10*t+2]+2]*scale );
-		fprintf(theFile, "Apex %lf %lf %lf\n", r1[3*triStorage[10*t+3]+0]*scale, r1[3*triStorage[10*t+3]+1]*scale, r1[3*triStorage[10*t+3]+2]*scale );
-						fprintf(theFile, "Rad %lf\n", rad * scale );
-						fprintf(theFile, "Texture\n"
-							"Ambient 0.1 Diffuse 0.1 Specular 0.0 Opacity 1.0\n"
-					 		"Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", 0.0, 0.0, 0.0 );
-					}
-				}
-
-		*col_u = cur_u + factor * (1.0/3.0);
-		*col_v = cur_v + factor * (1.0/3.0);
-		return 0;
+		return 1;
 	}
 
+	int procd=0;
+	
 	int nvmax = 6+mhigh;
 
 	for( int x1 = 0; x1 < 4; x1++ )
@@ -2763,37 +2693,6 @@ int tachyonCollision2( FILE* theFile, double *r1, int nv1, double *r2, double **
 	
 		double *mat1 = M[nv1-6-mlow]+x1*(nv1 < 12 ? 12 : nv1)*nv1;
 
-		if( nv1 != 12 )
-		{
-//			printf("Using matrix %d (%d vertices).\n", nv1-6-mlow, nv1 );
-		}
-		double one = 1.0, zero = 0.0;
-		int incrxy=3;
-
-		double check1[nvmax*3];
-		memset(check1, 0, sizeof(double) * 3 * nvmax );
-		char trans = 'T';
-		int nI = nv1;
-		int nO = nv_use1;
-#define USE_DGEMV
-#ifdef USE_DGEMV
-		if(  nv1 == 12  )
-		{
-			if( x1 == 0 )
-				fast_sub6_0( r1, sub1 );
-			else if( x1 == 1 )
-				fast_sub6_1( r1, sub1 );
-			else if( x1 == 2 )
-				fast_sub6_2( r1, sub1 );
-			else if( x1 == 3 )
-				fast_sub6_3( r1, sub1 );
-		}
-		else
-		{
-			for( int c = 0; c < 3; c++ )
-				dgemv( &trans, &nI, &nO, &one, mat1, &nv1, r1+c, &incrxy, &zero, sub1+c, &incrxy );
-		}
-#else
 		for( int i = 0; i < nv_use1; i++ )
 		{
 			for( int j = 0; j < nv1; j++ )
@@ -2803,291 +2702,77 @@ int tachyonCollision2( FILE* theFile, double *r1, int nv1, double *r2, double **
 				sub1[i*3+2] += mat1[i*nv1+j] * r1[3*j+2];	
 			}
 		}
-#endif
 
-		double new_u = cur_u;
-		double new_v = cur_v;
-		
-		double new_factor = factor;
-
-		switch(x1)
+		for( int x2 = 0; x2 < 4; x2++ )
 		{
-			case 0:
-				new_factor *= 0.5;
-				break;
-			case 1:
-				new_u += factor * 0.5;
-				new_factor *= 0.5;
-				break;
-			case 2:
-				new_v += factor * 0.5;
-				new_factor *= 0.5;
-				break;
-			case 3:
-				new_u += factor * 0.5;
-				new_v += factor * 0.5;
-				new_factor *= -0.5;
-				break;
-		
-		}
+			double sub2[nvmax*3];
+			memset( sub2, 0, sizeof(double)*nvmax*3);
+			double frc2[nvmax*3];
+			memset( frc2, 0, sizeof(double) * nvmax*3);
 
-			if( tachyonCollision2( theFile, sub1, nv_use1, r2, M, mlow, mhigh, level+1, max_level, radius,
-				new_factor, new_u, new_v, col_u, col_v,scale, draw_type ) )
-				return 1;	
-	}
+			int nv_use2 = 12;
+			if( x2 == 0 ) nv_use2 = nv2;
+			double *mat2 = M[nv2-6-mlow]+x2*(nv2 < 12 ? 12 : nv2)*nv2;
 
-	return 0;
-} 
-
-void surface::printTachyonRadius( FILE *theFile, double scale, int tachyon_collision_level, double *pt_in, int draw_type, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, double L, double radius,	
-		double *vertex_data, int *ptr_to_data, int *nump, int disable_PBC_z  )
-{
-	 //for now, brute force comparison of all triangular pairs 
-
-	double Lx = L;
-	double Ly = L;
-	double Lz = L;
-
-	if( L< 0 )
-	{
-		Lx = PBC_vec[0][0];	
-		Ly = PBC_vec[1][1];	
-		Lz = PBC_vec[2][2];	
-	}
-
-	double pt[3] = { pt_in[0], pt_in[1], pt_in[2] };
-
-	while( pt[0] < -Lx/2 ) pt[0] += Lx;
-	while( pt[1] < -Ly/2 ) pt[1] += Ly;
-
-	if( !disable_PBC_z )
-		while( pt[2] < -Lz/2 ) pt[2] += Lz;
-	
-	while( pt[0] > Lx/2 ) pt[0] -= Lx;
-	while( pt[1] > Ly/2 ) pt[1] -= Ly;
-
-	if( !disable_PBC_z )
-		while( pt[2] > Lz/2 ) pt[2] -= Lz;
-
-
-
-
-	double trial_R = radius;
-
-                                                struct timeval tp;
-                                                gettimeofday(&tp, NULL);
-                                                double time_1 = tp.tv_usec * (1e-6) + tp.tv_sec;
-		// find boxes to search inside
-
-		bool did_collide = 0;
-	
-		double tpt[3] = { pt[0] + Lx/2, pt[1] + Ly/2, pt[2] + Lz/2 };
-	
-		while( tpt[0] < 0 ) tpt[0] += Lx;
-		while( tpt[1] < 0 ) tpt[1] += Ly;
-		
-		if( !disable_PBC_z )
-			while( tpt[2] < 0 ) tpt[2] += Lz;
-		
-		while( tpt[0] >= Lx ) tpt[0] -= Lx;
-		while( tpt[1] >= Ly ) tpt[1] -= Ly;
-
-		if( !disable_PBC_z )
-			while( tpt[2] >= Lz ) tpt[2] -= Lz;
-			
-		int cenx = xbox * (tpt[0]) / Lx; 
-		int ceny = ybox * (tpt[1]) / Ly; 
-		int cenz = zbox * (tpt[2]) / Lz;
-
-		int low_bin_x = xbox * (tpt[0] - trial_R - max_width_x) / Lx;
-		int low_bin_y = ybox * (tpt[1] - trial_R - max_width_y) / Ly;
-		int low_bin_z = zbox * (tpt[2] - trial_R - max_width_z) / Lz;
-		
-		int high_bin_x = xbox * (tpt[0] + trial_R + max_width_x) / Lx;
-		int high_bin_y = ybox * (tpt[1] + trial_R + max_width_y) / Ly;
-		int high_bin_z = zbox * (tpt[2] + trial_R + max_width_z) / Lz;
-		
-
-		if( high_bin_x - low_bin_x >= xbox )
-			high_bin_x = low_bin_x + xbox - 1;
-		if( high_bin_y - low_bin_y >= ybox )
-			high_bin_y = low_bin_y + ybox - 1;
-		if( high_bin_z - low_bin_z >= zbox )
-			high_bin_z = low_bin_z + zbox - 1;
-	
-		while( high_bin_x < 0 )
-		{
-			low_bin_x += xbox;
-			high_bin_x += xbox;
-		}
-		while( high_bin_y < 0 )
-		{
-			low_bin_y += ybox;
-			high_bin_y += ybox;
-		}
-		while( high_bin_z < 0 )
-		{
-			low_bin_z += zbox;
-			high_bin_z += zbox;
-		}
-
-		int arrayX[xbox];
-		int arrayY[ybox];
-		int arrayZ[zbox];
-		int sizeX = 0;
-		int sizeY = 0;
-		int sizeZ = 0;
-		
-		for( int t_xB = low_bin_x; t_xB <= high_bin_x; t_xB++, sizeX++ ) 
-			arrayX[sizeX] = t_xB - cenx;
-		qsort(arrayX, sizeX, sizeof(int), cmpfunci);
-		for( int t_yB = low_bin_y; t_yB <= high_bin_y; t_yB++, sizeY++ ) 
-			arrayY[sizeY] = t_yB - ceny;
-		qsort(arrayY, sizeY, sizeof(int), cmpfunci);
-		for( int t_zB = low_bin_z; t_zB <= high_bin_z; t_zB++, sizeZ++ ) 
-			arrayZ[sizeZ] = t_zB - cenz;
-		qsort(arrayZ, sizeZ, sizeof(int), cmpfunci);
-
-	
-/*	
-		for( int t_xB = - binloop_x; t_xB <= binloop_x + fudge_x; t_xB++, sizeX++ ) 
-			arrayX[sizeX] = t_xB;
-		qsort(arrayX, sizeX, sizeof(int), cmpfunci);
-		for( int t_yB = - binloop_y; t_yB <= binloop_y + fudge_y; t_yB++, sizeY++ ) 
-			arrayY[sizeY] = t_yB;
-		qsort(arrayY, sizeY, sizeof(int), cmpfunci);
-		for( int t_zB = - binloop_z; t_zB <= binloop_z + fudge_z; t_zB++, sizeZ++ ) 
-			arrayZ[sizeZ] = t_zB;
-		qsort(arrayZ, sizeZ, sizeof(int), cmpfunci);
-*/
-		int numChecks = 0;
-		int numTris = 0;
-		for( int t_xB = 0; t_xB < sizeX && !did_collide; t_xB++ ) 
-		{
-			int xB =  cenx + arrayX[t_xB];
-
-			if( xB < 0 ) xB += xbox;
-			if( xB >= xbox ) xB -= xbox;
-
-			for( int t_yB = 0; t_yB < sizeY && !did_collide; t_yB++ ) 
-			{ 
-				int yB =  ceny + arrayY[t_yB];
-				
-				if( yB < 0 ) yB += ybox;
-				if( yB >= ybox ) yB -= ybox;
-
-				for( int t_zB = 0; t_zB < sizeZ && !did_collide; t_zB++ )
+			for( int i = 0; i < nv_use2; i++ )
+			{
+				for( int j = 0; j < nv2; j++ )
 				{
-					int zB = cenz + arrayZ[t_zB];
-				
-					if( zB < 0 ) zB += zbox;
-					if( zB >= zbox ) zB -= zbox;
+					sub2[i*3+0] += mat2[i*nv2+j] * r2[3*j+0];	
+					sub2[i*3+1] += mat2[i*nv2+j] * r2[3*j+1];	
+					sub2[i*3+2] += mat2[i*nv2+j] * r2[3*j+2];	
+				}
+			}	
 
-					bool worthCheck = true;		
-#ifndef SKIP_SUPPORT_CHECK
-					if (box[xB][yB][zB].num_tri > 0) {
-						double support = pt[0]*box[xB][yB][zB].search[0] + pt[1]*box[xB][yB][zB].search[1] + pt[2]*box[xB][yB][zB].search[2];
-						double test = support + trial_R;
-						double test2 = support - trial_R;
-						double mindiff = box[xB][yB][zB].vmin;
-						double maxdiff = box[xB][yB][zB].vmax;
+			int do_proc = collisionForces( 
+					sub1, nv_use1, 
+					sub2, nv_use2, 
+					M, mlow, mhigh, 
+					level+1, max_level,
+					frc1, frc2, cutoff, alpha ); 
 
-						if ((test < mindiff && test2 < mindiff) || (test > maxdiff && test2 > maxdiff)) {
-							worthCheck = false;
-						} else {
-							numChecks++;
-						}
+			if( do_proc )
+			{
+				do_proc1 = 1;
+
+				// transform forces back to original
+			
+				for( int i = 0; i < nv_use2; i++ )
+				{
+					for( int j = 0; j < nv2; j++ )
+					{
+						f2[j*3+0] += mat2[i*nv2+j] * frc2[3*i+0];	
+						f2[j*3+1] += mat2[i*nv2+j] * frc2[3*i+1];	
+						f2[j*3+2] += mat2[i*nv2+j] * frc2[3*i+2];	
 					}
-#endif
-
-					for (int ind = 0; ind < box[xB][yB][zB].num_tri && !did_collide && worthCheck; ind++) {
-						numTris++;
-						triangle *tri1 = theTriangles + box[xB][yB][zB].tri_list[ind];
-                        			int f1 = tri1->f;
-/*
-						int *indices1;
-                      				int val1 = 0;
-                        			int np1 = 0;
-                        			int base1 = 0;
-						double *pbc1;
-	
-                        			if( f1 >= nf_faces )
-                        			{
-
-                                			f1 -= nf_faces;
-                                			int formulas_per_face = nf_irr_pts;
-                                			indices1 = theIrregularFormulas[f1*formulas_per_face].cp;
-							pbc1 = theIrregularFormulas[f1*formulas_per_face].r_pbc;
-                                			np1 = theIrregularFormulas[f1*formulas_per_face].ncoor;
-                                			base1 = theIrregularFormulas[f1*formulas_per_face].vertex;
-                        			}
-                        			else
-                        			{
-                                			int formulas_per_face = nf_g_q_p;
-                                			indices1 = theFormulas[f1*formulas_per_face].cp;
-							pbc1 = theFormulas[f1*formulas_per_face].r_pbc;
-                                			np1 = theFormulas[f1*formulas_per_face].ncoor;
-                                			base1 = theFormulas[f1*formulas_per_face].vertex;
-                        			}
-
-                        			double pts1[3*np1];
-                        			for( int x = 0; x < np1; x++ )
-                        			{
-                                			pts1[3*x+0] = theVertices[indices1[x]].r[0] + pbc1[3*x+0];
-                                			pts1[3*x+1] = theVertices[indices1[x]].r[1] + pbc1[3*x+1];
-                                			pts1[3*x+2] = theVertices[indices1[x]].r[2] + pbc1[3*x+2];
-							
-                        			}
-					*/	
-
-						int np1 = nump[tri1->f];
-						double *pts1 = vertex_data + ptr_to_data[tri1->f]; 
-
-						double usep[3] = { pt[0], pt[1], pt[2] };
-
-						while( usep[0] - pts1[0] < -Lx/2 ) usep[0] += Lx;
-						while( usep[1] - pts1[1] < -Ly/2 ) usep[1] += Ly;
-						if( !disable_PBC_z )
-							while( usep[2] - pts1[2] < -Lz/2 ) usep[2] += Lz;
-
-						while( usep[0] - pts1[0] > Lx/2 ) usep[0] -= Lx;
-						while( usep[1] - pts1[1] > Ly/2 ) usep[1] -= Ly;
-						if( !disable_PBC_z )
-							while( usep[2] - pts1[2] > Lz/2 ) usep[2] -= Lz;
-
-                        			if(  tachyonCollision2( theFile, pts1, np1, usep, M, mlow, mhigh, 0, tachyon_collision_level, trial_R,
-                                			1.0, 1e-6, 1e-6, col_u, col_v, scale, draw_type ) )
-                        			{
-                                			*col_f =tri1->f;
-                                			did_collide = 1;
-		        			}
-	
-					} 
-                		}
+				}	 
 			}
 		}
-}
+		
+		if( do_proc1 )
+		{
+			procd = 1;
 
-int collisionForces( double *r1, int nv1, 
-		     double *r2, int nv2, 
-		     double **M, int mlow, int mhigh, 
-		     int level, int max_level,
-		     double *f1, double *f2, double cutoff, double alpha );
+			for( int i = 0; i < nv_use1; i++ )
+			{
+				for( int j = 0; j < nv1; j++ )
+				{
+					f1[j*3+0] += mat1[i*nv1+j] * frc1[3*i+0];	
+					f1[j*3+1] += mat1[i*nv1+j] * frc1[3*i+1];	
+					f1[j*3+2] += mat1[i*nv1+j] * frc1[3*i+2];	
+				}
+			}
+		}
+	}
 
-
-
-int parallelCollisionForces( double *r1, int nv1,
-                     double *r2, int nv2,
-                     double **M, int mlow, int mhigh,
-                     int level, int max_level,
-                     double *f1, double *f2, double cutoff, double alpha );
-
+	return procd;
+} 
 
 void surfaceSurfaceCollisionForces( surface *surface1, surface *surface2, double *grad1, double *grad2, double alpha, double v0, double **M, int mlow, int mhigh )
 {
 	// V = rho1 rho2 v0 exp(-r/alpha)
 	
-	int eval_level = 4;
+	int eval_level = 1; // eval level one: triangle centers.
 	double cutoff = 10 * alpha; // where we neglect exp(-r/alpha)
 
 	// f_mesh: -dv dr_mesh, etc
@@ -3175,15 +2860,8 @@ void surfaceSurfaceCollisionForces( surface *surface1, surface *surface2, double
 				pts2[3*x+2] = surface2->theVertices[indices2[x]].r[2] + pbc2[3*x+2];
 			} 
 
-
-/*
 			collisionForces( pts1, np1, pts2, np2, M, mlow, mhigh, 0, eval_level,
 				frc1, frc2, cutoff, alpha );
-*/
-
-			collisionForces( pts1, np1, pts2, np2, M, mlow, mhigh, 0, eval_level,
-				frc1, frc2, cutoff, alpha );
-
 			
 			for( int x = 0; x < np2; x++ )
 			{
@@ -3361,6 +3039,5 @@ int collisionForces( double *r1, int nv1,
 
 	return procd;
 } 
-
 
 

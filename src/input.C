@@ -35,6 +35,7 @@ void setDefaults( parameterBlock *block )
 	block->concentration = 0;
 	block->rho = 0;
 	block->lipid_lib = NULL;
+	block->meshName2 = NULL;
 
 	block->record_curvature = 0;
 	block->create_all_atom = 0;	
@@ -93,6 +94,7 @@ void setDefaults( parameterBlock *block )
 	block->tachyon_dull = 0;
 	block->tachyon_clear = 0;
 	block->tachyon_flip_sense = 0;
+	block->tachyon_clear = 0;
 	block->tachyon_curvature = 0;
 	block->tachyon_gauss = 0;
 	block->tachyon_view_x = 0;
@@ -529,6 +531,13 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			free(block->meshName);
 			block->meshName = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
 			strcpy( block->meshName, word2 );
+		}
+		else if( !strcasecmp( word1, "mesh2" ) )
+		{
+			if( block->meshName2 )
+				free(block->meshName2);
+			block->meshName2 = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->meshName2, word2 );
 		}
 		else if( !strcasecmp( word1, "lipid_lib" ) )
 		{
@@ -1043,6 +1052,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				block->tachyon_flip_sense = 1;
 			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
 				block->tachyon_flip_sense = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
+		else if( !strcasecmp( word1, "tachyon_clear" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->tachyon_clear = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->tachyon_clear = 0;
 			else
 			{
 				printf("Could not interpret input line '%s'.\n", tbuf );

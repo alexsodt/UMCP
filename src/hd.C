@@ -55,11 +55,10 @@ extern double VR;
 double mode_KA = 0; // a ``global'' KA to use when doing modes, because with "z" movements individual elements cannot relax -- this is artificial. 
 double dist_nrm = 0;
 int do_2p= 0;
-surface *sub_surface = NULL;
 
 double pp_grad( double *r, double *gc, int np, double *alpha, double *rads, int * pleaflet);
 double particle_particle_energy( double *r, int np_1, int np_2, int *set, int np_set, double rad1, double rad2, double *alpha, double *rads, int *dimer_p, int *pleaflet );
-void updateParticleR( int p, int *pfaces, double *puv, double *p_r_m, double *r, surface *sub_surface, int np );
+void updateParticleR( int p, int *pfaces, double *puv, double *p_r_m, double *r, surface *theSurface, int np );
 
 int *global_plist = NULL;
 
@@ -82,6 +81,34 @@ int main( int argc, char **argv )
 {
 	return temp_main( argc, argv );
 }
+
+typedef struct surface_record
+{
+	int id; // for locating bound particles
+	surface *theSurface;
+	FILE *tFile; // for writing trajectory
+	struct surface_record *next;
+	double *r;
+	double *g;
+	double *pp;
+	double *qdot;
+	double *qdot0;
+
+	// for harmonic modes
+	int NQ;
+	double *gen_transform;
+	double *scaling_factor;
+	int NQ;
+	int do_gen_q;
+	int doing_spherical_harmonics;
+	int doing_planar_harmonics;
+	double *output_qvals;
+	
+
+	SparseMatrix *EFFM;
+	SparseMatrix *MMat;
+	force_set *theForceSet;
+} surface_record;
 
 int temp_main( int argc, char **argv )
 {
@@ -110,7 +137,6 @@ int temp_main( int argc, char **argv )
 	parameterBlock block;
 
 	int nwarnings = getInput( (const char **)argv, argc, &block );
-	
 
 	srand(block.random_seed);
 
@@ -143,89 +169,107 @@ int temp_main( int argc, char **argv )
 	double dt = block.time_step;
 
 	srd_integrator *srd_i = NULL;
-	surface *theSurface =(surface *)malloc( sizeof(surface) );
-	theSurface->loadLattice( block.meshName , 0. );
-	surface *prev_surface = theSurface;
-	surface *next_surface;
+	surface_record *allSurfaces = NULL;
+	
 
+	surface *theSurface1 =(surface *)malloc( sizeof(surface) );
+	theSurface1->loadLattice( block.meshName , 0. );
 
 	pcomplex **allComplexes = NULL;
 
 	int ncomplex = 0;
 
+	double Lx = theSurface1->PBC_vec[0][0];
+	double Ly = theSurface1->PBC_vec[1][1];
+	double Lz = theSurface1->PBC_vec[2][2];
 
-	int ndiv = 0;
-	for( int d = 0; d < ndiv; d++ )
-	{
-		next_surface = (surface *)malloc( sizeof(surface) );
-		int ssize = sizeof(surface);
-		char *init = (char *)next_surface;
+	theSurface1->generatePlan();
 
-		next_surface->subdivideSurface( prev_surface );
-		prev_surface = next_surface;
-	}
-	
-	sub_surface = prev_surface;
-	double Lx = sub_surface->PBC_vec[0][0];
-	double Ly = sub_surface->PBC_vec[1][1];
-	double Lz = sub_surface->PBC_vec[2][2];
-
-	sub_surface->generatePlan();
 	double *M5 = (double *)malloc( sizeof(double) * 4 * 11 * 12 ); 
 	double *M6 = (double *)malloc( sizeof(double) * 4 * 12 * 12 ); 
 	double *M7 = (double *)malloc( sizeof(double) * 4 * 13 * 13 );
 	double *M[3] = { M5, M6, M7 };
 	int mlow = 5;
 	int mhigh = 7;
-	sub_surface->generateSubdivisionMatrices( M, mlow, mhigh );
+	theSurface1->generateSubdivisionMatrices( M, mlow, mhigh );
+
+	surface_record *newSurface = (struct surface_record*)malloc( sizeof(surface_record) );
+	newSurface->theSurface = theSurface1;
+	newSurface->id = 0;
+	newSurface->next = allSurfaces;
+	allSurfaces = newSurface;
+
+	if( block.meshName2 )
+	{
+		// load and propagate a second mesh. just a hack for now until we simulate lots of objects.
 	
-	int nc = 3 * sub_surface->nv+3;
-	int nv = sub_surface->nv;
+		surface *addSurface = (surface *)malloc( sizeof(surface) );
+		addSurface->loadLattice( block.meshName2, 0. );
+	
+		surface_record *newSurface = (struct surface_record*)malloc( sizeof(surface_record) );
+		newSurface->theSurface = addSurface;
+		newSurface->id = 1;
+		newSurface->next = allSurfaces;
+		allSurfaces = newSurface;
+	
+	}
+
 	double av_edge_length = 0;
 	double n_edge_length = 0;
-	double *r = (double *)malloc( sizeof(double) * nc );
-	sub_surface->get(r);
-	double *g = (double *)malloc( sizeof(double) * nc );
-	r[3*nv+0] = 1.0;
-	r[3*nv+1] = 1.0;
-	r[3*nv+2] = 1.0;
 
-	for ( int x = 0; x < nv; x++ )
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
 	{
-		int val = sub_surface->theVertices[x].valence;
+		surface *useSurface =sRec->theSurface;
 
-		for( int e = 0; e < val; e++ )
+		int nc = 3 * useSurface->nv+3;
+		int nv = useSurface->nv;
+		sRec->r = (double *)malloc( sizeof(double) * nc );
+		useSurface->get(r);
+		sRec->g = (double *)malloc( sizeof(double) * nc );
+		r[3*nv+0] = 1.0;
+		r[3*nv+1] = 1.0;
+		r[3*nv+2] = 1.0;
+
+		for ( int x = 0; x < nv; x++ )
 		{
-			int j = sub_surface->theVertices[x].edges[e];
-
-			double *epbc = sub_surface->theVertices[x].edge_PBC+3*e;
-
-			double dr[3] = { 
-				r[3*x+0] - r[3*j+0] - (epbc[0]*sub_surface->PBC_vec[0][0] + epbc[1] * sub_surface->PBC_vec[1][0] + epbc[2]*sub_surface->PBC_vec[2][0]), 
-				r[3*x+1] - r[3*j+1] - (epbc[0]*sub_surface->PBC_vec[0][1] + epbc[1] * sub_surface->PBC_vec[1][1] + epbc[2]*sub_surface->PBC_vec[2][1]), 
-				r[3*x+2] - r[3*j+2] - (epbc[0]*sub_surface->PBC_vec[0][2] + epbc[1] * sub_surface->PBC_vec[1][2] + epbc[2]*sub_surface->PBC_vec[2][2]) };
-			double r = normalize(dr);
-
-			av_edge_length += r;
-			n_edge_length += 1;
+			int val = theSurface->theVertices[x].valence;
+	
+			for( int e = 0; e < val; e++ )
+			{
+				int j = theSurface->theVertices[x].edges[e];
+	
+				double *epbc = theSurface->theVertices[x].edge_PBC+3*e;
+	
+				double dr[3] = { 
+					r[3*x+0] - r[3*j+0] - (epbc[0]*theSurface->PBC_vec[0][0] + epbc[1] * theSurface->PBC_vec[1][0] + epbc[2]*theSurface->PBC_vec[2][0]), 
+					r[3*x+1] - r[3*j+1] - (epbc[0]*theSurface->PBC_vec[0][1] + epbc[1] * theSurface->PBC_vec[1][1] + epbc[2]*theSurface->PBC_vec[2][1]), 
+					r[3*x+2] - r[3*j+2] - (epbc[0]*theSurface->PBC_vec[0][2] + epbc[1] * theSurface->PBC_vec[1][2] + epbc[2]*theSurface->PBC_vec[2][2]) };
+				double r = normalize(dr);
+	
+				av_edge_length += r;
+				n_edge_length += 1;
+			}
 		}
+	
+		FILE *inputFile = fopen(argv[1],"r");
+		useSurface->readLipidComposition(inputFile);
+		if( inputFile) fclose(inputFile);
+		useSurface->setg0(sRec->r);
+	
+		double area0;
+		double cur_area;
+		useSurface->area(r, -1, &cur_area, &area0 );
+		printf("Surace %d area: %le area0: %le\n", sRec->id, cur_area, area0 );
 	}
 	
-	FILE *inputFile = fopen(argv[1],"r");
-	sub_surface->readLipidComposition(inputFile);
-	if( inputFile) fclose(inputFile);
-	
-	sub_surface->setg0(r);
-
 	av_edge_length /= n_edge_length;
-	sub_surface->box_system(av_edge_length);
+	theSurface1->box_system(av_edge_length);
 	
+	// for now we are putting all complexes on the first surface.
+	
+	theSurface1->loadComplexes( &allComplexes, &ncomplex, &block ); 
 
-	double area0;
-	double cur_area;
-	sub_surface->area(r, -1, &cur_area, &area0 );
-	printf("area: %le area0: %le\n", cur_area, area0 );
-	theSurface->loadComplexes( &allComplexes, &ncomplex, &block ); 
+	// for now only collect kc info from first surface.
 
 	int nmodes = 8;
 	int nspacehk = 10;
@@ -256,7 +300,7 @@ int temp_main( int argc, char **argv )
 
 	if( block.sphere )
 	{
-		V0 =fabs(sub_surface->volume( r));
+		V0 =fabs(theSurface1->volume( r));
 		printf("Area: %lf (R: %lf)\n", area0, sqrt(area0/(4*M_PI))  );
 		printf("Volume: %lf (R: %lf)\n", V0, pow( V0/(4*M_PI/3.0), 1.0/3.0) );
 		sphere_rad = sqrt(area0/(4*M_PI));
@@ -264,7 +308,7 @@ int temp_main( int argc, char **argv )
 
 	double *qvals = NULL;
 
-	sub_surface->processSANS( &block, &qvals, &(block.nq) );
+	initSANS( &block, &qvals, &(block.nq) );
 	double A2dz2_sampled = 0;
 	double *B_hist = NULL;
 	double sans_max_r = 0;
@@ -273,11 +317,11 @@ int temp_main( int argc, char **argv )
 
 	if( block.s_q )
 	{
-		sans_max_r = sub_surface->PBC_vec[0][0];
-		if( sans_max_r < sub_surface->PBC_vec[1][1] )
-			sans_max_r = sub_surface->PBC_vec[1][1];
-		if( sans_max_r < sub_surface->PBC_vec[2][2] )
-			sans_max_r = sub_surface->PBC_vec[2][2];
+		sans_max_r = theSurface1->PBC_vec[0][0];
+		if( sans_max_r < theSurface1->PBC_vec[1][1] )
+			sans_max_r = theSurface1->PBC_vec[1][1];
+		if( sans_max_r < theSurface1->PBC_vec[2][2] )
+			sans_max_r = theSurface1->PBC_vec[2][2];
 		nsans_bins = sans_max_r / sans_bin_width;
 		B_hist = (double *)malloc( sizeof(double) * nsans_bins );
 	}
@@ -291,74 +335,57 @@ int temp_main( int argc, char **argv )
 
 	double time_step = block.time_step; // one nanosecond.
 	double time_step_collision = block.time_step_collision; // one nanosecond.
+	
+	
+	int nsurfaces = 0;
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+		nsurfaces++;
 
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+	{	
+		sRec->tFile = NULL;
+		if( block.movie && par_info.my_id == BASE_TASK )
+		{
+			FILE *tpsf = NULL;
+			char fname[256];
+			if( nsurfaces > 0 )
+				sprintf(fname, "%s_%d.psf", block.jobName, sRec->id );
+			else
+				sprintf(fname, "%s.psf", block.jobName );
+
+			tpsf = fopen(fname,"w");
+			if( sRec->id == 0 )
+	        		sRec->theSurface->writeLimitingSurfacePSF(tpsf, allComplexes, ncomplex );
+			else
+	        		sRec->theSurface->writeLimitingSurfacePSF(tpsf, allComplexes, 0 );
+			fclose(tpsf);
 	
-	FILE *tFile = NULL;
-	if( block.movie && par_info.my_id == BASE_TASK )
-	{
-		FILE *tpsf = NULL;
-		char fname[256];
-		sprintf(fname, "%s.psf", block.jobName );
-		tpsf = fopen(fname,"w");
-        	sub_surface->writeLimitingSurfacePSF(tpsf, allComplexes, ncomplex );
-		fclose(tpsf);
-	
-		sprintf(fname, "%s.xyz", block.jobName );
-		tFile = fopen(fname,"w");
+			if( nsurfaces > 0 )	
+				sprintf(fname, "%s_%d.xyz", block.jobName, sRec->id );
+			else
+				sprintf(fname, "%s.xyz", block.jobName );
+
+			sRec->tFile = fopen(fname,"w");
+		}
 	}
-	
-	int nfaces = sub_surface->nf_faces + sub_surface->nf_irr_faces;
-
-	// allocate a large array to potentially hold every face that may need to be recomputed if we break up or form a complex.
-	int *modified_face_list = (int *)malloc( sizeof(int) * 3 * nfaces );
-	int nmod = 0;
-
 
 	int o_lim = nsteps;
 
-	
-//#define FDIFF_GRAD
-/*
-	if( block.loadName )
-	{
-		FILE *loadFile = fopen(block.loadName, "r");
-	
-		for( int x = 0; x < sub_surface->nv; x++ )
-		{
-			getLine(loadFile, buffer );
-			if( feof(loadFile) ) break;
-			sscanf(buffer, "%lf %lf %lf\n",
-				r+3*x+0, r+3*x+1, r+3*x+2 );
-		}
-		getLine(loadFile, buffer );
-		sscanf(buffer, "%lf %lf %lf\n", r+3*nv+0, r+3*nv+1, r+3*nv+2);
-
-		fclose(loadFile);		
-	}
-*/	
 	double hours = block.hours;
 	struct timeval tstart;
 
 	gettimeofday( &tstart, NULL );	
 
 	if( hours > 0 )
-	{
 		o_lim = 2e9;		
-	}
 	
-	int n_test_pts = 1;
-	double *rvals = NULL;
-
 	// Langevin dynamics
-	
 
 	double cur_t = 0;
 
 	int done = 0;
 
-	
-	force_set *theForceSet = (force_set *)malloc( sizeof(force_set) );
-
+	// BLOCK FOR SETTING UP POINT EVALULATIONS ON SURFACE
 	int plim = 10;
 	int ppf = 0;
 
@@ -375,93 +402,94 @@ int temp_main( int argc, char **argv )
 	double mass_per_lipid = MSCALE * 1000 * 760.09 / 6.022e23 / 1000; // POPC kg, wikipedia
 	double area_per_lipid = 65.35; // A^2, POPC, interpolated from Kucerka 2011 BBA 2761
 	// factor of two for leaflets.
-	double mass_per_pt = AMU_PER_KG * 2 * area0 / (sub_surface->nf_faces + sub_surface->nf_irr_faces) / ppf * mass_per_lipid / area_per_lipid; 
-	printf("mass per mesh vertex: %le\n", AMU_PER_KG * 2 * area0 * mass_per_lipid / area_per_lipid / (sub_surface->nv) );
+	double mass_per_pt = AMU_PER_KG * 2 * area0 / (theSurface->nf_faces + theSurface->nf_irr_faces) / ppf * mass_per_lipid / area_per_lipid; 
+	printf("mass per mesh vertex: %le\n", AMU_PER_KG * 2 * area0 * mass_per_lipid / area_per_lipid / (theSurface->nv) );
 
-	theForceSet->npts = ppf * sub_surface->nt;
-	theForceSet->face_set = (int *)malloc( sizeof(int) * theForceSet->npts );
-	theForceSet->uv_set = (double *)malloc( sizeof(double) * theForceSet->npts *2 );
-	theForceSet->mass = (double *)malloc( sizeof(double) * theForceSet->npts );
-
-	int totp = 0;
-
-	for( int t = 0; t < sub_surface->nt; t++ )
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
 	{
-		int f = sub_surface->theTriangles[t].f;
-		
-		for( int fi = 0; fi <= plim; fi++ )
-		for( int fj = 0; fj <= plim-fi; fj++, totp++)
+		surface *useSurface = sRec->theSurface;
+
+		int nc = 3 * useSurface->nv+3;
+		int nv = useSurface->nv;
+
+		sRec->theForceSet = (force_set *)malloc( sizeof(force_set) );
+		force_set *theForceSet = sRec->theForceSet;
+
+		theForceSet->npts = ppf * useSurface->nt;
+		theForceSet->face_set = (int *)malloc( sizeof(int) * theForceSet->npts );
+		theForceSet->uv_set = (double *)malloc( sizeof(double) * theForceSet->npts *2 );
+		theForceSet->mass = (double *)malloc( sizeof(double) * theForceSet->npts );
+
+		int totp = 0;
+
+		for( int t = 0; t < sRec->theSurface->nt; t++ )
 		{
-			double f1 = fi / (double)plim;
-			double f2 = fj / (double)plim;
-
-			theForceSet->face_set[totp] = f;
-
-			theForceSet->uv_set[2*totp+0] = f1;
-			theForceSet->uv_set[2*totp+1] = f2;
-			theForceSet->mass[totp] = mass_per_pt;
-		}
-	}
+			int f = sRec->theSurface->theTriangles[t].f;
+			
+			for( int fi = 0; fi <= plim; fi++ )
+			for( int fj = 0; fj <= plim-fi; fj++, totp++)
+			{
+				double f1 = fi / (double)plim;
+				double f2 = fj / (double)plim;
 	
-	sub_surface->load_least_squares_fitting( theForceSet );
+				theForceSet->face_set[totp] = f;
+	
+				theForceSet->uv_set[2*totp+0] = f1;
+				theForceSet->uv_set[2*totp+1] = f2;
+				theForceSet->mass[totp] = mass_per_pt;
+			}
+		}
+	
+		sRec->theSurface->load_least_squares_fitting( theForceSet );
+	
+	// END BLOCK FOR SETTING UP POINT EVALULATIONS ON SURFACE
 
 /*
  * for doing generalized coordinates (normal modes here).
  *
  * */
 	
-	double *scaling_factor = NULL;
-	double *gen_transform = NULL;
-	int NQ = 0;
-	int do_gen_q = 0;
-	int doing_spherical_harmonics = 0;
-	int doing_planar_harmonics = 0;
-	double *output_qvals=NULL;
+		sRec->scaling_factor = NULL;
+		sRec->gen_transform = NULL;
+		sRec->NQ = 0;
+		sRec->do_gen_q = 0;
+		sRec->doing_spherical_harmonics = 0;
+		sRec->doing_planar_harmonics = 0;
+		sRec->output_qvals = NULL;	
 
-	if( block.mode_max >= 0 )
-	{
-		do_gen_q=1;
-		if( block.sphere )
-		{	
-			doing_spherical_harmonics = 1;
-			NQ = sub_surface->getSphericalHarmonicModes( r, block.mode_min, block.mode_max, &gen_transform, &output_qvals, &scaling_factor );
 
+		if( block.mode_max >= 0 )
+		{
+			sRec->do_gen_q=1;
+			if( block.sphere )
+			{	
+				sRec->doing_spherical_harmonics = 1;
+				sRec->NQ = useSurface->getSphericalHarmonicModes( sRec->r, block.mode_min, block.mode_max, &sRec->gen_transform, &sRec->output_qvals, &sRec->scaling_factor );
+			}
+			else
+			{
+				sRec->doing_planar_harmonics = 1;
+				sRec->NQ = useSurface->getPlanarHarmonicModes( sRec->r, -1, -1, block.mode_min, block.mode_max, &sRec->gen_transform, &sRec->output_qvals, &sRec->scaling_factor );
+			}
+		}
+		else if( block.mode_x >= 0 || block.mode_y >= 0 )
+		{
+			sRec->do_gen_q=1;
+			if( block.sphere )
+			{
+				sRec->doing_spherical_harmonics = 1;
+				printf("Single spherical harmonic NYI.\n");
+				exit(1);
+			}
+			else
+			{
+				sRec->doing_planar_harmonics = 1;
+				int max_l = block.mode_x;
+				if( block.mode_y > max_l ) max_l = block.mode_y;
 	
-
-#if 0 
-			doing_spherical_harmonics = 0;
-			gen_transform = ( double *)malloc( sizeof(double)*3*nv*3*nv);
-			memset( gen_transform, 0, sizeof(double) * 3 * nv * 3 * nv );
-	
-			for( int v = 0; v < nv*3; v++ )
-				gen_transform[v*(3*nv)+v] = 1;
-			NQ=3*nv;
-#endif
+				sRec->NQ = useSurface->getPlanarHarmonicModes( sRec->r, block.mode_x, block.mode_y, 0, max_l, &sRec->gen_transform, &sRec->output_qvals, &sRec->scaling_factor );
+			}
 		}
-		else
-		{
-			doing_planar_harmonics = 1;
-			NQ = sub_surface->getPlanarHarmonicModes( r, -1, -1, block.mode_min, block.mode_max, &gen_transform, &output_qvals, &scaling_factor );
-		}
-	}
-	else if( block.mode_x >= 0 || block.mode_y >= 0 )
-	{
-		do_gen_q=1;
-		if( block.sphere )
-		{
-			doing_spherical_harmonics = 1;
-			printf("Single spherical harmonic NYI.\n");
-			exit(1);
-		}
-		else
-		{
-			doing_planar_harmonics = 1;
-			int max_l = block.mode_x;
-			if( block.mode_y > max_l ) max_l = block.mode_y;
-
-			NQ = sub_surface->getPlanarHarmonicModes( r, block.mode_x, block.mode_y, 0, max_l, &gen_transform, &output_qvals, &scaling_factor );
-		}
-	}
 	
 	/*
 		Langevin/leapfrog dynamics:
@@ -478,112 +506,69 @@ int temp_main( int argc, char **argv )
 	// dynamics in terms of control points as generalized coordinates.	
 	// we need partial r partial q
 	// this is stored in the force set.
+
+		sRec->pp = NULL;
+		sRec->next_pp = NULL;
+		sRec->del_pp = NULL;
+		sRec->n_real_q = 3*nv;
+		sRec->nav_Q = NULL;
+		sRec->nav_Q = NULL;
+		sRec->av_Q = NULL;
+		sRec->av_Q2 = NULL;
+		sRec->av_Q_T = NULL;
+		sRec->nav_Q_T = NULL;
+		sRec->QV = NULL;
+		sRec->Qdot = NULL;
+		sRec->Qdot0 = NULL;
+		sRec->Qdot0_trial = NULL;		
+
+		if( sRec->do_gen_q )
+		{
+			sRec->n_real_q = sRec->NQ;
+			sRec->pp = (double *)malloc( sizeof(double) * sRec->NQ ); 
+			memset( sRec->pp, 0, sizeof(double) * sRec->NQ );
+			sRec->next_pp = (double *)malloc( sizeof(double) * sRec->NQ );
+			memset( sRec->next_pp, 0, sizeof(double) * sRec->NQ );
+			sRec->del_pp = (double *)malloc( sizeof(double) * sRec->NQ );
+			sRec->QV = (double *)malloc( sizeof(double) * sRec->NQ );
+			sRec->Qdot = (double *)malloc( sizeof(double) * sRec->NQ );
+			sRec->Qdot0 = (double *)malloc( sizeof(double) * sRec->NQ );
+			sRec->Qdot0_trial = (double *)malloc( sizeof(double) * sRec->NQ );
+			sRec->nav_Q = (double *)malloc( sizeof(double) * sRec->NQ );
+			sRec->av_Q = (double *)malloc( sizeof(double) * sRec->NQ );
+			sRec->av_Q2 = (double *)malloc( sizeof(double) * sRec->NQ );
+			sRec->av_Q_T = (double *)malloc( sizeof(double) * sRec->NQ );
+			sRec->nav_Q_T = (double *)malloc( sizeof(double) * sRec->NQ );
+			memset( sRec->nav_Q, 0, sizeof(double) * sRec->NQ );
+			memset( sRec->av_Q, 0, sizeof(double) * sRec->NQ );
+			memset( sRec->av_Q2, 0, sizeof(double) * sRec->NQ );
+			memset( sRec->av_Q_T, 0, sizeof(double) * sRec->NQ );
+			memset( sRec->nav_Q_T, 0, sizeof(double) * sRec->NQ );
+		}
+		else
+		{
+			sRec->pp = (double *)malloc( sizeof(double) * (3*nv+3) );
+			memset( sRec->pp, 0, sizeof(double) * (3*nv+3) );
+			sRec->next_pp = (double *)malloc( sizeof(double) * (3*nv+3) );
+			memset( sRec->next_pp, 0, sizeof(double) * (3*nv+3) );
 	
-	double *pp=NULL;
-	double *next_pp=NULL;
-	double *del_pp=NULL; // for gen_q
-	int n_real_q = 3*nv;
-
-	double *nav_Q = NULL;
-	double *av_Q = NULL;
-	double *av_Q2 = NULL;
-	double *av_Q_T = NULL;
-	double *nav_Q_T = NULL;
-
-	double *QV = NULL;
-	double *Qdot = NULL;
-	double *Qdot0 = NULL;
-	double *Qdot0_trial = NULL;
-
-	if( do_gen_q )
-	{
-		n_real_q = NQ;
-		pp = (double *)malloc( sizeof(double) * NQ ); 
-		memset( pp, 0, sizeof(double) * NQ );
-		next_pp = (double *)malloc( sizeof(double) * NQ );
-		memset( next_pp, 0, sizeof(double) * NQ );
-		del_pp = (double *)malloc( sizeof(double) * NQ );
-		QV = (double *)malloc( sizeof(double) * NQ );
-		Qdot = (double *)malloc( sizeof(double) * NQ );
-		Qdot0 = (double *)malloc( sizeof(double) * NQ );
-		Qdot0_trial = (double *)malloc( sizeof(double) * NQ );
-		nav_Q = (double *)malloc( sizeof(double) * NQ );
-		av_Q = (double *)malloc( sizeof(double) * NQ );
-		av_Q2 = (double *)malloc( sizeof(double) * NQ );
-		av_Q_T = (double *)malloc( sizeof(double) * NQ );
-		nav_Q_T = (double *)malloc( sizeof(double) * NQ );
-		memset( nav_Q, 0, sizeof(double) * NQ );
-		memset( av_Q, 0, sizeof(double) * NQ );
-		memset( av_Q2, 0, sizeof(double) * NQ );
-		memset( av_Q_T, 0, sizeof(double) * NQ );
-		memset( nav_Q_T, 0, sizeof(double) * NQ );
+			sRec->QV = (double *)malloc( sizeof(double) * (3*nv+3) );
+			sRec->Qdot = (double *)malloc( sizeof(double) * (3*nv+3) );
+			sRec->Qdot0 = (double *)malloc( sizeof(double) * (3*nv+3) );
+			sRec->Qdot0_trial = (double *)malloc( sizeof(double) * (3*nv+3) );
+		}
+		
+		sRec->qdot = (double *)malloc( sizeof(double) * (3*nv+3) );
+		sRec->qdot0 = (double *)malloc( sizeof(double) * (3*nv+3) );
+		sRec->qdot_temp = (double *)malloc( sizeof(double) * (3*nv+3) );
+	
+		memset( sRec->pp, 0, sizeof(double) * sRec->NQ );
+		memset( sRec->qdot, 0, sizeof(double) * 3 * nv );	
+		memset( sRec->qdot0, 0, sizeof(double) * 3 * nv );	
+		memset( sRec->qdot_temp, 0, sizeof(double) * 3 * nv );	
 	}
-	else
-	{	
-		pp = (double *)malloc( sizeof(double) * (3*nv+3) );
-		memset( pp, 0, sizeof(double) * (3*nv+3) );
-		next_pp = (double *)malloc( sizeof(double) * (3*nv+3) );
-		memset( next_pp, 0, sizeof(double) * (3*nv+3) );
-		QV = (double *)malloc( sizeof(double) * (3*nv+3) );
-		Qdot = (double *)malloc( sizeof(double) * (3*nv+3) );
-		Qdot0 = (double *)malloc( sizeof(double) * (3*nv+3) );
-		Qdot0_trial = (double *)malloc( sizeof(double) * (3*nv+3) );
-	}
 	
-
-
-	double *qdot = (double *)malloc( sizeof(double) * 3 * nv );
-	double *qdot0 = (double *)malloc( sizeof(double) * 3 * nv );
-	
-	
-	double *qdot_temp = (double *)malloc( sizeof(double) * 3 * nv );
-
-	double *ap = (double *)malloc( sizeof(double) * 3 * nv );	
-
-	memset( pp, 0, sizeof(double) * NQ );
-	memset( ap, 0, sizeof(double) * 3 * nv );	
-	memset( qdot, 0, sizeof(double) * 3 * nv );	
-	memset( qdot0, 0, sizeof(double) * 3 * nv );	
-	memset( qdot_temp, 0, sizeof(double) * 3 * nv );	
-
-
 	double KE = 0;
-
-//#define PERTURB_START
-
-#ifdef PERTURB_START
-	if( doPlanarTopology )
-	{
-		sub_surface->setup_mode_perturb( r, 1, 0, 16, 16, Lx, Ly );
-		sub_surface->mode_perturb( r, 100.0, 0 );
-		for( int iq = 1; iq <= 1; iq++ )
-		{
-			double q = 2 * M_PI * iq / sub_surface->PBC_vec[0][0];
-	
-			double kc_use = 14;
-			double mag = 60; //sqrt(temperature / (q*q*q*q*kc_use*area0));
-
-/*			for( int x = 0; x < nv; x++ )
-			{
-				double xv = r[3*x+0];
-
-				r[3*x+2] += mag * sin(xv*q)*2* (rand()/(double)RAND_MAX - 0.5);
-			}
-*/
-		}
-	}
-	else
-	{
-
-		for( int x = 0; x < nv; x++ )
-		{
-			double rand_mag = 5 * rand() / (double)RAND_MAX;
-			r[3*x+0] += rand_mag * 2* (rand()/(double)RAND_MAX - 0.5);
-			r[3*x+1] += rand_mag * 2* (rand()/(double)RAND_MAX - 0.5);
-			r[3*x+2] += rand_mag * 2* (rand()/(double)RAND_MAX - 0.5);
-		}
-	}
-#endif
 
 	FILE *srdXYZFile = NULL;
 	
@@ -591,22 +576,18 @@ int temp_main( int argc, char **argv )
 	{
 		srd_i = (srd_integrator *)malloc( sizeof(srd_integrator) );
 		
-		srd_i->init( av_edge_length, sub_surface->PBC_vec, temperature, eta_SI, time_step_collision, time_step_collision * AKMA_TIME, doPlanarTopology, mass_per_pt, block.srd_M, block.hard_z_boundary ); 
-		srd_i->initializeDistances( r, sub_surface, M, mlow, mhigh );
+		srd_i->init( av_edge_length, theSurface->PBC_vec, temperature, eta_SI, time_step_collision, time_step_collision * AKMA_TIME, doPlanarTopology, mass_per_pt, block.srd_M, block.hard_z_boundary ); 
+		srd_i->initializeDistances( r, theSurface, M, mlow, mhigh );
 		if( debug )
 			srd_i->activateDebugMode();
 		srdXYZFile = fopen("srd.xyz", "w" );
 	
 	}
-
 			
 	memset( g, 0, sizeof(double) * nc );
 
-	double *saved_ref_point = (double *)malloc( sizeof(double) * 3 * (nv+1) );	
-	memcpy( saved_ref_point, r, sizeof(double) * 3 * (nv+1) );
 
 	double *delta_hull = (double *)malloc( sizeof(double) * block.o_lim );
-
 
 	int o = 0;
 	double running_time = 0;
@@ -664,7 +645,7 @@ int temp_main( int argc, char **argv )
 		}
 
 		for( int c = 0; c < ncomplex; c++ )
-			allComplexes[c]->loadComplex(xyzLoad,sub_surface,r);
+			allComplexes[c]->loadComplex(xyzLoad,theSurface,r);
 
 		for( int Q = 0; Q < NQ; Q++ )
 		{
@@ -686,7 +667,7 @@ int temp_main( int argc, char **argv )
 	}
 	
 
-	setupParallel( sub_surface, allComplexes, ncomplex, ( do_gen_q ? NQ : 0) );
+	setupParallel( theSurface, allComplexes, ncomplex, ( do_gen_q ? NQ : 0) );
 	SparseMatrix *EFFM = NULL;
 	SparseMatrix *MMat = NULL;
 	int max_mat = nv;
@@ -696,16 +677,14 @@ int temp_main( int argc, char **argv )
 	int n_vuse = 0;
 	double *mass_scaling = NULL;
 
-	if( !block.disable_mesh )
-	{
-		sub_surface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
-		if( do_bd_membrane )
-			sub_surface->getSparseRoot( theForceSet, &MMat ); 
-		setupSparseVertexPassing( EFFM, sub_surface->nv, do_gen_q );
-	}
+	theSurface->getSparseEffectiveMass( theForceSet, sparse_use, &n_vuse, &EFFM, gen_transform, NQ, mass_scaling );	
+	if( do_bd_membrane )
+		theSurface->getSparseRoot( theForceSet, &MMat ); 
+	setupSparseVertexPassing( EFFM, theSurface->nv, do_gen_q );
 
 
-	double V = sub_surface->energy(r,NULL);
+
+	double V = theSurface->energy(r,NULL);
 #ifdef PARALLEL
 	ParallelSum(&V,1);
 #endif
@@ -721,23 +700,23 @@ int temp_main( int argc, char **argv )
 		if( par_info.my_id == BASE_TASK )
 		{
 			mpsf = fopen("minimize.psf","w");
-        		sub_surface->writeLimitingSurfacePSF(mpsf, allComplexes, ncomplex);
+        		theSurface->writeLimitingSurfacePSF(mpsf, allComplexes, ncomplex);
 			fclose(mpsf);
        
 			minFile = fopen("minimize.xyz","w");
 		}
 
-		sub_surface->put(r);
-		for( int c = 0; c < ncomplex; c++ ) allComplexes[c]->refresh(sub_surface, r );
+		theSurface->put(r);
+		for( int c = 0; c < ncomplex; c++ ) allComplexes[c]->refresh(theSurface, r );
 		if( par_info.my_id == BASE_TASK )
-		 	sub_surface->writeLimitingSurface(minFile, allComplexes, ncomplex );
+		 	theSurface->writeLimitingSurface(minFile, allComplexes, ncomplex );
 		for( int m = 0; m < block.nmin; m++ )
 		{
-			sub_surface->minimize( r, allComplexes, ncomplex, do_gen_q  );
-			sub_surface->put(r);
-			for( int c = 0; c < ncomplex; c++ ) allComplexes[c]->refresh(sub_surface, r );
+			theSurface->minimize( r, allComplexes, ncomplex, do_gen_q  );
+			theSurface->put(r);
+			for( int c = 0; c < ncomplex; c++ ) allComplexes[c]->refresh(theSurface, r );
 			if( par_info.my_id == BASE_TASK )
-	 			sub_surface->writeLimitingSurface(minFile, allComplexes, ncomplex );
+	 			theSurface->writeLimitingSurface(minFile, allComplexes, ncomplex );
 			if( par_info.my_id == BASE_TASK )
 			{
 				FILE *minSave = fopen("min.save","w");
@@ -757,7 +736,7 @@ int temp_main( int argc, char **argv )
 		
 	
 //	if( block.timestep_analysis && taskid == BASE_TASK )
-//		sub_surface->timestep_analysis( r, theForceSet, effective_mass, allComplexes, ncomplex, dt );
+//		theSurface->timestep_analysis( r, theForceSet, effective_mass, allComplexes, ncomplex, dt );
 
 	double	navc = 0;
 	double *avc = NULL;
@@ -773,7 +752,7 @@ int temp_main( int argc, char **argv )
 
 		if( block.tachyon && par_info.my_id == BASE_TASK )
 		{
-			sub_surface->writeTachyon( block.jobName, block.tachyon_res, 1, 
+			theSurface->writeTachyon( block.jobName, block.tachyon_res, 1, 
 				r, allComplexes, ncomplex, &block, srd_i, block.tachyon_tri_center ); 
 		}
 
@@ -818,20 +797,20 @@ int temp_main( int argc, char **argv )
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
-		allComplexes[c]->compute_qdot( sub_surface, r, qdot0, qdot_temp );			
+		allComplexes[c]->compute_qdot( theSurface, r, qdot0, qdot_temp );			
 	}
 #ifdef PARALLEL		
 	ParallelSum( qdot_temp, 3*nv );
 #endif
 	if( ! do_gen_q && !block.disable_mesh )
 		AltSparseCartMatVecIncrScale( qdot, qdot_temp, EFFM, 1.0, r+3*nv );
-	sub_surface->grad( r, g );
+	theSurface->grad( r, g );
 
 
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
-		allComplexes[c]->update_dH_dq( sub_surface, r, g, qdot, qdot0 );
+		allComplexes[c]->update_dH_dq( theSurface, r, g, qdot, qdot0 );
 	}
 #ifdef PARALLEL
 	// synchronizes particle positions at this point for computing particle-particle interactions. does not synchronize their gradient.
@@ -852,10 +831,10 @@ int temp_main( int argc, char **argv )
 	expec_time[par_info.my_id] = 0;
 	for( int f = 0; f < par_info.nf; f++ )
 	{
-		if( par_info.faces[f] < sub_surface->nf_faces ) 
-			expec_time[par_info.my_id] += sub_surface->nf_g_q_p;	
+		if( par_info.faces[f] < theSurface->nf_faces ) 
+			expec_time[par_info.my_id] += theSurface->nf_g_q_p;	
 		else
-			expec_time[par_info.my_id] += sub_surface->nf_irr_pts;	
+			expec_time[par_info.my_id] += theSurface->nf_irr_pts;	
 	}
 	ParallelGather(expec_time,1);
 	double total_work = 0;
@@ -869,10 +848,10 @@ int temp_main( int argc, char **argv )
 	printf("Max work is %lf times more than optimal.\n", par_info.nprocs * max_work / total_work );
 
 #endif
-	for( int f = 0; f < sub_surface->nt; f++ )
-		sub_surface->set_g0_from_f(f);
+	for( int f = 0; f < theSurface->nt; f++ )
+		theSurface->set_g0_from_f(f);
 
-//	sub_surface->debugDeformation( r );
+//	theSurface->debugDeformation( r );
 
 	double p_min = -10000.0;
 	double p_max = 10000.0;
@@ -908,9 +887,8 @@ int temp_main( int argc, char **argv )
 	while( !done )
 	{
 
-		memcpy( saved_ref_point, r, sizeof(double) * 3 * (nv+1) );
 //		if( do_srd )
-//			srd_i->initializeDistances( r, sub_surface, M, mlow, mhigh );
+//			srd_i->initializeDistances( r, theSurface, M, mlow, mhigh );
 
 		double max_tpoint = 0;
 		double delta_hull = 0;
@@ -960,12 +938,12 @@ int temp_main( int argc, char **argv )
 
 			// leapfrog
 
-			sub_surface->put(r);			
+			theSurface->put(r);			
 
 			/*********** COMPUTE ENERGY ************/	
 	
 			VR=0;
-			V = sub_surface->energy(r,NULL);
+			V = theSurface->energy(r,NULL);
 			double VMEM = V; 
 			memset( g, 0, sizeof(double) * nc );
 		
@@ -973,9 +951,14 @@ int temp_main( int argc, char **argv )
 			for( int cx = 0; cx < par_info.nc; cx++ )
 			{
 				int c = par_info.complexes[cx];
+<<<<<<< HEAD
 				VP += allComplexes[c]->V(sub_surface, r );	
 				VP += allComplexes[c]->AttachV(sub_surface, r );	
 
+=======
+				VP += allComplexes[c]->V(theSurface, r );	
+				VP += allComplexes[c]->AttachV(theSurface, r );	
+>>>>>>> Initial development of multi_mesh branch
 			}
 
 
@@ -991,7 +974,7 @@ int temp_main( int argc, char **argv )
 			if( buffer_cycle[cur_save] )
 				free(buffer_cycle[cur_save]);
 			if( par_info.my_id == BASE_TASK )
-				sub_surface->saveRestart( buffer_cycle+cur_save, r, pp, allComplexes, ncomplex, (do_gen_q ? NQ : 0), save_seed );
+				theSurface->saveRestart( buffer_cycle+cur_save, r, pp, allComplexes, ncomplex, (do_gen_q ? NQ : 0), save_seed );
 			cur_save++;
 			if( cur_save == NUM_SAVE_BUFFERS )
 				cur_save = 0;
@@ -1003,19 +986,19 @@ int temp_main( int argc, char **argv )
 				PartialSyncVertices(r);
 				if( global_cntr % block.lipid_mc_period == 0 )
 				{
-					sub_surface->local_lipidMCMove( r, allComplexes, ncomplex, time_step, 1.0 / temperature );
+					theSurface->local_lipidMCMove( r, allComplexes, ncomplex, time_step, 1.0 / temperature );
 				}	 
 			}
 			
 			if( block.npt_mc_period > 0 )
 			{
 				if( global_cntr % block.npt_mc_period == 0 )
-					sub_surface->area_MC_move( r, allComplexes, ncomplex,  1.0 / temperature, qdot, pp, VOLUME_MOVE, &block );
+					theSurface->area_MC_move( r, allComplexes, ncomplex,  1.0 / temperature, qdot, pp, VOLUME_MOVE, &block );
 			}
 			if( block.cyl_tension_mc_period > 0 )
 			{
 				if( global_cntr % block.cyl_tension_mc_period == 0 )
-					sub_surface->area_MC_move( r, allComplexes, ncomplex,  1.0 / temperature, qdot, pp, CYL_TENSION_MOVE, &block );
+					theSurface->area_MC_move( r, allComplexes, ncomplex,  1.0 / temperature, qdot, pp, CYL_TENSION_MOVE, &block );
 			}
 
 			/*********** COMPUTE GRADIENT ******************/
@@ -1028,7 +1011,7 @@ int temp_main( int argc, char **argv )
 			double mesh_start = tnow.tv_sec +(1e-6)*tnow.tv_usec;
 
 			// LEAPFROG: gives p-dot at t, we have q(t), p(t-eps/2)
-			sub_surface->grad( r, g );
+			theSurface->grad( r, g );
 	
 			gettimeofday(&tnow,NULL);
 			double mesh_stop = tnow.tv_sec +(1e-6)*tnow.tv_usec;
@@ -1131,34 +1114,38 @@ int temp_main( int argc, char **argv )
 				{
 					memcpy( allComplexes[c]->save_grad, save_grad, sizeof(double)*3*nsites );
 
-					double dt = allComplexes[c]->update_dH_dq( sub_surface, r, g, qdot, qdot0, time_remaining, time_step );
+					double dt = allComplexes[c]->update_dH_dq( theSurface, r, g, qdot, qdot0, time_remaining, time_step );
 			
 					if(  do_ld || o < nequil )
 					{					
-						allComplexes[c]->applyLangevinFriction( sub_surface, r, dt, gamma_langevin );
-						allComplexes[c]->applyLangevinNoise( sub_surface, r, dt,  gamma_langevin, temperature );
+						allComplexes[c]->applyLangevinFriction( theSurface, r, dt, gamma_langevin );
+						allComplexes[c]->applyLangevinNoise( theSurface, r, dt,  gamma_langevin, temperature );
 					}
 
 					if( !allComplexes[c]->do_bd )
 					{
-						allComplexes[c]->propagate_p( sub_surface, r, dt/2 );
-						allComplexes[c]->compute_qdot( sub_surface, r, qdot0, qdot_temp, dt/time_step );			
+						allComplexes[c]->propagate_p( theSurface, r, dt/2 );
+						allComplexes[c]->compute_qdot( theSurface, r, qdot0, qdot_temp, dt/time_step );			
 			
 						// close enough.
-						PT += allComplexes[c]->T(sub_surface,r)  * (dt/time_step);
+						PT += allComplexes[c]->T(theSurface,r)  * (dt/time_step);
 	
-						allComplexes[c]->propagate_p( sub_surface, r, dt/2 );
-						allComplexes[c]->compute_qdot( sub_surface, r, qdot0, qdot_temp,  dt/time_step );			
+						allComplexes[c]->propagate_p( theSurface, r, dt/2 );
+						allComplexes[c]->compute_qdot( theSurface, r, qdot0, qdot_temp,  dt/time_step );			
 					}
 						
-					allComplexes[c]->propagate_surface_q( sub_surface, r, dt );
+					allComplexes[c]->propagate_surface_q( theSurface, r, dt );
 
 					time_remaining -= dt;
 				}
 			}
 			
 			// has special routines for handling elastic collisions.
+<<<<<<< HEAD
 			propagateSolutionParticles( sub_surface, r, allComplexes, ncomplex, time_step);
+=======
+			propagateSolutionParticles( theSurface, r, allComplexes, ncomplex, time_step * AKMA_TIME );
+>>>>>>> Initial development of multi_mesh branch
 
 			gettimeofday(&tnow, NULL);
 			double complex_time_stop = tnow.tv_sec + (1e-6) * tnow.tv_usec;
@@ -1171,10 +1158,10 @@ int temp_main( int argc, char **argv )
 			
 			if( do_srd )
 			{
-				sub_surface->rebox_system();
+				theSurface->rebox_system();
 				double use_dhull = 0;
 
-				double ncol = srd_i->stream_and_collide( r, g, qdot, EFFM, sub_surface, M, mlow, mhigh, use_dhull, theForceSet, cur_t*AKMA_TIME, time_step * AKMA_TIME, time_step_collision * AKMA_TIME  );
+				double ncol = srd_i->stream_and_collide( r, g, qdot, EFFM, theSurface, M, mlow, mhigh, use_dhull, theForceSet, cur_t*AKMA_TIME, time_step * AKMA_TIME, time_step_collision * AKMA_TIME  );
 			}
 
 
@@ -1448,14 +1435,14 @@ int temp_main( int argc, char **argv )
 			if( block.record_curvature && o >= nequil  )
 			{
 				for( int c = 0; c < ncomplex; c++ )
-					avc[c] += allComplexes[c]->local_curvature( sub_surface, r );
+					avc[c] += allComplexes[c]->local_curvature( theSurface, r );
 				navc+=1;
 			}
 
 			if( block.s_q && global_cntr % block.s_q_period == 0 && o >= nequil)
 			{
 				// Update SANS B-histogram.
-				sub_surface->sample_B_hist( r, B_hist, &A2dz2_sampled, SANS_SAMPLE_NRM, 100000, sans_max_r, nsans_bins, block.shape_correction );  
+				theSurface->sample_B_hist( r, B_hist, &A2dz2_sampled, SANS_SAMPLE_NRM, 100000, sans_max_r, nsans_bins, block.shape_correction );  
 			}
 
 		}
@@ -1500,11 +1487,11 @@ int temp_main( int argc, char **argv )
 		step_rate = block.o_lim / (time_1-time_0+1e-10);
 		
 		if( block.lipid_mc_period > 0 )
-			sub_surface->measureLipidCurvature(r, o < nequil );
+			theSurface->measureLipidCurvature(r, o < nequil );
 
 		if( collect_hk )
 		{
-			sub_surface->directFT( lhq, lhq2, r, nmodes, nmodes );
+			theSurface->directFT( lhq, lhq2, r, nmodes, nmodes );
 
 			int *q_sorter = (int*)malloc( sizeof(int) * nmodes*nmodes);
 			int ind = 0;
@@ -1565,9 +1552,9 @@ int temp_main( int argc, char **argv )
 #endif
 		if( tFile && par_info.my_id == BASE_TASK )
 		{
-			sub_surface->put(r);
-			//sub_surface->writeLimitStructure(tFile);
-        		sub_surface->writeLimitingSurface(tFile, allComplexes, ncomplex,r+3*nv);
+			theSurface->put(r);
+			//theSurface->writeLimitStructure(tFile);
+        		theSurface->writeLimitingSurface(tFile, allComplexes, ncomplex,r+3*nv);
 			fflush(tFile);
 	
 			if( do_srd )
@@ -1583,7 +1570,7 @@ int temp_main( int argc, char **argv )
 	
 		if( block.tachyon && par_info.my_id == BASE_TASK )
 		{
-			sub_surface->writeTachyon( block.jobName, block.tachyon_res, block.tachyon_interp, 
+			theSurface->writeTachyon( block.jobName, block.tachyon_res, block.tachyon_interp, 
 				r, allComplexes, ncomplex, &block, srd_i, block.tachyon_tri_center ); 
 		}
 			
@@ -1736,11 +1723,11 @@ int temp_main( int argc, char **argv )
 	}
 
 	if( block.create_all_atom )
-		sub_surface->createAllAtom(  &block );
+		theSurface->createAllAtom(  &block );
 
 /*	FILE *saveFile = fopen("file.save", "w");
 
-	for( int x = 0; x < sub_surface->nv; x++ )
+	for( int x = 0; x < theSurface->nv; x++ )
 	{
 		fprintf(saveFile, "%.14le %.14le %.14le\n",
 			r[3*x+0], r[3*x+1], r[3*x+2] );
@@ -1763,26 +1750,26 @@ int temp_main( int argc, char **argv )
 
 
 
-void updateParticleR( int p, int *pfaces, double *puv, double *p_r_m, double *r, surface *sub_surface, int np )
+void updateParticleR( int p, int *pfaces, double *puv, double *p_r_m, double *r, surface *theSurface, int np )
 {
-	int nv = sub_surface->nv;
+	int nv = theSurface->nv;
 
 	double rp[3];
 	double nrm[3];
-	sub_surface->evaluateRNRM( pfaces[p], puv[2*p+0], puv[2*p+1], rp, nrm, r);
+	theSurface->evaluateRNRM( pfaces[p], puv[2*p+0], puv[2*p+1], rp, nrm, r);
 
 	p_r_m[3*p+0] = rp[0];			
 	p_r_m[3*p+1] = rp[1];			
 	p_r_m[3*p+2] = rp[2];		
 	
-	sub_surface->updateParticle( p_r_m+3*p, p, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
+	theSurface->updateParticle( p_r_m+3*p, p, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
 	
 	if( do_2p )	
 	{
 		p_r_m[3*np+3*p+0] = rp[0] + dist_nrm * nrm[0];			
 		p_r_m[3*np+3*p+1] = rp[1] + dist_nrm * nrm[1];			
 		p_r_m[3*np+3*p+2] = rp[2] + dist_nrm * nrm[2];			
-		sub_surface->updateParticle( p_r_m+3*np+3*p, np+p, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
+		theSurface->updateParticle( p_r_m+3*np+3*p, np+p, r[3*nv+0], r[3*nv+1], r[3*nv+2] );
 	}
 }
 

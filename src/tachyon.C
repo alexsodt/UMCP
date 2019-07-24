@@ -423,7 +423,6 @@ int surface::writeTachyon( const char *name,
 
 	}	
 	
-
 	double forced_light_dir[3];
 
 	if( face_center >= 0 )	                 
@@ -575,7 +574,7 @@ int surface::writeTachyon( const char *name,
 "  Viewdir %lf %lf %lf \n"
 "  Updir   %lf %lf %lf \n"
 "End_Camera\n"
-//"Directional_Light Direction %lf %lf %lf Color 0.4 0.4 0.4\n"
+"Directional_Light Direction %lf %lf %lf Color 0.4 0.4 0.4\n"
 "Directional_Light Direction %lf %lf %lf Color 0.4 0.4 0.4\n"
 "Directional_Light Direction %lf %lf %lf Color 0.4 0.4 0.4\n"
 "Directional_Light Direction %lf %lf %lf Color 0.2 0.2 0.2\n"

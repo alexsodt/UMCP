@@ -85,6 +85,10 @@ int main( int argc, char **argv )
 //	theSurface->fdiff_check_grad(r);
 	double vol = theSurface->volume(r);
 
+	double area0;
+	double cur_area;
+	theSurface->area(r, -1, &cur_area, &area0 );
+	printf("area: %le area0: %le\n", cur_area, area0 );
 
 	printf("vol: %lf\n", vol );
 	
@@ -118,7 +122,7 @@ int main( int argc, char **argv )
 	fclose(tpsf);
 
 	minSurface = theSurface;
-	for( int o = 0; o < 10; o++ )
+	for( int o = 0; o < 5; o++ )
 	{
 		l_bfgs_setup( 20, 3*minSurface->nv+3, r, 0, f, fdf); 
 
