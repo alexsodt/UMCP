@@ -59,6 +59,7 @@ AC_CHECK_HEADERS([fftw3.h],
 
 
 AM_CONDITIONAL(MPI, test "$parallel" = "yes" )
+AM_CONDITIONAL(PARALLEL, test "$parallel" = "yes" )
 AM_CONDITIONAL(CUDA, test "$cuda" = "yes" )
 
 linearAlgebraString="no"
@@ -170,5 +171,5 @@ AC_SUBST(AM_INCLUDE)
 AC_SUBST(AM_QHULL)
 AC_SUBST(AM_CUDA)
 
-AC_CONFIG_FILES([Makefile optimized/Makefile debug/Makefile])
+AC_CONFIG_FILES([Makefile optimized/Makefile debug/Makefile examples/test/Makefile])
 AC_OUTPUT

@@ -1592,7 +1592,7 @@ void pcomplex::evaluate_momentum( surface *theSurface, double *rsurf, double *po
 	}
 }
 
-double pcomplex::T( surface *theSurface, double *rsurf )
+double pcomplex::T( surface *theSurface, double *rsurf, int subp)
 {
 	double T = 0;
 
@@ -1600,6 +1600,7 @@ double pcomplex::T( surface *theSurface, double *rsurf )
 
 	for( int s = 0; s < nattach; s++ )
 	{
+		if( subp != -1 && s!= subp) continue;
 		int f = fs[s];
 		double u = puv[2*s+0];
 		double v = puv[2*s+1];
@@ -1619,14 +1620,13 @@ double pcomplex::T( surface *theSurface, double *rsurf )
 				    Pinv[2] * p[2*s+0] + Pinv[3] * p[2*s+1] };
 
 		// T = 0.5 * p * qdot
-#ifndef DISABLE_ON_MEMBRANE_T
 		T += 0.5 * (p[2*s+0]) * (qdot0[0]);
 		T += 0.5 * (p[2*s+1]) * (qdot0[1]);
-#endif
 	}
 
 	for( int s = nattach; s < nsites; s++ )
 	{
+		if( subp != -1 && s!= subp) continue;
 		T += 0.5 * (p[3*s+0]) * (qdot[3*s+0]);
 		T += 0.5 * (p[3*s+1]) * (qdot[3*s+1]);
 		T += 0.5 * (p[3*s+2]) * (qdot[3*s+2]);

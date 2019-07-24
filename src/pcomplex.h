@@ -94,7 +94,7 @@ struct pcomplex
 	void loadCoords( surface *theSurface, double *rsurf, double *r, double *n );
 	void setrall( surface *theSurface, double *rsurf );
 	void base_init( void );
-	double T(surface *theSurface, double *rsurf);
+	double T(surface *theSurface, double *rsurf, int subp=-1);
 	double update_dH_dq( surface *theSurface, double *rsurf, double *mesh_grad, double *mesh_qdot, double *mesh_qdot0, double time_step=-1, double timestep_total=0 );
 	void propagate_p( surface *theSurface, double *rsurf, double dt );
 	void compute_qdot( surface *theSurface, double *rsurf, double *mesh_qdot0, double *mesh_qdot, double frac_mult=1.0 );

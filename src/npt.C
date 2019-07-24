@@ -54,7 +54,9 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
-		PT += allComplexes[c]->T(this,r);
+		
+		for( int s = allComplexes[c]->nattach; s < allComplexes[c]->nsites; s++ )
+			PT += allComplexes[c]->T(this,r,s);
 
 		if( allComplexes[c]->do_bd )
 			n_bd_sol_p += allComplexes[c]->nsites - allComplexes[c]->nattach;
@@ -198,7 +200,8 @@ void surface::area_MC_move( double *r, pcomplex **allComplexes, int ncomplex, do
 	{
 
 		int c = par_info.complexes[cx];
-		PT += allComplexes[c]->T(this,r);
+		for( int s = allComplexes[c]->nattach; s < allComplexes[c]->nsites; s++ )
+			PT += allComplexes[c]->T(this,r,s);
 	}
 
 #ifdef PARALLEL
