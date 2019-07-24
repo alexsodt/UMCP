@@ -98,6 +98,10 @@ void NBAR::init( surface *theSurface, double *rsurf, int f, double u, double v )
 	double rp[3];
 	double nrm[3];
 	theSurface->evaluateRNRM( f, u, v, rp, nrm, rsurf);
+
+	sid[0] = theSurface->surface_id;
+	sid[1] = theSurface->surface_id;
+	sid[2] = theSurface->surface_id;
 	
 	rall[3] = rp[0];
 	rall[4] = rp[1];
@@ -219,9 +223,9 @@ void NBAR::putBonds( int *bond_list )
 	bond_list[3] = 2;
 }
 
-double NBAR::V( surface *theSurface, double *rsurf )
+double NBAR::V( Simulation *theSimulation  )
 {
-	double *alphas = rsurf+3*theSurface->nv;
+	double *alphas = theSimulation->alpha;
 	double pot = 0;
 
 	double r[9];
@@ -230,30 +234,11 @@ double NBAR::V( surface *theSurface, double *rsurf )
 	if( bound )
 	{
 		// evaluate the real-space coordinates and normals based on the membrane surface coordinates.
-#if 0
 		for( int s = 0; s < nattach; s++ )
 		{
-			int f_1 = fs[s], nf = fs[s];
-			double uv1[2] = { 0.33, 0.33 };
-			double duv1[2] = { puv[2*s+0]-uv1[0], puv[2*s+1]-uv1[1] };
-	
-			do {
-				f_1 = nf;
-				nf = theSurface->nextFace( f_1, uv1+0, uv1+1, duv1+0, duv1+1, rsurf ); 
-			} while( nf != f_1 );
-
-			uv1[0] += duv1[0];		
-			uv1[1] += duv1[1];		
-
-			grad_fs[s] = f_1;
-			grad_puv[2*s+0] = uv1[0];
-			grad_puv[2*s+1] = uv1[1];
-
-			theSurface->evaluateRNRM( f_1, uv1[0], uv1[1], r+3*s, n+3*s, rsurf );  
-		}
-#else		
-		for( int s = 0; s < nattach; s++ )
-		{
+			surface_record *sRec = theSimulation->fetch(sid[s]);
+			surface *theSurface = sRec->theSurface;
+			double *rsurf = sRec->r;
 			int f_1 = fs[s], nf = fs[s];
 			double uv1[2] = { 0.33, 0.33 };
 			double duv1[2] = { puv[2*s+0]-uv1[0], puv[2*s+1]-uv1[1] };
@@ -302,7 +287,6 @@ double NBAR::V( surface *theSurface, double *rsurf )
 			r[3*s+2] += theSurface->PBC_vec[0][2] * PBC_ext[3*s+0] *alphas[2] + theSurface->PBC_vec[1][2] * PBC_ext[3*s+1] *alphas[2] + theSurface->PBC_vec[2][2] * PBC_ext[3*s+2] *alphas[2];
 
 		}
-#endif
 	}
 	else
 	{
@@ -385,9 +369,9 @@ double NBAR::V( surface *theSurface, double *rsurf )
 
 // gets derivative of internal energy relative to position (surfacer_g) and the normal (surfacen_g).
 
-double NBAR::grad(surface *theSurface, double *rsurf, double *surfacer_g, double *surfacen_g )
+double NBAR::grad( Simulation *theSimulation,  double *surfacer_g, double *surfacen_g )
 {
-	double *alphas = rsurf+3*theSurface->nv;
+	double *alphas = theSimulation->alpha;
 	double pot = 0;
 
 	double r[9];
@@ -395,30 +379,11 @@ double NBAR::grad(surface *theSurface, double *rsurf, double *surfacer_g, double
 
 	if( bound )
 	{
-#if OLD_METHOD
 		for( int s = 0; s < nattach; s++ )
 		{
-			int f_1 = fs[s], nf = fs[s];
-			double uv1[2] = { 0.33, 0.33 };
-			double duv1[2] = { puv[2*s+0]-uv1[0], puv[2*s+1]-uv1[1] };
-	
-			do {
-				f_1 = nf;
-				nf = theSurface->nextFace( f_1, uv1+0, uv1+1, duv1+0, duv1+1, rsurf ); 
-			} while( nf != f_1 );
-
-			uv1[0] += duv1[0];		
-			uv1[1] += duv1[1];		
-			
-			grad_fs[s] = f_1;
-			grad_puv[2*s+0] = uv1[0];
-			grad_puv[2*s+1] = uv1[1];
-
-			theSurface->evaluateRNRM( f_1, uv1[0], uv1[1], r+3*s, n+3*s, rsurf );  
-		}
-#else
-		for( int s = 0; s < nattach; s++ )
-		{
+			surface_record *sRec = theSimulation->fetch(sid[s]);
+			surface *theSurface = sRec->theSurface;
+			double *rsurf = sRec->r;
 			int f_1 = fs[s], nf = fs[s];
 			double uv1[2] = { 0.33, 0.33 };
 			double duv1[2] = { puv[2*s+0]-uv1[0], puv[2*s+1]-uv1[1] };
@@ -471,7 +436,6 @@ double NBAR::grad(surface *theSurface, double *rsurf, double *surfacer_g, double
 			r[3*s+2] += theSurface->PBC_vec[0][2] * PBC_ext[3*s+0] * alphas[2] + theSurface->PBC_vec[1][2] * PBC_ext[3*s+1] * alphas[2] + theSurface->PBC_vec[2][2] * PBC_ext[3*s+2] * alphas[2];
 
 		}
-#endif		
 		double dr1[3] = { r[0] - r[3], r[1] - r[4], r[2] - r[5] };	
 		double dr2[3] = { r[6] - r[3], r[7] - r[4], r[8] - r[5] };	
 	
@@ -816,8 +780,8 @@ double NBAR::grad(surface *theSurface, double *rsurf, double *surfacer_g, double
 		double dr1[3] = { r[0] - r[3], r[1] - r[4], r[2] - r[5] };	
 		double dr2[3] = { r[6] - r[3], r[7] - r[4], r[8] - r[5] };	
 	
-		theSurface->wrapPBC( dr1, rsurf+theSurface->nv*3 );
-		theSurface->wrapPBC( dr2, rsurf+theSurface->nv*3 );
+		theSimulation->wrapPBC( dr1, theSimulation->alpha );
+		theSimulation->wrapPBC( dr2, theSimulation->alpha );
 	
 			// nx ny nz n[3] n[4] n[5]
 		

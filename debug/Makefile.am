@@ -2,8 +2,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 
 EMAIL = alexander.sodt@nih.gov
 
-
-bin_PROGRAMS = hd.dbg makeHexSquare.dbg min.dbg subdivide.dbg scale.dbg icosahedron.dbg makeBud.dbg makeBump.dbg makeHexCylinder.dbg writeBiasPotential.dbg writeCylRTraj.dbg rd.dbg makePore.dbg join.dbg frc_sandbox.dbg
+bin_PROGRAMS = hd.dbg makeHexSquare.dbg min.dbg subdivide.dbg scale.dbg icosahedron.dbg makeBud.dbg makeBump.dbg makeHexCylinder.dbg writeBiasPotential.dbg writeCylRTraj.dbg makePore.dbg join.dbg frc_sandbox.dbg
 
 AM_CPPFLAGS = -include ../config.h -include ../src/local_config.h $(AM_INCLUDE) 
 AM_CFLAGS = -g

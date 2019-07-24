@@ -227,11 +227,15 @@ void Simulation::sample_B_hist( double *B_hist, double *A2dz2_sampled,
 		int s1 = rand() % nSurfaces;
 		int s2 = rand() % nSurfaces;
 
-		int p1 = rand() % ( n_draw * draw_z );
-		int p2 = rand() % ( n_draw * draw_z );
+		int p1 = rand() % n_draw;
+		int z1 = rand() % draw_z;
+		int p2 = rand() % n_draw;
+		int z2 = rand() % draw_z;
 
-		double *rp1 = draw_pts[s1] + p1 * 4;	
-		double *rp2 = draw_pts[s2] + p2 * 4;	
+		if( p1 == p2 ) continue;
+
+		double *rp1 = draw_pts[s1] + (p1*draw_z+z1) * 4;	
+		double *rp2 = draw_pts[s2] + (p2*draw_z+z2) * 4;	
 
 		double dr[3] = { rp1[0]-rp2[0],rp1[1]-rp2[1],rp1[2]-rp2[2]};
 

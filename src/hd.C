@@ -258,7 +258,7 @@ int temp_main( int argc, char **argv )
 		double area0;
 		double cur_area;
 		useSurface->area(r, -1, &cur_area, &area0 );
-		printf("Surace %d area: %le area0: %le\n", sRec->id, cur_area, area0 );
+		printf("Surface %d area: %le area0: %le\n", sRec->id, cur_area, area0 );
 	}
 	
 	av_edge_length /= n_edge_length;
@@ -640,6 +640,12 @@ int temp_main( int argc, char **argv )
 			printf("Couldn't load save file '%s'.\n", block.loadName );
 			exit(1);
 		}
+
+		theSimulation->loadRestart(xyzLoad,&debug_seed);
+
+		if( debug_seed > 0 )	
+			use_seed = debug_seed;
+#ifdef OLD_RESTART
 		for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 		{
 			double *r = sRec->r;
@@ -669,7 +675,7 @@ int temp_main( int argc, char **argv )
 			}
 		}
 		for( int c = 0; c < ncomplex; c++ )
-			allComplexes[c]->loadComplex(xyzLoad,theSurface1,r1);
+			allComplexes[c]->loadComplex(xyzLoad,theSimulation,theSurface1->surface_id );
 		
 		for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 		{
@@ -693,6 +699,7 @@ int temp_main( int argc, char **argv )
 			printf("Loaded seed %d\n", debug_seed );
 			use_seed = debug_seed;
 		}
+#endif
 	}
 	
 	setupParallel( theSimulation ); //theSurface, allComplexes, ncomplex, ( do_gen_q ? NQ : 0) );
@@ -732,14 +739,16 @@ int temp_main( int argc, char **argv )
 #endif
 	printf("Initial energy: %lf\n", V );
 
-	
+	int any_do_gen_q = 0;
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 	{
 		if( !sRec->do_gen_q ) // generalized coordinates are simply the control point positions.
 			sRec->NQ = 3 * sRec->theSurface->nv;
+		else
+			any_do_gen_q = 1;	
 	}
 
-#ifdef REDO_MINIMIZE
+
 	if( block.nmin > 0 )
 	{
 		FILE *mpsf;
@@ -748,40 +757,45 @@ int temp_main( int argc, char **argv )
 		if( par_info.my_id == BASE_TASK )
 		{
 			mpsf = fopen("minimize.psf","w");
-        		theSurface->writeLimitingSurfacePSF(mpsf, allComplexes, ncomplex);
+        		theSimulation->writeLimitingSurfacePSF(mpsf);
 			fclose(mpsf);
        
 			minFile = fopen("minimize.xyz","w");
 		}
 
-		theSurface->put(r);
-		for( int c = 0; c < ncomplex; c++ ) allComplexes[c]->refresh(theSurface, r );
+		for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+			sRec->theSurface->put(sRec->r);
+		for( int c = 0; c < ncomplex; c++ ) allComplexes[c]->refresh(theSimulation );
 		if( par_info.my_id == BASE_TASK )
-		 	theSurface->writeLimitingSurface(minFile, allComplexes, ncomplex );
+		 	theSimulation->writeLimitingSurface(minFile );
 		for( int m = 0; m < block.nmin; m++ )
 		{
-			theSurface->minimize( r, allComplexes, ncomplex, do_gen_q  );
-			theSurface->put(r);
-			for( int c = 0; c < ncomplex; c++ ) allComplexes[c]->refresh(theSurface, r );
+			theSimulation->minimize(any_do_gen_q);
+			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+				sRec->theSurface->put(sRec->r);
+			for( int c = 0; c < ncomplex; c++ ) allComplexes[c]->refresh(theSimulation);
+
 			if( par_info.my_id == BASE_TASK )
-	 			theSurface->writeLimitingSurface(minFile, allComplexes, ncomplex );
+	 			theSimulation->writeLimitingSurface(minFile);
 			if( par_info.my_id == BASE_TASK )
 			{
 				FILE *minSave = fopen("min.save","w");
-			
+				theSimulation->saveRestart(minSave,-1);
+
+/*			
 				for( int x = 0; x < nv+1; x++ )
 					fprintf( minSave, "%lf %lf %lf\n", r[3*x+0], r[3*x+1], r[3*x+2] );
 	
 				for( int c = 0; c < ncomplex; c++ )
 					allComplexes[c]->saveComplex(minSave);
 				fclose(minSave);
+*/
 			}
 		}
 		if( par_info.my_id == BASE_TASK )
 			fclose(minFile);
 		
 	}
-#endif		
 	
 //	if( block.timestep_analysis && taskid == BASE_TASK )
 //		theSurface->timestep_analysis( r, theForceSet, effective_mass, allComplexes, ncomplex, dt );

@@ -1,3 +1,4 @@
+#include "simulation.h"
 #include "interp.h"
 #include "pcomplex.h"
 #include <string.h>
@@ -9,23 +10,39 @@
 extern int enable_elastic_interior;
 static int min_ncomplex = 0;
 static int min_nparams = 0;
+static int min_nsurfaceparams = 0;
 static int do_freeze_membrane = 0;
 static pcomplex **min_complexes;
-static surface *min_surface;
 extern double VA,VC;
+Simulation *min_simulation = NULL;
 double surface_f( double *p )
 {
-#if 0 // pre-simulation change me
+	int offset = 3; 
+	for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
+	{
+		int nv = sRec->theSurface->nv;
+		p[offset+3*nv+0] = p[0];
+		p[offset+3*nv+1] = p[1];
+		p[offset+3*nv+2] = p[2];
+		
+		sRec->r = p+offset;		
+
+//		memcpy( sRec->r, p+offset, sizeof(double) * (3*nv+3) );
+		offset += sRec->theSurface->nv*3+3;
+	}
+
 #ifdef PARALLEL
 	ParallelSyncComplexes( min_complexes, min_ncomplex );
 #endif
 
 	VA = 0;
 	VC = 0;
-	double v = min_surface->energy( p, NULL );
+	double v = 0;
+	for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
+		v += sRec->theSurface->energy( p+sRec->temp_min_offset, NULL );
 	ParallelSum(&VA,1);
 	ParallelSum(&VC,1);
-	int nparams = 3 * min_surface->nv + 3;
+	int nparams = min_nsurfaceparams;
 
 	for( int c = 0; c < min_ncomplex; c++ )
 	{
@@ -37,10 +54,10 @@ double surface_f( double *p )
 	{
 		int c = par_info.complexes[cx];
 
-		v += min_complexes[c]->V( min_surface, p );
-		v += min_complexes[c]->AttachV( min_surface, p );
+		v += min_complexes[c]->V( min_simulation );
+		v += min_complexes[c]->AttachV( min_simulation );
 	}
-	v += Boxed_PP_V( min_surface, p, min_complexes, min_ncomplex );
+	v += Boxed_PP_V( min_simulation );
 	
 	ParallelSum(&v,1);
 
@@ -50,23 +67,33 @@ double surface_f( double *p )
 #endif
 //	printf("v: %le\n", v);
 	return v;
-#endif
 }
 
 
 
 double surface_fdf( double *p, double *g)
 {
-#if 0 // pre-simulation change me
 #ifdef PARALLEL
 	ParallelSyncComplexes( min_complexes, min_ncomplex );
 #endif
-	int nparams = 3 * min_surface->nv + 3;
 
 	memset( g, 0, sizeof(double) * min_nparams );
 	double v = 0;	
-	min_surface->grad( p, g );
-	
+	int offset = 3; 
+	for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
+	{
+		int nv = sRec->theSurface->nv;
+		p[offset+3*nv+0] = p[0];
+		p[offset+3*nv+1] = p[1];
+		p[offset+3*nv+2] = p[2];
+		sRec->g = g+offset;
+		sRec->r = p+offset;		
+//		memcpy( sRec->r, p+offset, sizeof(double) * (3*nv+3) );
+
+		sRec->theSurface->grad( p+offset, g+offset );
+		offset += sRec->theSurface->nv*3+3;
+	}
+	int nparams = min_nsurfaceparams;	
 	for( int c = 0; c < min_ncomplex; c++ )
 	{
 		int np = min_complexes[c]->nparams();
@@ -94,7 +121,7 @@ double surface_fdf( double *p, double *g)
 		memset( rg, 0, sizeof(double) * 3 * nsites );
 		memset( ng, 0, sizeof(double) * 3 * nsites );
 		// derivative wrt positions, normals
-		double le = min_complexes[c]->grad( min_surface, p, rg, ng );
+		double le = min_complexes[c]->grad( min_simulation, rg, ng );
 			
 		v += le;
 	
@@ -106,34 +133,23 @@ double surface_fdf( double *p, double *g)
 			{
 				double point_grad[2]={0,0};
 				double point_rgrad[3] = { 0,0,0};
-
+				surface_record *sRec = min_simulation->fetch( min_complexes[c]->sid[a] );
+				
 				// function updates the gradient of the energy for the surface coordinates.
 
-				min_surface->pointGradient( min_complexes[c]->grad_fs[a], min_complexes[c]->grad_puv[2*a+0], 
+				sRec->theSurface->pointGradient( min_complexes[c]->grad_fs[a], min_complexes[c]->grad_puv[2*a+0], 
 										     min_complexes[c]->grad_puv[2*a+1],
-										     p, g, point_grad, rg+3*a, ng+3*a );  			
+										     sRec->r, sRec->g, point_grad, rg+3*a, ng+3*a );  			
 				min_complexes[c]->save_grad[2*a+0] += point_grad[0];		
 				min_complexes[c]->save_grad[2*a+1] += point_grad[1];		
-
-				if( !(min_complexes[c]->save_grad[2*a+0] < 0) && !(min_complexes[c]->save_grad[2*a+0] > -1) )
-				{
-					printf("P GNAN.\n");
-					exit(1);
-				}
-				if( !(min_complexes[c]->save_grad[2*a+1] < 0) && !(min_complexes[c]->save_grad[2*a+1] > -1) )
-				{
-					printf("P GNAN.\n");
-					exit(1);
-				}
 			}
 			
 		}
 	
-		v += min_complexes[c]->AttachG( min_surface, p, g, min_complexes[c]->save_grad );
+		v += min_complexes[c]->AttachG( min_simulation, min_complexes[c]->save_grad );
 	}
 
-
-	nparams = 3*min_surface->nv+3;
+	nparams = min_nsurfaceparams;
 
 	for( int c = 0; c < min_ncomplex; c++ )
 	{
@@ -182,9 +198,9 @@ double surface_fdf( double *p, double *g)
 	for( int c = 0; c < min_ncomplex; c++ )
 		memset( min_complexes[c]->save_grad, 0, sizeof(double) * 3 * min_complexes[c]->nsites );
 		
-	v += Boxed_PP_G( min_surface, p, min_complexes, min_ncomplex, g );
+	v += Boxed_PP_G( min_simulation);
 	
-	nparams = 3 * min_surface->nv + 3;
+	nparams = min_nsurfaceparams;
 	for( int c = 0; c < min_ncomplex; c++ )
 	{
 		int np = min_complexes[c]->nparams();
@@ -198,16 +214,10 @@ double surface_fdf( double *p, double *g)
 				double det = M[0]*M[3]-M[1]*M[2];
 				double MINV[4] = { M[3]/det, -M[1]/det, -M[2]/det, M[0]/det };
 
-#if 1 
 				g[nparams+2*a+0] += min_complexes[c]->save_grad[2*a+0] * M[0];
 				g[nparams+2*a+0] += min_complexes[c]->save_grad[2*a+1] * M[2];
 				g[nparams+2*a+1] += min_complexes[c]->save_grad[2*a+0] * M[1];
 				g[nparams+2*a+1] += min_complexes[c]->save_grad[2*a+1] * M[3];
-#else
-				g[nparams+2*a+0] += min_complexes[c]->save_grad[2*a+0];
-				g[nparams+2*a+1] += min_complexes[c]->save_grad[2*a+1];
-
-#endif
 		}
 	 	int poff = 2 * min_complexes[c]->nattach;
 		for( int a = min_complexes[c]->nattach; a < min_complexes[c]->nsites; a++ )
@@ -219,20 +229,29 @@ double surface_fdf( double *p, double *g)
 		}
 		nparams += np;
 	}
+
+	// for now zero box dimension gradient.
 	
-	g[3*min_surface->nv+0] = 0;
-	g[3*min_surface->nv+1] = 0;
-	g[3*min_surface->nv+2] = 0;
+	g[0] = 0;
+	g[1] = 0;
+	g[2] = 0;
+
+	for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
+	{
+		g[sRec->temp_min_offset+3*sRec->theSurface->nv+0] = 0;
+		g[sRec->temp_min_offset+3*sRec->theSurface->nv+1] = 0;
+		g[sRec->temp_min_offset+3*sRec->theSurface->nv+2] = 0;
+	}
 	
 	if( do_freeze_membrane )
 	{
-		for( int x = 0; x < 3*min_surface->nv; x++ )
+		for( int x = 0; x < min_nsurfaceparams; x++ )
 			g[x] = 0;
 	}
 
-	v += min_surface->energy( p, NULL );
+	for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
+		v += sRec->theSurface->energy( p+sRec->temp_min_offset, NULL );
 	ParallelSum( &v, 1 );
-
 	ParallelSum( g, min_nparams );
 
 #if 0 	
@@ -249,62 +268,11 @@ double surface_fdf( double *p, double *g)
 	exit(1);
 #endif
 	return v;
-#endif
 
 }
 
 void full_fd_test( double *p )
 {
-#if 0 // pre-simulation change me
-	double deps = 1e-10;
-
-	double *tp = (double *)malloc( sizeof(double) * min_nparams );
-	memset( tp, 0, sizeof(double) * min_nparams );
-	double *g = (double *)malloc( sizeof(double) * min_nparams );
-	memset( g, 0, sizeof(double) * min_nparams );
-
-	double e0 = surface_fdf( p, g );
-	printf("Finite difference test.\n");
-	
-	memcpy( tp, p, sizeof(double) * min_nparams );
-	for( int ttp = 0; ttp < min_nparams; ttp++ )
-	{
-		double use_eps[2] = { -1e-6, 1e-6 };
-		double ens[2];
-		for( int ieps = 0; ieps < 2; ieps++ )
-		{
-			tp[ttp] += use_eps[ieps];
-			ens[ieps] = surface_f(tp);
-			tp[ttp] -= use_eps[ieps];
-		}
-
-		double de = (ens[1]-ens[0])/(use_eps[1]-use_eps[0]);
-	
-		if( ttp == (3 * min_surface->nv+3) )
-			printf("FINISHED MESH FD\n");
-
-		if( fabs(de-g[ttp])/(fabs(1e-20)+fabs(de)+fabs(g[ttp])) < 1e-3 )
-			printf("P %d FD %.14le G %.14le OK\n", ttp, de, g[ttp] );
-		else
-			printf("P %d FD %.14le G %.14le CHECK\n", ttp, de, g[ttp] );
-	}
-
-	for( double eps = 0; eps < 20 * deps; eps += deps)
-	{
-		double expec = 0;
-		for( int x = 0; x < min_nparams;x++ )
-		{
-			tp[x] = p[x] - eps * g[x];
-			expec += -g[x] * g[x] * eps;
-		}
-
-		double v = surface_f( tp );
-		printf("%le %.14le %.14le del %.14le\n", eps, v, e0+expec, (v-(e0+expec)) );
-	}
-
-	free(tp);
-	free(g);
-#endif
 }
 
 void fd_test( double *p )
@@ -337,36 +305,61 @@ void fd_test( double *p )
 #endif
 }
 
-void surface::minimize( double *r, pcomplex **allComplexes, int ncomplex, int freeze_membrane )
+void Simulation::minimize( int freeze_membrane  )
 {
-#if 0 // pre-simulation change me
 	do_freeze_membrane = freeze_membrane;
 
 	int prev_enable = enable_elastic_interior; 
 
 	enable_elastic_interior = 1;
 
-	min_surface = this;
+
+	min_simulation = this;
 	min_ncomplex = ncomplex;	
 	min_complexes = allComplexes;
-
-
 
 #ifdef PARALLEL
 	ParallelSyncComplexes( min_complexes, min_ncomplex );
 #endif
 	
-	int num_params = 3*nv+3;
+	int num_params = 3; // alphas
+
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+		num_params += sRec->theSurface->nv*3+3;
+
+	min_nsurfaceparams = num_params;
 
 	for( int c = 0; c < ncomplex; c++ )
 		num_params += allComplexes[c]->nparams();
+
 	min_nparams = num_params;
 	
-
 	double *p = (double *)malloc( sizeof(double) * num_params );
-	memcpy( p, r, sizeof(double) * 3 * (nv+1) );
+	double *g = (double *)malloc( sizeof(double) * num_params );
 
-	int tp = 3*nv+3;
+	p[0] = alpha[0];
+	p[1] = alpha[1];
+	p[2] = alpha[2];
+	int offset = 3;
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+	{
+		int nv = sRec->theSurface->nv;
+
+		memcpy( p+offset, sRec->r, sizeof(double) * 3 * nv );
+		sRec->temp_min_offset = offset;
+		sRec->temp_r = sRec->r;
+		sRec->temp_g = sRec->g;
+		sRec->r = p + offset;
+		sRec->g = g + offset;
+
+		p[offset+3*nv+0] = alpha[0];
+		p[offset+3*nv+1] = alpha[1];
+		p[offset+3*nv+2] = alpha[2];
+
+		offset += 3*nv+3;
+	}
+
+	int tp = min_nsurfaceparams;
 
 	for( int c = 0; c < ncomplex; c++ )
 	{
@@ -374,8 +367,8 @@ void surface::minimize( double *r, pcomplex **allComplexes, int ncomplex, int fr
 		tp += allComplexes[c]->nparams();
 	}	
 	
-	double *g = (double *)malloc( sizeof(double) * num_params );
 	// derivative might be zero (absolutely)
+
 	surface_fdf(p,g);
 	double mag_init = 0;
 	for( int p = 0; p < num_params; p++ )
@@ -420,18 +413,24 @@ void surface::minimize( double *r, pcomplex **allComplexes, int ncomplex, int fr
 
 	printf("Minimize: VG: %.14le VV: %.14le VA: %lf VC: %lf grad rms %le\n", v, e, VA, VC, rms );
 
-	memcpy( r, p, sizeof(double) * 3 * (nv+1) );
+	enable_elastic_interior = prev_enable;
+
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+	{
+		int nv = sRec->theSurface->nv;
+
+		memcpy( sRec->temp_r, sRec->r, sizeof(double) * 3 * nv );
+		sRec->temp_r[3*nv+0] = p[0];
+		sRec->temp_r[3*nv+1] = p[1];
+		sRec->temp_r[3*nv+2] = p[2];
+		sRec->r = sRec->temp_r;
+		sRec->g = sRec->temp_g;
+	}
 	
 	for( int c = 0; c < ncomplex; c++ )
-		allComplexes[c]->refresh(this, r);
+		allComplexes[c]->refresh(this);
 	
 	free(p);
 	free(g);
-	
-	enable_elastic_interior = prev_enable;
-#endif
 }
-
-
-
 

@@ -2333,6 +2333,7 @@ int main( int argc, const char **argv )
 					}
 					else
 						temp_complexes[i]->init(aqueous_r+3*i);
+
 					temp_complexes[i]->refresh(sub_surface,r);
 					temp_complexes[i]->sigma[0] = binding_radius*4;
 				}

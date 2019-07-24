@@ -1095,8 +1095,9 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 
 		puv[2*s+0] += duv[0];
 		puv[2*s+1] += duv[1];
+	
 
-		refresh(theSurface, rsurf );
+		refresh(theSimulation);
 		
 		double new_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
 		double fr = fabs(1-new_metric/last_metric);
@@ -1278,9 +1279,9 @@ int pcomplex::nparams( void )
 		return 3 * nsites;
 }
 
-void pcomplex::refresh( surface *theSurface, double *rsurf)
+void pcomplex::refresh( Simulation *theSimulation )
 {
-	double *alphas = rsurf+3*theSurface->nv;
+	double *alphas = theSimulation->alpha;
 	double center_on[3] = { 0,0,0};
 	int update_attach = 1;
 
@@ -1294,6 +1295,11 @@ void pcomplex::refresh( surface *theSurface, double *rsurf)
 
 	for( int s = 0; s < nattach; s++ )
 	{
+		surface_record *sRec = theSimulation->fetch(sid[s]);
+
+		surface *theSurface = sRec->theSurface;
+		double *rsurf = sRec->r;
+
 		double nrm[3];
 
 		int o_f = fs[s];
@@ -1377,9 +1383,9 @@ void pcomplex::refresh( surface *theSurface, double *rsurf)
 		PBC_ext[3*s+1] = del[1];
 		PBC_ext[3*s+2] = del[2];
 */		
-		rall[3*s+0] += theSurface->PBC_vec[0][0] * PBC_ext[3*s+0] * alphas[0] + theSurface->PBC_vec[1][0] * PBC_ext[3*s+1] * alphas[0] + theSurface->PBC_vec[2][0] * PBC_ext[3*s+2] * alphas[0];
-		rall[3*s+1] += theSurface->PBC_vec[0][1] * PBC_ext[3*s+0] * alphas[1] + theSurface->PBC_vec[1][1] * PBC_ext[3*s+1] * alphas[1] + theSurface->PBC_vec[2][1] * PBC_ext[3*s+2] * alphas[1];
-		rall[3*s+2] += theSurface->PBC_vec[0][2] * PBC_ext[3*s+0] * alphas[2] + theSurface->PBC_vec[1][2] * PBC_ext[3*s+1] * alphas[2] + theSurface->PBC_vec[2][2] * PBC_ext[3*s+2] * alphas[2];
+		rall[3*s+0] += theSimulation->PBC_vec[0][0] * PBC_ext[3*s+0] * alphas[0] + theSimulation->PBC_vec[1][0] * PBC_ext[3*s+1] * alphas[0] + theSimulation->PBC_vec[2][0] * PBC_ext[3*s+2] * alphas[0];
+		rall[3*s+1] += theSimulation->PBC_vec[0][1] * PBC_ext[3*s+0] * alphas[1] + theSimulation->PBC_vec[1][1] * PBC_ext[3*s+1] * alphas[1] + theSimulation->PBC_vec[2][1] * PBC_ext[3*s+2] * alphas[1];
+		rall[3*s+2] += theSimulation->PBC_vec[0][2] * PBC_ext[3*s+0] * alphas[2] + theSimulation->PBC_vec[1][2] * PBC_ext[3*s+1] * alphas[2] + theSimulation->PBC_vec[2][2] * PBC_ext[3*s+2] * alphas[2];
 
 
 	}
@@ -1581,8 +1587,7 @@ void surface::loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterB
 			else
 				prot->move_outside();
 
-			prot->init(this, rsurf, f,u,v); 
-				 
+			prot->init(this, rsurf, f,u,v); 				 
 
 			if( *ncomplex  == nspace )
 			{
@@ -1795,7 +1800,7 @@ void pcomplex::applyLangevinNoise( Simulation *theSimulation,  double dt, double
 	}
 }
 
-void pcomplex::loadComplex( FILE *theFile, surface *theSurface, double *rsurf )
+void pcomplex::loadComplex( FILE *theFile, Simulation *theSimulation, int load_to )
 {
 	char buffer[4096];
 
@@ -1815,6 +1820,7 @@ void pcomplex::loadComplex( FILE *theFile, surface *theSurface, double *rsurf )
 		getLine( theFile, buffer );
 		int nr = sscanf( buffer, "%d %lf %lf %lf %lf %lf %lf %lf", fs+s, puv+2*s+0, puv+2*s+1, PBC_ext+3*s, PBC_ext+3*s+1, PBC_ext+3*s+2, p+2*s+0, p+2*s+1 );
 
+		sid[s] = load_to;
 		grad_fs[s] = fs[s];
 		grad_puv[2*s+0] = puv[2*s+0];
 		grad_puv[2*s+1] = puv[2*s+1];
@@ -1846,7 +1852,7 @@ void pcomplex::loadComplex( FILE *theFile, surface *theSurface, double *rsurf )
 		}
 	}
 
-	refresh(theSurface, rsurf);
+	refresh(theSimulation);
 }
 
 int pcomplex::saveComplex( char *write_to, int *bytes_written, int max_write)
