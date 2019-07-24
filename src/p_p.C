@@ -12,7 +12,8 @@ inter-complex particle-particle interactions
 #include "units.h"
 #include "mutil.h"
 
-#define TOMMY
+//#define DISABLE_POINT_GRADIENT_DEBUG
+
 //#define DISABLE_PP
 //#define DISABLE_ELASTIC
 int enable_elastic_interior = 1;
@@ -509,9 +510,7 @@ double Boxed_PP_V( Simulation *theSimulation )
 							double r4 = r2*r2;
 							double r6 = r2*r4;
 
-#ifdef TOMMY
 							v += (eps + 4.0 * eps * (r4-r2));
-#endif
 						}
 					}
 					else if( sigma1 > 0 && sigma2 > 0 )
@@ -721,10 +720,8 @@ double Boxed_PP_G( Simulation *theSimulation )
 							double r4 = r2*r2;
 							double r6 = r2*r4;
 
-#ifdef TOMMY
 							v += (eps + 4.0 * eps * (r4-r2)) * local_fac;
 							dvdr += 4 * eps * (-4 * r4 + 2 * r2)/r;
-#endif
 						}
 					}
 					else if( sigma1 > 0 && sigma2 > 0 )
@@ -1060,7 +1057,6 @@ double handleElasticCollisions( Simulation *theSimulation, pcomplex **allComplex
 	ParallelSum(&n_not_ok, 1);
 #endif
 	
-	printf("NNOT: %lf\n", n_not_ok );
 	free(nearlist);
 	free(ourp);
 	free(complex_for_id);

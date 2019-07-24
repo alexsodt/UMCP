@@ -19,4 +19,3 @@ void printCompilationTime(void);
 //#define M_MAX 1
 #define FFTW
 #define DISABLE_ALIGNMENT
-//#define DISABLE_ON_MEMBRANE_T

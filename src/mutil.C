@@ -25,6 +25,12 @@ double cross( double *dr1, double *dr2, double *cp )
 	return l;
 }
 
+
+double length3(double*dr)
+{
+	double lr = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+	return lr;
+}
 double normalize( double *dr )
 {
 	double lr = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);

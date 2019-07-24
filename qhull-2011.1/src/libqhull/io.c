@@ -2311,7 +2311,31 @@ void qh_printfacet3vertex(FILE *fp, facetT *facet, qh_PRINT format) {
   vertices= qh_facet3vertex(facet);
   if (format == qh_PRINToff)
     qh_fprintf(fp, 9111, "%d ", qh_setsize(vertices));
-  FOREACHvertex_(vertices)
+ 
+		if( ntri >= ntri_space )
+		{
+			ntri_space *= 2;
+			triStorage = (int *)realloc( triStorage, sizeof(int) * 10 * ntri_space );
+		}
+   int tt = 0;
+    FOREACHvertex_(facet->vertices)
+		{ 
+		triStorage[10*ntri+1+tt] = qh_pointid(vertex->point); 
+		tt++; 
+		triStorage[10*ntri] = tt; 
+		}
+			ntri++;
+
+
+
+
+
+
+
+
+
+
+ FOREACHvertex_(vertices)
     qh_fprintf(fp, 9112, "%d ", qh_pointid(vertex->point));
   qh_fprintf(fp, 9113, "\n");
   qh_settempfree(&vertices);
@@ -2478,12 +2502,17 @@ void qh_printfacetNvertex_simplicial(FILE *fp, facetT *facet, qh_PRINT format) {
 		if( ntri >= ntri_space )
 		{
 			ntri_space *= 2;
-			triStorage = (int *)realloc( triStorage, sizeof(int) * 4 * ntri_space );
+			triStorage = (int *)realloc( triStorage, sizeof(int) * 10 * ntri_space );
 		}
-	
    int tt = 0;
     FOREACHvertex_(facet->vertices)
-		{ triStorage[4*ntri+tt] = qh_pointid(vertex->point); tt++; }
+		{ 
+		printf("ntri: %d ntri_space: %d tt: %d\n", ntri, ntri_space, tt );
+
+		triStorage[10*ntri+1+tt] = qh_pointid(vertex->point); 
+		tt++; 
+		triStorage[10*ntri] = tt; 
+		}
 			ntri++;
 	
         }
@@ -2497,12 +2526,20 @@ void qh_printfacetNvertex_simplicial(FILE *fp, facetT *facet, qh_PRINT format) {
 		if( ntri >= ntri_space )
 		{
 			ntri_space *= 2;
-			triStorage = (int *)realloc( triStorage, sizeof(int) * 4 * ntri_space );
+			triStorage = (int *)realloc( triStorage, sizeof(int) * 10 * ntri_space );
 		}
 	
    int tt = 0;
     FOREACHvertex_(facet->vertices)
-		{ triStorage[4*ntri+tt] = qh_pointid(vertex->point); tt++; }
+		{ 
+
+		printf("ntri: %d ntri_space: %d\n", ntri, ntri_space );
+
+		triStorage[10*ntri+1+tt] = qh_pointid(vertex->point); 
+		tt++; 
+		triStorage[10*ntri] = tt; 
+
+			}
 			ntri++;
 	
         }

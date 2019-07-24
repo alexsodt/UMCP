@@ -1,0 +1,15 @@
+time_step 1e-13
+add NBAR nbound 1 outside
+planar_topology yes
+mesh planar.mesh
+bar_bond_k 0.01
+bar_theta_k 0.01 
+bar_phi_k 0.01
+do_ld no 
+nmin 0
+o_lim 1
+nsteps 100
+seed 2
+movie		yes
+KA		0.2
+#load min.save

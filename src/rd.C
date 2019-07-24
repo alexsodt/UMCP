@@ -21,6 +21,7 @@ double reflecting_surface = 0;
 
 //#define XY_DIFFUSION
 
+#define LAPLACE_BELTRAMI
 
 //#define NUMERICAL_INTEGRATION
 #define DO_HISTOGRAM
@@ -72,6 +73,8 @@ int get_pair_list( surface *sub_surface, double *r, double *aqueous_r, int **pai
 
 int main( int argc, const char **argv )
 {
+	double kT = 0.596;
+
 	char buffer[4096];
 
 	printf("No options are required:\n");
@@ -107,6 +110,7 @@ int main( int argc, const char **argv )
 	double Dtot = ( (2.0/3.0) * block.diffc + block.aqueous_diffc);
 	binding_radius = sp_ap_displacement;
 
+	printf("block.diffc: %le\n", block.diffc );
 	
 
 	srand(block.random_seed);
@@ -1500,7 +1504,66 @@ int main( int argc, const char **argv )
 						double u = puv[2*p+0], v = puv[2*p+1];
 						double frc_duv[2] = { -pgrad[2*p+0], -pgrad[2*p+1]};
 		
+						double ou = u, ov = v;
+#ifdef LAPLACE_BELTRAMI
+
+						double gmat[4];
+						double g_u; // derivative of |g|, not root wrt u
+						double g_v; //                             wrt v
+			
+						double noise[2] = { 
+							gsl_ran_gaussian(rng_x, 1 ),
+							gsl_ran_gaussian(rng_x, 1 )
+							};
+				
+						// gval is the sqrt metric
+						double root_g = theSurface->metric( f, u, v, r, gmat, &g_u, &g_v );
+			
+						double val = sqrt(gmat[0]*gmat[0]+4*gmat[1]*gmat[1]-2*gmat[0]*gmat[3]+gmat[3]*gmat[3]);
+			
+						double gamma_neg_half[4] = { 
+							(1.0/val) * ((-gmat[0]+gmat[3]+val)/sqrt(2*(gmat[0]+gmat[3]-val))-(-gmat[0]+gmat[3]-val)/sqrt(2*(gmat[0]+gmat[3]+val))),   	
+							(1.0/val) * ( -sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]-val) + sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]+val) ),
+							(1.0/val) * ( -sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]-val) + sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]+val) ),
+							(1.0/val) * (( gmat[0]-gmat[3]+val)/sqrt(2*(gmat[0]+gmat[3]-val))+(-gmat[0]+gmat[3]+val)/sqrt(2*(gmat[0]+gmat[3]+val))),   
+							};
+			
+						double gamma_inv[4] = {
+							gmat[0]/(root_g*root_g), -gmat[1]/(root_g*root_g), -gmat[1]/(root_g*root_g), gmat[3]/(root_g*root_g)
+						};
+			
+						// g_u + means metric increases in u direction, move particle there.
+						double pre_drift[2] = { 
+								pgrad[2*p+0]/kT + (-g_u/(2*root_g*root_g)), // 1/g done with sqrt
+								pgrad[2*p+1]/kT + (-g_v/(2*root_g*root_g))
+									};
+			
+						double corr_noise[2] = { gamma_neg_half[0] * noise[0] + gamma_neg_half[1] * noise[1],
+									 gamma_neg_half[2] * noise[0] + gamma_neg_half[3] * noise[1] }; 
+						double duv[2];
+						// negative sign means move in the direction of force not grad.
+						duv[0] = -(gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * block.diffc * dt + sqrt(2 * block.diffc * dt) * corr_noise[0];
+						duv[1] = -(gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * block.diffc * dt + sqrt(2 * block.diffc * dt) * corr_noise[1];	
+						int of=f;
+						int nf=f,f_1;
+						double uv[2] = { u,v };
+						do {
+							f_1 = nf;
+							nf = theSurface->nextFace( f_1, uv+0, uv+1, duv+0, duv+1, r ); 
+						} while( nf != f_1 );
+	
+						uv[0] += duv[0];		
+						uv[1] += duv[1];		
 						
+						double sigma = sqrt(2.0 * block.diffc);
+		
+						f =nf;
+						pfaces[p] = nf;
+						puv[2*p+0] = uv[0];
+						puv[2*p+1] = uv[1];
+
+
+#else						
 						frc_duv[0] *= block.diffc / temperature;
 						frc_duv[1] *= block.diffc / temperature;
 		
@@ -1516,10 +1579,16 @@ int main( int argc, const char **argv )
 						pfaces[p] = f;
 						puv[2*p+0] = u;
 						puv[2*p+1] = v;
-						
+#endif						
 						double old_p[3] = { surface_p_r_m[3*p+0], surface_p_r_m[3*p+1], surface_p_r_m[3*p+2] };
 		
 						updateParticleR( p, pfaces, puv, surface_p_r_m, surface_p_r_n, r, sub_surface, surface_np ); 
+
+						double dr[3] = { surface_p_r_m[3*p+0] - old_p[0],
+								 surface_p_r_m[3*p+1] - old_p[1],
+								 surface_p_r_m[3*p+2] - old_p[2] };
+						printf("grep dt %le dr %le of: %d ou: %le ov: %le\n",
+							block.time_step, normalize(dr), of, ou, ov );
 #endif
 
 		

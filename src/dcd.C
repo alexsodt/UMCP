@@ -653,6 +653,9 @@ void loadCRD( FILE *theFile, struct atom_rec *at)
 		at[x].altloc = ' ';
 		at[x].chain = ' ';
 
+		if( at_q )
+			at[x].charge = at_q[x];
+
 		at[x].x = lx;
 		at[x].y = ly;
 		at[x].z = lz;
@@ -793,10 +796,22 @@ void loadPSF( FILE *theFile )
 		int l_atid;
 		double l_atq;
 		char l_atname[16]; 
+		char l_attype[16];
 		
-		sscanf( buffer, " %d %s %d %s %s %d %lf ",
+		int nr = sscanf( buffer, " %d %s %d %s %s %d %lf ",
 			&l_atnum, l_segname, &l_resnum, l_resname, l_atname, &l_atid, &l_atq );
-	
+		if( nr == 5 )
+		{	// try reading atom name.
+			nr = sscanf( buffer, " %d %s %d %s %s %s %lf ",
+				&l_atnum, l_segname, &l_resnum, l_resname, l_atname, l_attype, &l_atq );
+
+		}	
+		if( nr != 7 )
+		{
+			printf("Error reading PSF at atom %d.\n", x );
+			exit(1);
+		}
+
 		res_name[x] = (char *)malloc( sizeof(char) * ( strlen(l_resname) +1 ) );
 		at_name[x] = (char *)malloc( sizeof(char) * ( strlen(l_atname) +1 ) );
 		seg_name[x] = (char *)malloc( sizeof(char) * ( strlen(l_segname) +1 ) );
@@ -1433,6 +1448,9 @@ void loadPDB( FILE *theFile, struct atom_rec *at)
 				at[a].segid = (char *)malloc( sizeof(char) * (strlen(seg_name[a])+1) );
 				strcpy( at[a].segid, seg_name[a] );
 			}
+
+			if( at_q )
+				at[a].charge = at_q[a];
 
                         a++; 
                 }     

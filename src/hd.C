@@ -21,6 +21,9 @@
 #include "random_global.h"
 #include "sans.h"
 #include "globals.h"
+#ifdef USE_CUDA
+#include "local_cuda.h"
+#endif
 #include "simulation.h"
 #include "meshCollisionLib.h"
 
@@ -91,6 +94,11 @@ int temp_main( int argc, char **argv )
 	quietParallel();
 #endif
 	printCompilationTime();
+
+#ifdef USE_CUDA
+	showCUDAStats();
+#endif
+
 
 	int nprocs = 1;
 	int taskid = 0;
@@ -329,8 +337,6 @@ int temp_main( int argc, char **argv )
 
 	double time_step = block.time_step; // one nanosecond.
 	double time_step_collision = block.time_step_collision; // one nanosecond.
-	
-	
 	int nsurfaces = 0;
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 		nsurfaces++;
@@ -947,6 +953,8 @@ int temp_main( int argc, char **argv )
 
 	int global_cntr = 0;
 	struct timeval tnow;
+
+
 	while( !done )
 	{
 
@@ -1023,6 +1031,7 @@ int temp_main( int argc, char **argv )
 				VP += allComplexes[c]->V(theSimulation);	
 				VP += allComplexes[c]->AttachV(theSimulation);	
 			}
+
 
 			V += VP;
 			
@@ -1229,7 +1238,7 @@ int temp_main( int argc, char **argv )
 			}
 			
 			// has special routines for handling elastic collisions.
-			propagateSolutionParticles( theSimulation, time_step * AKMA_TIME );
+			propagateSolutionParticles( theSimulation, time_step );
 
 			gettimeofday(&tnow, NULL);
 			double complex_time_stop = tnow.tv_sec + (1e-6) * tnow.tv_usec;
@@ -1500,11 +1509,16 @@ int temp_main( int argc, char **argv )
 			T += srd_T;
 			dof += srd_dof;
 			for( int c = 0; c < ncomplex; c++ )
+			{
+				if( ! allComplexes[c]->do_bd ) 
+				{	
 #ifdef DISABLE_ON_MEMBRANE_T
-				dof += 3 * (allComplexes[c]->nsites - allComplexes[c]->nattach);
+					dof += 3 * (allComplexes[c]->nsites - allComplexes[c]->nattach);
 #else
-				dof += 3 * allComplexes[c]->nsites - allComplexes[c]->nattach;
+					dof += 3 * allComplexes[c]->nsites - allComplexes[c]->nattach;
 #endif
+				}
+			}
 			double TEMP = 2 * T / dof;
 
 			// in kcal/mol

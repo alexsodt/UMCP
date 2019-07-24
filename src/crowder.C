@@ -4,6 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+// defaults
+extern double lipid_DC;
+extern double solution_DC;
+
 void elasticCrowder::init( surface *theSurface, double *rsurf, int f, double u, double v )
 {
 	base_init();
@@ -31,6 +36,8 @@ void elasticCrowder::init( surface *theSurface, double *rsurf, int f, double u, 
 	mass[0] = crowder_mass;
 	mass[1] = crowder_mass;
 
+	DC[0] = lipid_DC;
+	DC[1] = solution_DC;
 	
 	grad_puv[0] = puv[0] = u;
 	grad_puv[1] = puv[1] = v;

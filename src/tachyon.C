@@ -28,6 +28,8 @@ static double fixed_center[3] = {0,0,0};
 static double fixed_view[3] = {0,0,1};
 static int fixed_views_set = 0;
 
+extern "C" int convex_hull( double *pts, int npts, const char *unique );
+
 int surface::writeTachyon( const char *name,
 				int grid_uv, // resolution, how many points we do on one side of a triangle 
 				int nint, // number of interpolation frames
@@ -39,6 +41,13 @@ int surface::writeTachyon( const char *name,
 				int face_center // put the origin on this face.
 			)
 {
+	double *M5 = (double *)malloc( sizeof(double) * 4 * 11 * 12 ); 
+	double *M6 = (double *)malloc( sizeof(double) * 4 * 12 * 12 ); 
+	double *M7 = (double *)malloc( sizeof(double) * 4 * 13 * 13 );
+	double *M[3] = { M5, M6, M7 };
+	int mlow = 5;
+	int mhigh = 7;
+	generateSubdivisionMatrices( M, mlow, mhigh );
 	double cur_area;
 	double area0;
 	double spec_mag = 0.2;
@@ -108,13 +117,22 @@ int surface::writeTachyon( const char *name,
 		double min = 1e10;
 		double max = -1e10;
 		
-		for( int x = 0; x < nv; x++ )
 		for( int xc = 0; xc < 3; xc++ )
 		{
-			if( r[3*x+xc] < min ) min = r[3*x+xc];
-			if( r[3*x+xc] > max ) max = r[3*x+xc];
+			for( int x = 0; x < nv; x++ )
+			{
+				if( r[3*x+xc] < min ) min = r[3*x+xc];
+				if( r[3*x+xc] > max ) max = r[3*x+xc];
+			}
+
+			if( params->tachyon_collision_radius > 0 )
+			{
+				double rad = params->tachyon_collision_radius;
+				if( params->tachyon_collision_point[xc]-rad < min ) min = params->tachyon_collision_point[xc]-rad;
+				if( params->tachyon_collision_point[xc]+rad > max ) max = params->tachyon_collision_point[xc]+rad;
+			}
 		}
-	
+
 		scale = 0.9 / (max-min);	
 
 		printf("scale: %lf\n", scale );
@@ -490,6 +508,40 @@ int surface::writeTachyon( const char *name,
 		center[1] -= view[1];
 		center[2] -= view[2];
 	}
+	
+	if( params->tachyon_collision_radius )
+	{
+		// center on the near point.
+
+		int f;
+		double u, v;
+		double distance = 1e10;
+		double cpt[3];
+		memcpy(cpt,params->tachyon_collision_point,sizeof(double)*3);
+		nearPointOnBoxedSurface( cpt, &f, &u, &v, M, mlow, mhigh, &distance );	
+		double rpt[3],npt[3];
+		evaluateRNRM( f, u, v, rpt, npt, r); 
+
+		center[0] = rpt[0]*scale;
+		center[1] = rpt[1]*scale;
+		center[2] = rpt[2]*scale;
+		
+		double dr[3] = { cpt[0] - rpt[0], cpt[1] - rpt[1], cpt[2] - rpt[2] }; 	
+		double zdir[3] = { 0,0,1};
+		double tdir[3];
+		cross(dr, zdir, view );
+		cross(dr, tdir, updir );
+		normalize(updir);
+		// rotate the view dir slightly
+
+		double origin[3]={0,0,0};
+		rotateArbitrary( view, updir, origin, 1, 30 * M_PI/180.0 );	
+		normalize(view);
+
+		center[0] -= 2 * view[0];
+		center[1] -= 2 * view[1];
+		center[2] -= 2 * view[2];
+	}
 
 	bg[0] = 1.;
 	bg[1] = 1.;
@@ -499,7 +551,7 @@ int surface::writeTachyon( const char *name,
 	forced_light_dir[1] = -updir[1];
 	forced_light_dir[2] = -updir[2];
 
-	if( params->tachyon_curvature || params->tachyon_gauss )
+	if( params->tachyon_curvature || params->tachyon_gauss || params->tachyon_collision_radius > 0 )
 	{
 		forced_light_dir[0] = view[0];
 		forced_light_dir[1] = view[1];
@@ -517,7 +569,7 @@ int surface::writeTachyon( const char *name,
 "  Zoom %lf\n"
 "  Aspectratio 1\n"
 "  Antialiasing 4\n"
-"  Raydepth 2\n"
+"  Raydepth 10\n"
 "  Center  %lf %lf %lf \n"
 "  Viewdir %lf %lf %lf \n"
 "  Updir   %lf %lf %lf \n"
@@ -534,7 +586,7 @@ updir[0], updir[1], updir[2],
 forced_light_dir[0]+updir[0]*0.3, forced_light_dir[1]+updir[1]*0.3, forced_light_dir[2]+updir[2]*0.3, 
 forced_light_dir[0], forced_light_dir[1], forced_light_dir[2], 
 forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light_dir[2]-updir[2]*0.3, 
--updir[0], -updir[1], -updir[2], 
+//-updir[0], -updir[1], -updir[2], 
 (do_planar ? -1.0 : 1.0), (do_planar ? -0.5 : 0.5), bg[0], bg[1], bg[2] );
 	
 		int num = grid_uv * (grid_uv+1)/2;
@@ -863,6 +915,92 @@ forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light
 
 				off += allComplexes[c]->nsites;
 			}
+
+			if( params->tachyon_collision_radius > 0 )
+			{
+				double *vertex_data = NULL;
+				int *ptr_to_data = (int *)malloc( sizeof(int) * nt );
+				int *nump = (int *)malloc( sizeof(int) * nt );
+				buildFaceData( &vertex_data, ptr_to_data, nump );
+				int col_f;
+				double col_u,col_v;
+				printTachyonRadius( theFile, scale, params->tachyon_collision_level,
+								    params->tachyon_collision_point, 
+								    params->tachyon_collision_draw_type, 
+									&col_f, &col_u, &col_v, M, mlow, mhigh, -1., params->tachyon_collision_radius, vertex_data, ptr_to_data, nump, 0 );	
+				free(vertex_data);
+				free(ptr_to_data);
+				free(nump);
+						
+				fprintf(theFile, "Sphere\n");
+				fprintf(theFile, "Center %lf %lf %lf\n", params->tachyon_collision_point[0]*scale, params->tachyon_collision_point[1]*scale, params->tachyon_collision_point[2]*scale); 
+				fprintf(theFile, "Rad %lf\n", params->tachyon_collision_radius * scale );
+				double pcolor[3] = { 1,0,0};
+				fprintf(theFile, "Texture\n"
+					"Ambient 0.1 Diffuse 0.1 Specular 0.0 Opacity 0.1\n"
+					 "Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", pcolor[0], pcolor[1], pcolor[2] );
+				
+				fprintf(theFile, "Sphere\n");
+				fprintf(theFile, "Center %lf %lf %lf\n", params->tachyon_collision_point[0]*scale, params->tachyon_collision_point[1]*scale, params->tachyon_collision_point[2]*scale); 
+				fprintf(theFile, "Rad %lf\n", 25.0 * scale );
+
+				fprintf(theFile, "Texture\n"
+					"Ambient 0.1 Diffuse 0.1 Specular 0.0 Opacity 1.0\n"
+					 "Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", pcolor[0], pcolor[1], pcolor[2] );
+			}
+
+			if( params->tachyon_face_box_spline >= 0 )
+			{
+				// draw the box spline for a particular face.
+	
+				int f = params->tachyon_face_box_spline;
+				int npts = 12;
+				int *indices = NULL;
+				double *pbc = NULL;
+					
+				if( f >= nf_faces )
+				{
+					indices = theIrregularFormulas[(f-nf_faces)*nf_irr_pts].cp;		
+					pbc = theIrregularFormulas[(f-nf_faces)*nf_irr_pts].r_pbc;		
+					npts = theIrregularFormulas[(f-nf_faces)*nf_irr_pts].ncoor;	
+				} 
+				else
+				{
+					indices = theFormulas[(f)*nf_g_q_p].cp;		
+					pbc     = theFormulas[(f)*nf_g_q_p].r_pbc;		
+					npts    = theFormulas[(f)*nf_g_q_p].ncoor;	
+				} 
+	
+				double hull_pts[3*npts];
+	
+				for( int x = 0; x < npts; x++ )
+				{
+					hull_pts[3*x+0] = theVertices[indices[x]].r[0] + pbc[3*x+0];
+					hull_pts[3*x+1] = theVertices[indices[x]].r[1] + pbc[3*x+1];
+					hull_pts[3*x+2] = theVertices[indices[x]].r[2] + pbc[3*x+2];
+				}
+	
+				// get the convex hull.
+	
+				convex_hull( hull_pts, npts, "tachyon_qhull");
+				extern int ntri;
+				extern int *triStorage;
+
+				double convex_hull_spec = 0.5;
+				double convex_hull_opacity = 0.2;
+	
+				for( int t = 0; t < ntri; t++ )
+				{
+					fprintf(theFile, "Tri\n");
+						fprintf(theFile, "V0 %lf %lf %lf\n", theVertices[indices[triStorage[10*t+1]]].r[0]*scale + dx*Lx*scale, theVertices[indices[triStorage[10*t+1]]].r[1]*scale+ dy*Ly*scale, theVertices[indices[triStorage[10*t+1]]].r[2]*scale+ dz*Lz*scale );
+						fprintf(theFile, "V1 %lf %lf %lf\n", theVertices[indices[triStorage[10*t+2]]].r[0]*scale + dx*Lx*scale, theVertices[indices[triStorage[10*t+2]]].r[1]*scale+ dy*Ly*scale, theVertices[indices[triStorage[10*t+2]]].r[2]*scale+ dz*Lz*scale );
+						fprintf(theFile, "V2 %lf %lf %lf\n", theVertices[indices[triStorage[10*t+3]]].r[0]*scale + dx*Lx*scale, theVertices[indices[triStorage[10*t+3]]].r[1]*scale+ dy*Ly*scale, theVertices[indices[triStorage[10*t+3]]].r[2]*scale+ dz*Lz*scale );
+						fprintf(theFile, "Texture\n"
+								"Ambient 0 Diffuse 0.45 Specular %lf Opacity %lf\n"
+								 "Phong Metal 0.5 Phong_size 40 Color %lf %lf %lf TexFunc 0\n", convex_hull_spec, convex_hull_opacity, 1.0, 0.0, 0.0  );
+				}
+			}
+
 		}
 
 		
@@ -880,6 +1018,10 @@ forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light
 	}
 	free(use_frame);
 	free(tris);
+				
+	free(M5);
+	free(M6);
+	free(M7);
 
 	return n_frames_written;
 }

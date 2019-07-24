@@ -83,7 +83,16 @@ void setDefaults( parameterBlock *block )
 
 	block->disable_mesh = 0;
 
+	block->tachyon_collision_draw_type = 0;
+	block->tachyon_collision_point[0] = 0;
+	block->tachyon_collision_point[1] = 0;
+	block->tachyon_collision_point[2] = 0;
+	block->tachyon_collision_radius = -1;
+	block->tachyon_collision_level = 3;
+
+	block->tachyon_face_box_spline = -1;
 	block->tachyon_dull = 0;
+	block->tachyon_clear = 0;
 	block->tachyon_flip_sense = 0;
 	block->tachyon_clear = 0;
 	block->tachyon_curvature = 0;
@@ -179,9 +188,29 @@ void setDefaults( parameterBlock *block )
 	block->shape_correction = 0;
 
 	block->on_surface = 0;
+	
+	block->addSalt = 0;
+	block->innerKCL = 0;
+	block->outerKCL = 0;
+
+	block->addProteinPDB   = NULL;
+	block->addProteinPSF   = NULL;
+
+	block->strainInner = 0;
+	block->strainOuter = 0;
+
+	block->innerPatchPDB = NULL;
+	block->innerPatchPSF = NULL;
+	
+	block->outerPatchPDB = NULL;
+	block->outerPatchPSF = NULL;
 
 	block->patchPDB = NULL;
 	block->patchPSF = NULL;
+
+	block->solvatePDB = NULL;
+	block->solvatePSF = NULL;
+
 	block->create_all_atom = 0;
 
 	// request a timestep analysis
@@ -315,6 +344,37 @@ int resolveParameters( parameterBlock *block )
 		exit(1);
 	}
 
+
+	if( !block->outerPatchPDB )
+	{
+		if( block->patchPDB )
+		{
+			block->outerPatchPDB = (char *)malloc( sizeof(char) * (1+strlen(block->patchPDB) ) );
+			strcpy( block->outerPatchPDB, block->patchPDB );
+
+			if( block->patchPSF )
+			{
+				block->outerPatchPSF = (char *)malloc( sizeof(char) * (1+strlen(block->patchPSF) ) );
+				strcpy( block->outerPatchPSF, block->patchPSF );
+			}
+		}
+	}
+	
+	if( !block->innerPatchPDB )
+	{
+		if( block->patchPDB )
+		{
+			block->innerPatchPDB = (char *)malloc( sizeof(char) * (1+strlen(block->patchPDB) ) );
+			strcpy( block->innerPatchPDB, block->patchPDB );
+
+			if( block->patchPSF )
+			{
+				block->innerPatchPSF = (char *)malloc( sizeof(char) * (1+strlen(block->patchPSF) ) );
+				strcpy( block->innerPatchPSF, block->patchPSF );
+			}
+		}
+	}
+
 	return warning;
 }
 
@@ -403,7 +463,16 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 
 			if( buffer[0] == '\0' )
 				continue;
+			
+			tbuf = buffer;
+			const char *p = tbuf;
+			while( *p == '\t' || *p == ' ' ) p += 1;
 
+			if( *p == '#' ) 
+			{
+				continue;
+			}
+				
 			int nr = sscanf( buffer, "%s %s", word1, word2 );
 	
 			if( !strcasecmp( word1, "lipid" ) ) continue; //special case handled in lipid_composition.C
@@ -422,7 +491,6 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}
 
-			tbuf = buffer;
 		
 		}
 		else if( pass == COMMAND_LINE_PASS )
@@ -962,6 +1030,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}	
 		}
+		else if( !strcasecmp( word1, "tachyon_clear" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->tachyon_clear = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->tachyon_clear = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
 		else if( !strcasecmp( word1, "tachyon_dull" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
@@ -1074,6 +1154,8 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->tachyon_res = atoi( word2 );
 		else if( !strcasecmp( word1, "tachyon_tri_center" ) )
 			block->tachyon_tri_center = atoi( word2 );
+		else if( !strcasecmp( word1, "tachyon_face_box_spline" ) )
+			block->tachyon_face_box_spline = atof( word2 );
 		else if( !strcasecmp( word1, "tachyon_view_x" ) )
 			block->tachyon_view_x = atof( word2 );
 		else if( !strcasecmp( word1, "tachyon_view_y" ) )
@@ -1082,6 +1164,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->tachyon_view_z = atof( word2 );
 		else if( !strcasecmp( word1, "tachyon_interp" ) )
 			block->tachyon_interp = atoi( word2 );
+		else if( !strcasecmp( word1, "tachyon_collision_level" ) )
+			block->tachyon_collision_level = atoi( word2 );
+		else if( !strcasecmp( word1, "tachyon_collision_radius" ) )
+			block->tachyon_collision_radius = atof( word2 );
+		else if( !strcasecmp( word1, "tachyon_collision_draw_type" ) )
+			block->tachyon_collision_draw_type = atoi( word2 );
+		else if( !strcasecmp( word1, "tachyon_collision_x" ) )
+			block->tachyon_collision_point[0] = atof( word2 );
+		else if( !strcasecmp( word1, "tachyon_collision_y" ) )
+			block->tachyon_collision_point[1] = atof( word2 );
+		else if( !strcasecmp( word1, "tachyon_collision_z" ) )
+			block->tachyon_collision_point[2] = atof( word2 );
 		else if( !strcasecmp( word1, "sphere" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
@@ -1177,6 +1271,76 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				printf("Could not interpret input line '%s'.\n", tbuf );
 				ERROR = 1;
 			}	
+		}
+		else if( !strcasecmp( word1, "strainOuter") )
+			block->strainOuter = atof(word2);
+		else if( !strcasecmp( word1, "strainInner") )
+			block->strainInner = atof(word2);
+		else if( !strcasecmp( word1, "innerKCL" ) )
+		{
+			block->addSalt = 1;
+			block->innerKCL = atof( word2 );
+		}
+		else if( !strcasecmp( word1, "outerKCL" ) )
+		{
+			block->addSalt = 1;
+			block->outerKCL = atof( word2 );
+		}
+		else if( !strcasecmp( word1, "outerPatchPDB" ) )
+		{
+			if( block->outerPatchPDB )
+				free(block->outerPatchPDB);
+			block->outerPatchPDB = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->outerPatchPDB, word2 );
+		}
+		else if( !strcasecmp( word1, "outerPatchPSF" ) )
+		{
+			if( block->outerPatchPSF )
+				free(block->outerPatchPSF);
+			block->outerPatchPSF = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->outerPatchPSF, word2 );
+		}
+		else if( !strcasecmp( word1, "addProteinPDB" ) )
+		{
+			if( block->addProteinPDB )
+				free(block->addProteinPDB);
+			block->addProteinPDB = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->addProteinPDB, word2 );
+		}
+		else if( !strcasecmp( word1, "addProteinPSF" ) )
+		{
+			if( block->addProteinPSF )
+				free(block->addProteinPSF);
+			block->addProteinPSF = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->addProteinPSF, word2 );
+		}
+		else if( !strcasecmp( word1, "solvatePDB" ) )
+		{
+			if( block->solvatePDB )
+				free(block->solvatePDB);
+			block->solvatePDB = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->solvatePDB, word2 );
+		}
+		else if( !strcasecmp( word1, "solvatePSF" ) )
+		{
+			if( block->solvatePSF )
+				free(block->solvatePSF);
+			block->solvatePSF = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->solvatePSF, word2 );
+		}
+		else if( !strcasecmp( word1, "innerPatchPDB" ) )
+		{
+			if( block->innerPatchPDB )
+				free(block->innerPatchPDB);
+			block->innerPatchPDB = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->innerPatchPDB, word2 );
+		}
+		else if( !strcasecmp( word1, "innerPatchPSF" ) )
+		{
+			if( block->innerPatchPSF )
+				free(block->innerPatchPSF);
+			block->innerPatchPSF = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->innerPatchPSF, word2 );
 		}
 		else if( !strcasecmp( word1, "patchPDB" ) )
 		{

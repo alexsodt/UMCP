@@ -517,6 +517,8 @@ struct surface
 
 
 	/* writing tachyon object file*/
+	void printTachyonRadius( FILE *theFile, double scale, int tachyon_collision_level, double *pt_in, int tachyon_collision_draw_type, int *col_f, double *col_u, double *col_v, double **M, int mlow, int mhigh, double L, double radius,	
+		double *vertex_data, int *ptr_to_data, int *nump, int disable_PBC_z=0  ); // utility for graphics
 	int writeTachyon( const char *name,
 				int grid_uv, // resolution, how many points we do on one side of a triangle 
 				int nint, // number of interpolation frames
@@ -532,7 +534,7 @@ struct surface
 	void readLipidComposition( FILE *inputFile );
 	void debugDeformation( double *r);
 	void createAllAtom( parameterBlock *block );
-	int evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf, int leaflet );
+	int evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf, int leaflet, double strain );
 };
 
 struct volel

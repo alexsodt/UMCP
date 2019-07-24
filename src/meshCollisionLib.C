@@ -32,6 +32,7 @@
 #define RADIUS_TOL    (1e-3)
 #endif
 
+extern "C" int convex_hull( double *pts, int npts, const char *unique );
 bool gjk_algorithm( double *r1, int nv1, double *r2, int nv2 );
 bool linear_collision_worker(double* r1, int nv1, double* pt1, double *pt2, double *pt,  double radius);
 

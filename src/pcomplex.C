@@ -12,9 +12,12 @@
 #include <ctype.h>
 #include "globals.h"
 
+//#define DISABLE_POINT_GRADIENT_DEBUG
+
 extern double kc;
 static double default_particle_area = 65;
-static double lipid_DC = 1e9; //Angstrom^2/s
+double lipid_DC = 1e10; //Angstrom^2/s
+double solution_DC = 1e10; //Angstrom^2/s
 
 // For doing Newtonian/Langevin dynamics:
 static double default_mass = 20000;
@@ -402,24 +405,6 @@ double pcomplex::update_dH_dq( Simulation *theSimulation, double time_step, doub
 			double cx[2] = { d_P_duv[2], d_P_duv[6] };
 			double dx[2] = { d_P_duv[3], d_P_duv[7] };
 
-#if 0		
-			// ratio of determinants, before and after: det(M0^-1 + d M0^-1)/det(M0^-1)
-			double machine_scale = sqrt(Pinv[0]*Pinv[0]+Pinv[1]*Pinv[1]);
-			double a=Pinv[0]/machine_scale; double b=Pinv[1]/machine_scale; double c = Pinv[2]/machine_scale; double d = Pinv[3]/machine_scale;
-		
-
-			double dM0_det[2] = 
-			{ 
-				ax[0]*b*b*c*c*d - bx[0]*a*a*c*d*d - cx[0] * a*a*b*d*d + dx[0]*a*b*b*c*c,
-				ax[1]*b*b*c*c*d - bx[1]*a*a*c*d*d - cx[1] * a*a*b*d*d + dx[1]*a*b*b*c*c 
-			};
-
-			dM0_det[0] /= (a*b*c*d)*(a*d-b*c);
-			dM0_det[1] /= (a*b*c*d)*(a*d-b*c);
-
-			dM0_det[0] *= machine_scale;
-			dM0_det[1] *= machine_scale;
-#else
 			double a=P_uv[0];
 			double b=P_uv[1];
 			double c=P_uv[2];
@@ -429,7 +414,6 @@ double pcomplex::update_dH_dq( Simulation *theSimulation, double time_step, doub
 					      ax[1]*d-bx[1]*c-cx[1]*b+dx[1]*a };
 			dM0_det[0] /= (b*c-a*d);
 			dM0_det[1] /= (b*c-a*d);		
-#endif
 			double fr = fabs(dM0_det[0] * expected_dq[0] + dM0_det[1] * expected_dq[1]);
 			double tolerance = 0.005;
 
@@ -462,7 +446,10 @@ double pcomplex::update_dH_dq( Simulation *theSimulation, double time_step, doub
 
 		double pg[2*nattach];
 		memset( pg, 0, sizeof(double) * 2 * nattach );
+<<<<<<< HEAD
+=======
 	
+>>>>>>> a8b8f84eaae5cf58ed3ba373ad3c5fb415fd6d14
 		grad( theSimulation, surfacer_g, surfacen_g );
 		if( debug == DEBUG_OFF || debug == DEBUG_NO_T )
 			AttachG( theSimulation, pg ); 
@@ -487,10 +474,11 @@ double pcomplex::update_dH_dq( Simulation *theSimulation, double time_step, doub
 			// the attachment gradient.
 			double uv_grad[2] = { pg[2*s+0],pg[2*s+1] };
 
+#ifndef DISABLE_POINT_GRADIENT_DEBUG
 			if( debug == DEBUG_OFF || debug == DEBUG_NO_T )
 			theSurface->pointGradient( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1],
 				rsurf, mesh_grad, uv_grad, surfacer_g+3*s, surfacen_g+3*s, frac_mult ); 
-			
+#endif
 			// the contribution from dV/du and dV/dv
 			save_grad[2*s+0] += uv_grad[0];
 			save_grad[2*s+1] += uv_grad[1];
@@ -632,7 +620,6 @@ double pcomplex::update_dH_dq( Simulation *theSimulation, double time_step, doub
 				mesh_grad[3*coef_list[c1]+1] -=  (mass[s] * qdot0[1] * drdv[1] * dcoef[(uv2)*ncoef+c1] * qdot0[uv2])*frac_mult;
 				mesh_grad[3*coef_list[c1]+2] -=  (mass[s] * qdot0[1] * drdv[2] * dcoef[(uv2)*ncoef+c1] * qdot0[uv2])*frac_mult;
 			}
-	
 			// now the first order piece. d ( - Mij^{-1} C Mij^{-1} ) / du		
 
 			// first, the derivative of the zero-order inverse matrix. only the particle flavor changes with u/v
@@ -994,6 +981,13 @@ void pcomplex::compute_qdot( Simulation *theSimulation,  double frac_mult )
 
 void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 {
+	static double av_dstep = 0;
+	static double av_dstep2 = 0;
+	static double n_dstep = 0;
+
+	static double av_root_g = 0;
+	static double av_root_g2 = 0;
+	static double n_av_root_g = 0;
 	// move a step.
 
 	for( int s = 0; s < nattach; s++ )
@@ -1032,6 +1026,23 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 			// gval is the sqrt metric
 			double root_g = theSurface->metric( fs[s], puv[2*s+0], puv[2*s+1], rsurf, gmat, &g_u, &g_v );
 
+#ifdef TRACK_UNUSUAL
+			if( n_av_root_g > 10 )
+			{
+				double var = av_root_g2/n_av_root_g - pow(av_root_g/n_av_root_g,2);
+				double stdd = sqrt(var);
+
+				if( fabs( (root_g - av_root_g/n_av_root_g)/stdd ) > 3 )
+				{
+					printf("Unusual root g %le av %le stdd %le\n",
+						root_g, av_root_g/n_av_root_g, stdd );
+				}
+			}
+
+			av_root_g2 += root_g*root_g;
+			av_root_g += root_g;
+			n_av_root_g += 1;
+#endif
 			double val = sqrt(gmat[0]*gmat[0]+4*gmat[1]*gmat[1]-2*gmat[0]*gmat[3]+gmat[3]*gmat[3]);
 
 			double gamma_neg_half[4] = { 
@@ -1045,18 +1056,40 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 				gmat[0]/(root_g*root_g), -gmat[1]/(root_g*root_g), -gmat[1]/(root_g*root_g), gmat[3]/(root_g*root_g)
 			};
 
-	
+			// g_u + means metric increases in u direction, move particle there.
 			double pre_drift[2] = { 
-					save_grad[0]/kT + (-g_u/(2*root_g*root_g)), // 1/g done with sqrt
-					save_grad[1]/kT + (-g_v/(2*root_g*root_g))
+					save_grad[2*s+0]/kT + (-g_u/(2*root_g*root_g)), // 1/g done with sqrt
+					save_grad[2*s+1]/kT + (-g_v/(2*root_g*root_g))
 						};
 
 
 			double corr_noise[2] = { gamma_neg_half[0] * noise[0] + gamma_neg_half[1] * noise[1],
 						 gamma_neg_half[2] * noise[0] + gamma_neg_half[3] * noise[1] }; 
 
-			duv[0] = (gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[0];
-			duv[1] = (gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[1];	
+#ifdef TRACK_UNUSUAL
+			double dstep[2] = { (gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt,
+					  (gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt };
+			
+			double dstep_mag = sqrt(dstep[0]*dstep[0]+dstep[1]*dstep[1]);
+			
+			av_dstep += dstep_mag;
+			av_dstep2 += dstep_mag*dstep_mag;
+			n_dstep += 1;
+
+			double av = av_dstep/n_dstep;
+			double av2 = av_dstep2/n_dstep;
+			double var = av2-av*av;
+			double stdd = sqrt(var);
+			double del = (dstep_mag-av)/stdd;
+
+			if( del > 3 )
+			{
+				printf("unusual step %le av %le std %le grad: %le %le gg: %le %le\n", dstep_mag, av, stdd, save_grad[2*s+0]/kT, save_grad[2*s+1]/kT, -g_u/(2*root_g*root_g), -g_v/(2*root_g*root_g)  );
+			}
+#endif
+			// negative sign means move in the direction of force not grad.
+			duv[0] = -(gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[0];
+			duv[1] = -(gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[1];	
 		}
 		else
 		{
@@ -1634,12 +1667,22 @@ void pcomplex::evaluate_momentum( surface *theSurface, double *rsurf, double *po
 	}
 }
 
+<<<<<<< HEAD
+double pcomplex::T( Simulation *theSimulation, int subp)
+=======
 double pcomplex::T( Simulation *theSimulation )
+>>>>>>> a8b8f84eaae5cf58ed3ba373ad3c5fb415fd6d14
 {
 	double T = 0;
 
+	if( do_bd ) return 0;
+
 	for( int s = 0; s < nattach; s++ )
 	{
+<<<<<<< HEAD
+		if( subp != -1 && s!= subp) continue;
+=======
+>>>>>>> a8b8f84eaae5cf58ed3ba373ad3c5fb415fd6d14
 		surface_record *sRec = theSimulation->fetch(sid[s]);
 		surface *theSurface = sRec->theSurface;
 		double *rsurf = sRec->r;
@@ -1663,14 +1706,13 @@ double pcomplex::T( Simulation *theSimulation )
 				    Pinv[2] * p[2*s+0] + Pinv[3] * p[2*s+1] };
 
 		// T = 0.5 * p * qdot
-#ifndef DISABLE_ON_MEMBRANE_T
 		T += 0.5 * (p[2*s+0]) * (qdot0[0]);
 		T += 0.5 * (p[2*s+1]) * (qdot0[1]);
-#endif
 	}
 
 	for( int s = nattach; s < nsites; s++ )
 	{
+		if( subp != -1 && s!= subp) continue;
 		T += 0.5 * (p[3*s+0]) * (qdot[3*s+0]);
 		T += 0.5 * (p[3*s+1]) * (qdot[3*s+1]);
 		T += 0.5 * (p[3*s+2]) * (qdot[3*s+2]);
@@ -2197,11 +2239,23 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 	double *alphas = theSimulation->alpha;
 	int done = 0;
 
+	for( int c = 0; c < ncomplex; c++ )
+	{
+		if( allComplexes[c]->do_bd  )
+		{
+			for( int s = allComplexes[c]->nattach; s < allComplexes[c]->nsites; s++ )
+			{ // DC is in seconds, same with dt.  AKMA_TIME converts.
+				allComplexes[c]->qdot[3*s+0] = (-allComplexes[c]->save_grad[3*s+0] * allComplexes[c]->DC[s]/kT + sqrt(2 * allComplexes[c]->DC[s]/dt ) * gsl_ran_gaussian(r_gen_global, 1 )) / AKMA_TIME;
+				allComplexes[c]->qdot[3*s+1] = (-allComplexes[c]->save_grad[3*s+1] * allComplexes[c]->DC[s]/kT + sqrt(2 * allComplexes[c]->DC[s]/dt ) * gsl_ran_gaussian(r_gen_global, 1 )) / AKMA_TIME;
+				allComplexes[c]->qdot[3*s+2] = (-allComplexes[c]->save_grad[3*s+2] * allComplexes[c]->DC[s]/kT + sqrt(2 * allComplexes[c]->DC[s]/dt ) * gsl_ran_gaussian(r_gen_global, 1 )) / AKMA_TIME;
+			}
+		}
+	}
+	
 	// propagate them all forward, then backtrack as we see fit.
+	dt *= AKMA_TIME;
 	double propagated = dt;
-
-	
-	
+		
 	for( int c = 0; c < ncomplex; c++ )
 	{
 		for( int s = allComplexes[c]->nattach; s < allComplexes[c]->nsites; s++ )
@@ -2211,7 +2265,6 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 			allComplexes[c]->rall[3*s+2] += allComplexes[c]->qdot[3*s+2] * dt;
 		}
 	}
-
 	double to_propagate = 0;
 
 //	printf("STEP %lf\n", dt );
@@ -2284,7 +2337,14 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 					pos1_at_c[0] - pos2_at_c[0],
 					pos1_at_c[1] - pos2_at_c[1],
 					pos1_at_c[2] - pos2_at_c[2] };
+<<<<<<< HEAD
+			double len = length3(dr_at_c);
+			if( len > 1.1 * (allComplexes[c1]->sigma[p1] + allComplexes[c2]->sigma[p2]) )
+				theSimulation->wrapPBC( dr_at_c, alphas );
+
+=======
 			theSimulation->wrapPBC( dr_at_c, alphas );
+>>>>>>> a8b8f84eaae5cf58ed3ba373ad3c5fb415fd6d14
 			normalize(dr_at_c);
 			// solve for dKE
 		
