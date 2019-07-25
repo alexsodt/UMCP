@@ -3,6 +3,7 @@
 
 #include "interp.h"
 #include "input.h"
+#include "2D.h"
 
 typedef struct
 {
@@ -32,6 +33,7 @@ struct RD
 	
 	void init(int ncomplex);
 	void get_tracked(surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex);
+	void do_rd(pcomplex **allComplexes, int ncomplex);
 };
 
 #endif
