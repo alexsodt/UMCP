@@ -12,18 +12,7 @@
 #include <limits>
 #include <math.h>
 #include <cfloat>
-
-typedef struct
-{
-	int nEntries;
-	int nEntriesSpace;
-	int DDtableindex;
-	double *TBLID;
-	gsl_matrix **contsur;
-	gsl_matrix **contnorm;
-	gsl_matrix **contpir;
-	int *vecLen;
-}  twoDReactionPTable;
+#include "2D.h"
 
 // DDtableindex: index of where we store information about a 2D reaction.
 
@@ -33,8 +22,28 @@ static double tolDvalue = 1e-3;
 //  copied and reorganized slightly from Margaret Johnson's code.
 //
 
-double get_2D_2D_rxn_prob( double R1, double kr, double bindrad, double Dtot, twoDReactionPTable *rxnTable, double deltat, double Rmax )
+twoDReactionPTable *newTable( void )
 {
+	twoDReactionPTable *theTable = (twoDReactionPTable *)malloc( sizeof(twoDReactionPTable) );
+
+	theTable->nEntries = 0;
+	theTable->nEntriesSpace = 1;
+	theTable->TBLID = (double *)malloc(  sizeof(double) * 2 * theTable->nEntriesSpace );
+	theTable->vecLen = (int *)malloc( sizeof(int) * theTable->nEntriesSpace );
+	theTable->contsur = (gsl_matrix **)malloc(  sizeof(gsl_matrix *) * theTable->nEntriesSpace );
+	theTable->contnorm = (gsl_matrix **)malloc( sizeof(gsl_matrix *) * theTable->nEntriesSpace );
+	theTable->contpir = (gsl_matrix **)malloc( sizeof(gsl_matrix *) * theTable->nEntriesSpace );
+
+	return theTable;
+}
+
+static twoDReactionPTable *rxnTable = NULL;
+
+double get_2D_2D_rxn_prob( double R1, double kr, double bindrad, double Dtot, double deltat, double Rmax )
+{
+	if( !rxnTable )
+		rxnTable = newTable();
+
 	double ktemp = kr / 2 / bindrad;
 	int uniquetableindex = -1;
 	int tableexistflag = 0;

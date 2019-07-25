@@ -33,6 +33,7 @@ class parameterBlock
 
 	int timestep_analysis;
 	int mass_scaling;
+	int fix_membrane;
 	int mode_x;
 	int mode_y;
 	int mode_min;
@@ -45,7 +46,6 @@ class parameterBlock
 	int silent;
 	int nruns;
 
-	int disable_mesh; // for debugging
 
 	int lipid_mc_period; // period which to do monte-carlo lipid movement
 	int npt_mc_period; // period which to do monte-carlo lipid movement
@@ -194,6 +194,8 @@ class parameterBlock
 	int srd_collision_freq;
 	int planar_topology;
 	int collect_hk;
+	//reaction diffusion
+	int do_rd;
 
 	int on_surface;
 

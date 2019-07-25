@@ -26,6 +26,7 @@
 #endif
 #include "simulation.h"
 #include "meshCollisionLib.h"
+#include "rd_kayla.h"
 
 #define MM_METHOD_1
 #define BOXED
@@ -131,6 +132,7 @@ int temp_main( int argc, char **argv )
 	int on_surface = block.on_surface;
 	int do_bd_membrane = block.do_bd_membrane;
 	int do_bd_particles = block.do_bd_particles;
+	int do_rd = block.do_rd;
 	int debug = block.debug;
 	double kcal_mol_K = (5.92186663194E-01/298);
 	kT = (5.92186663194E-01/298) * (block.T);
@@ -272,6 +274,16 @@ int temp_main( int argc, char **argv )
 
 
 	// for now only collect kc info from first surface.
+	// INITIALIZE REACTION DIFFUSION
+	RD *rd = NULL;
+
+	if(do_rd)
+	{
+		rd = (RD *)malloc( sizeof(RD) );
+		rd->init(ncomplex);
+		if(debug)
+			printf("debug RD 1st ncomplexes: %d\n", ncomplex);
+	}
 
 	int nmodes = 8;
 	int nspacehk = 10;
@@ -475,7 +487,6 @@ int temp_main( int argc, char **argv )
 		sRec->doing_spherical_harmonics = 0;
 		sRec->doing_planar_harmonics = 0;
 		sRec->output_qvals = NULL;	
-
 
 		if( block.mode_max >= 0 )
 		{
@@ -869,7 +880,6 @@ int temp_main( int argc, char **argv )
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 		ParallelSum( sRec->qdot_temp, 3*sRec->theSurface->nv );
 #endif
-
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 	{
 		if( ! sRec->do_gen_q )
@@ -1041,7 +1051,7 @@ int temp_main( int argc, char **argv )
 			V += VP;
 			
                         /*********** END COMPUTE ENERGY ************/	
-
+                                                
 			/*********** SAVE RESTARTS FOR DEBUGGING ***/
 #if 0 // PRESIMULATION, requires updating
 #ifdef SAVE_RESTARTS
@@ -1241,7 +1251,7 @@ int temp_main( int argc, char **argv )
 					time_remaining -= dt;
 				}
 			}
-			
+
 			// has special routines for handling elastic collisions.
 			propagateSolutionParticles( theSimulation, time_step );
 
@@ -1254,7 +1264,7 @@ int temp_main( int argc, char **argv )
 
 			/* BEGIN SRD */
 			
-			if( do_srd )
+			if( do_srd && ! block.fix_membrane )
 			{
 				for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 				sRec->theSurface->rebox_system();
@@ -1492,8 +1502,25 @@ int temp_main( int argc, char **argv )
 				else
 					PartialSyncVertices(sRec->pp, sRec->id);
 #endif
+			// ************* DO REACTION DIFFUSION
+
+			if(do_rd)
+			{	
+				// get_tracked
+				if(debug)
+					printf("debug RD 2nd ncomplexes: %d\n", ncomplex);
+				rd->get_tracked(theSurface, r, allComplexes, ncomplex); 
+				if(debug)
+				{
+					for(int p = 0; p < ncomplex; p++)
+					{
+						printf("debug RD 3rd id: %d ntracked: %d\n", p, rd->tracked[p]->ntracked);
+					}
+				}
+				//run RD
 			}
 
+			// ************* END REACTION DIFFUSION
 #ifdef PARALLEL
 			ParallelSum( &PT, 1 );
 #endif

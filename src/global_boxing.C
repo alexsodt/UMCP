@@ -7,15 +7,16 @@
 //global_boxing *boxing = NULL;
 //int global_boxing_init = 0;
 
-void global_boxing::setup_boxing( double target_box_width, double PBC[3][3] )
+void global_boxing::setup_boxing( double target_box_width, double PBC_in[3][3] )
 {
+	for( int i = 0; i < 3; i++ )
+	for( int j = 0; j < 3; j++ )
+		PBC[i][j] = PBC_in[i][j];
+	
 	nx = ceil(PBC[0][0] / target_box_width);	
 	ny = ceil(PBC[1][1] / target_box_width);	
 	nz = ceil(PBC[2][2] / target_box_width);	
 
-	for( int i = 0; i < 3; i++ )
-	for( int j = 0; j < 3; j++ )
-		PBC[i][j] = PBC[i][j];
 
 	if( nx < 0 ) nx = 1;
 	if( ny < 0 ) ny = 1;

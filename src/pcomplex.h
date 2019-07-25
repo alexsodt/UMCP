@@ -18,7 +18,7 @@ struct pcomplex
 	int bound;
 	int debug;
 	int do_bd;
-
+	
 	// diffusion constants.
 	double *DC;
 
@@ -53,6 +53,10 @@ struct pcomplex
 	double *p_c0;
 
 	double *coord_transform;
+
+// This is added by Kayla for keeping track of when to "delete" a complex
+	int alive; //1: alive, 0:dead -- remove from memory during garbage cleanup  
+// End of what Kayla added
 
 	virtual void alloc( void );
 	virtual void pfree( void );
@@ -117,6 +121,14 @@ struct pcomplex
 	double local_curvature( Simulation *theSimulation);
 	void print_type( char **outp );
 
+};
+
+struct actin : pcomplex
+{
+	int *interfaces; // array of avaiable interfaces by sub ID (for no branching - "0" and "nattach-1")
+	double *r_int; // position of the available interfaces
+	double k_on;
+	double k_off;
 };
 
 struct simpleParticle : pcomplex
