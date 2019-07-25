@@ -7,8 +7,29 @@
 #include "units.h"
 #include "mutil.h"
 #include "rd_kayla.h"
+#include "2D.h"
 
 static global_boxing *boxing = NULL;
+
+void RD::init( int ncomplex )
+{
+        // binding radius and the rates will eventually be read from a database or user input.
+        // for now K debugs on these great values.
+        binding_radius = 10.0;
+        k_off          = 1e4; // per second.
+        k_on           = 1e10; // per second times A^3 I guess?
+        // setup tracked: allocate tracked
+        tracked = (RD_tracked **)malloc(sizeof(RD_tracked)*ncomplex);
+        // for each particle, set ntracked_space = 10, set ntracked=0
+        for(int p = 0; p < ncomplex; p++)
+        {
+                tracked[p] = (RD_tracked *)malloc(sizeof(RD_tracked));
+                tracked[p]->ntracked = 0;
+                tracked[p]->ntracked_space = 10;
+                tracked[p]->tracked_info = (RD_tracked_info *)malloc(sizeof(RD_tracked_info) * tracked[p]->ntracked_space);
+                tracked[p]->tracked_new = (RD_tracked_info *)malloc(sizeof(RD_tracked_info) * tracked[p]->ntracked_space);
+        }
+}
 
 void RD::get_tracked(surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex )
 {
@@ -79,19 +100,21 @@ void RD::get_tracked(surface *theSurface, double *rsurf, pcomplex **allComplexes
 				if( r < binding_radius )
 				{
 					npairs++;
-					int old_id = 0;
+					int old = 0;
+					int old_id;
 					// Need to determine if newly tracked or already tracked
 					for(int n = 0; n < tracked[p]->ntracked; n++)
 					{
 						// Does this pair already exist?
 						if(tracked[p]->tracked_info[n].id == p2)
 						{
+							old = 1;
 							old_id = n;
 						}
 	
 					}
 					//If already tracked need to update prev_sep, prevnorm, curr_sep, etc.
-					if(old_id > 0)
+					if(old)
 					{
 						tracked[p]->tracked_info[old_id].info = 1;
 						tracked[p]->tracked_info[old_id].prev_sep = tracked[p]->tracked_info[old_id].curr_sep;
@@ -147,32 +170,19 @@ void RD::get_tracked(surface *theSurface, double *rsurf, pcomplex **allComplexes
 	free(nearlist);
 }
 
-void RD::init( int ncomplex )
+void RD::do_rd(pcomplex **allComplexes, int ncomplex) //use the structure from get_tracked and perfrom RD, update pcomplex structure
 {
-	// binding radius and the rates will eventually be read from a database or user input.
-	// for now K debugs on these great values.
-	binding_radius = 10.0;
-	k_off	       = 1e4; // per second.	
-	k_on	       = 1e10; // per second times A^3 I guess?
-	// setup tracked: allocate tracked
-	tracked = (RD_tracked **)malloc(sizeof(RD_tracked)*ncomplex);
-	// for each particle, set ntracked_space = 10, set ntracked=0
+	double prob;
 	for(int p = 0; p < ncomplex; p++)
         {
-		tracked[p] = (RD_tracked *)malloc(sizeof(RD_tracked));
-		tracked[p]->ntracked = 0;
-		tracked[p]->ntracked_space = 10;
-		tracked[p]->tracked_info = (RD_tracked_info *)malloc(sizeof(RD_tracked_info) * tracked[p]->ntracked_space);
-		tracked[p]->tracked_new = (RD_tracked_info *)malloc(sizeof(RD_tracked_info) * tracked[p]->ntracked_space);
+		for(int n = 0; n < tracked[p]->ntracked; n++)
+		{
+			double rn = gsl_rng_uniform(rng_x);
+			prob = get_2D_2D_rxn_prob(tracked[p]->tracked[n].curr_sep, k_on, binding_radius, Dtot, dt, Rmax);
+			if(prob > rn)
+			{
+				
+			}
+		}
 	}
 }
-
-//void RD() //use the structure from get_tracked and perfrom RD, update pcomplex structure
-//{
-
-//}
-
-//void garbage_clean() //cleanup the garbage in pcomplex after performing x # of iterations of RD
-//{
-
-//}
