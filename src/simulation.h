@@ -76,6 +76,7 @@ typedef struct Simulation
 
 	pcomplex **allComplexes;	
 	int ncomplex;	
+	int ncomplexSpace;	
 	double alpha[3];
 	double PBC_vec[3][3];
 
@@ -121,6 +122,10 @@ typedef struct Simulation
 	void saveRestart( FILE *theFile, int seed ); 
 	void saveRestart( char **buf, int seed);
 	void loadRestart( FILE *loadFile, int *seed );
+
+	int AddComplex( pcomplex *addMe );	
+	void RemoveComplexDelayed( int id );
+	void GarbageCollection( void );
 } Simulation;
 
 

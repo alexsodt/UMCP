@@ -27,7 +27,7 @@ class parameterBlock
 	char *jobName;
 	char *qvals;
 	char *lipid_lib;
-
+	char *rxnDiffusionInfoName;
 	double rho;
 
 

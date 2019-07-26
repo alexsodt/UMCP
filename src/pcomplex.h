@@ -12,12 +12,17 @@
 
 struct pcomplex
 {
+	int disabled;
+	int nwatchers;
+
 	int is_inside;
 	int nsites;
 	int nattach;
 	int bound;
 	int debug;
 	int do_bd;
+
+	char *complex_name;
 	
 	// diffusion constants.
 	double *DC;
@@ -34,6 +39,7 @@ struct pcomplex
 	double *rall;
 	// attach coordinates in f/uv; can exceed face bounds
 	int *sid; // id of surface we are on.
+	int *stype; // if doing rxn/diff
 	int *fs;	
 	double *puv;
 
@@ -121,6 +127,11 @@ struct pcomplex
 	double local_curvature( Simulation *theSimulation);
 	void print_type( char **outp );
 
+
+	void disable( void) { disabled = 1; }
+	void destroy( void);
+	void watch( void );
+	void forget( void );
 };
 
 struct actin : pcomplex
@@ -140,6 +151,11 @@ struct simpleLipid : pcomplex
 	double c0_val;
 	void loadParams( parameterBlock *block );
 	virtual void init( surface *theSurface, double *, int f, double u, double v ); 
+};
+
+struct simpleDimer : simpleLipid
+{
+	double c0_val;
 };
 
 struct NBAR : pcomplex

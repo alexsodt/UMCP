@@ -660,6 +660,17 @@ void ParallelGather( double *vec, int len_per_proc )
 #endif
 }
 
+void ParallelSum( int *vec, int len )
+{
+#ifdef PARALLEL
+	int *vin=(int*)malloc(sizeof(int)*len);
+	memset(vin,0,sizeof(int)*len);
+	MPI_Allreduce( vec, vin, len, MPI_INT, MPI_SUM, MPI_COMM_WORLD ); 
+	memcpy( vec, vin, sizeof(int) * len );
+	free(vin);
+#endif
+}
+
 void ParallelSum( double *vec, int len )
 {
 #ifdef PARALLEL

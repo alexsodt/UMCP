@@ -35,6 +35,8 @@ void pcomplex::base_init( void )
 {
 	do_bd = 0;
 	debug = DEBUG_OFF;
+	nwatchers = 0;
+	disabled = 0;
 }
 
 /* general routines */
@@ -48,6 +50,7 @@ void pcomplex::alloc( void )
 	memset( rall, 0, sizeof(double) * 3 * nsites );
 
 	sid = (int*)malloc( sizeof(int) * nsites );
+	stype = (int*)malloc( sizeof(int) * nsites );
 
 	fs = (int *)malloc( sizeof(int) * nsites );
 	puv = (double *)malloc( sizeof(double) * 2 * nsites );
@@ -110,6 +113,10 @@ void pcomplex::print_type( char **outp )
 	sprintf(*outp, "%s", p );
 	
 	free(temp);
+}
+
+void pcomplex::destroy( void )
+{
 }
 
 void pcomplex::activateBrownianDynamics( void )
@@ -1407,11 +1414,16 @@ pcomplex *loadComplex( const char *name )
 		the_complex = new simpleParticle;
 	else if( !strcasecmp( name, "simpleLipid" ) )
 		the_complex = new simpleLipid;
+	else if( !strcasecmp( name, "simpleDimer" ) )
+		the_complex = new simpleDimer;
 	else
 	{
 		printf("Unknown complex name '%s'.\n", name );
 		exit(1);
 	}
+
+	the_complex->complex_name = (char *)malloc( sizeof(char) * (1 + strlen(name) ) );
+	strcpy( the_complex->complex_name, name );
 
 	return the_complex;
 }
@@ -1636,6 +1648,7 @@ void simpleLipid::loadParams( parameterBlock *block )
 {
 	c0_val = block->c0;
 }
+
 
 void simpleLipid::init( surface *theSurface, double *rsurf, int f, double u, double v )
 {
@@ -2387,5 +2400,15 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 
 //	if( icntr % 100 == 0 )
 //		printf("NCollisions/check %le\n", ncol / icntr );
+}
+
+void pcomplex::watch( void )
+{
+	nwatchers++;
+}
+
+void pcomplex::forget( void )
+{
+	nwatchers--;
 }
 

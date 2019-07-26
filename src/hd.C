@@ -271,7 +271,7 @@ int temp_main( int argc, char **argv )
 	theSurface1->loadComplexes( &allComplexes, &ncomplex, &block ); 
 	theSimulation->allComplexes = allComplexes;
 	theSimulation->ncomplex = ncomplex;
-
+	theSimulation->ncomplexSpace = ncomplex;
 
 	// for now only collect kc info from first surface.
 	// INITIALIZE REACTION DIFFUSION
@@ -280,7 +280,7 @@ int temp_main( int argc, char **argv )
 	if(do_rd)
 	{
 		rd = (RD *)malloc( sizeof(RD) );
-		rd->init(theSimulation, dt );
+		rd->init(theSimulation, dt, &block );
 		if(debug)
 			printf("debug RD 1st ncomplexes: %d\n", ncomplex);
 	}

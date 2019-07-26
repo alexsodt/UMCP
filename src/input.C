@@ -30,6 +30,8 @@ void setDefaults( parameterBlock *block )
 	block->betazFile = (char *)malloc( sizeof(char) * ( strlen(defaultBZ)+1) );
 	sprintf(block->betazFile, "%s", defaultBZ );
 
+	block->rxnDiffusionInfoName = NULL;
+
 	block->qvals = NULL;
 	block->loadName = NULL;
 	block->concentration = 0;
@@ -541,6 +543,13 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				free(block->meshName2);
 			block->meshName2 = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
 			strcpy( block->meshName2, word2 );
+		}
+		else if( !strcasecmp( word1, "rxn_diffusion" ) )
+		{
+			if( block->rxnDiffusionInfoName )
+				free(block->rxnDiffusionInfoName);
+			block->rxnDiffusionInfoName = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->rxnDiffusionInfoName, word2 );
 		}
 		else if( !strcasecmp( word1, "lipid_lib" ) )
 		{

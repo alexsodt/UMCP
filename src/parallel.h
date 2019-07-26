@@ -61,6 +61,7 @@ void setupParallel( Simulation *theSimulation );
 //void setupSparseVertexPassing( SparseMatrix *EFFM, int nverts, int NQ, int surface_id  );
 void setupSparseVertexPassing( Simulation *theSimulation);
 void ParallelSum( double *vec, int len );
+void ParallelSum( int *vec, int len );
 void ParallelSyncComplexes( pcomplex **allComplexes, int ncomplexes);
 void ParallelBroadcast( double *vec, int len);
 void ParallelBroadcast( int *vec, int len);
