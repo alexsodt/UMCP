@@ -115,7 +115,7 @@ int temp_main( int argc, char **argv )
 	int nwarnings = getInput( (const char **)argv, argc, &block );
 
 	srand(block.random_seed);
-
+	if( !rng_x ) init_random(block.random_seed);
 	/* copy parameters */
 
 	int collect_hk = block.collect_hk;	
@@ -280,7 +280,7 @@ int temp_main( int argc, char **argv )
 	if(do_rd)
 	{
 		rd = (RD *)malloc( sizeof(RD) );
-		rd->init(ncomplex);
+		rd->init(theSimulation, dt );
 		if(debug)
 			printf("debug RD 1st ncomplexes: %d\n", ncomplex);
 	}
@@ -1502,6 +1502,7 @@ int temp_main( int argc, char **argv )
 				else
 					PartialSyncVertices(sRec->pp, sRec->id);
 #endif
+			}
 			// ************* DO REACTION DIFFUSION
 
 			if(do_rd)
@@ -1509,7 +1510,9 @@ int temp_main( int argc, char **argv )
 				// get_tracked
 				if(debug)
 					printf("debug RD 2nd ncomplexes: %d\n", ncomplex);
-				rd->get_tracked(theSurface, r, allComplexes, ncomplex); 
+
+				rd->do_rd(theSimulation); 
+
 				if(debug)
 				{
 					for(int p = 0; p < ncomplex; p++)

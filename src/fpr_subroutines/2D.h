@@ -1,6 +1,8 @@
 #ifndef __2Dh__
 #define __2Dh__
 
+#include <gsl/gsl_matrix.h>
+
 typedef struct
 {
 	int nEntries;

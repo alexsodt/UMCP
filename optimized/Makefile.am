@@ -30,15 +30,15 @@ cuda_SRCS = cuda.cu
 else
 cuda_SRCS =
 endif
-rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutines/pirr_pfree_ratio_psF.cpp fpr_subroutines/2D.o fpr_subroutines/DDmatrixcreate.cpp fpr_subroutines/DDpsur.cpp fpr_subroutines/TBLnorm.cpp fpr_subroutines/TBLpirr.cpp fpr_subroutines/TBLsur.cpp fpr_subroutines/fpir.cpp fpr_subroutines/fsur.cpp fpr_subroutines/integrator.cpp fpr_subroutines/fnorm.cpp rd_kayla.C
+rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutines/pirr_pfree_ratio_psF.cpp fpr_subroutines/2D.cpp fpr_subroutines/DDmatrixcreate.cpp fpr_subroutines/DDpsur.cpp fpr_subroutines/TBLnorm.cpp fpr_subroutines/TBLpirr.cpp fpr_subroutines/TBLsur.cpp fpr_subroutines/fpir.cpp fpr_subroutines/fsur.cpp fpr_subroutines/integrator.cpp fpr_subroutines/fnorm.cpp rd_kayla.C fpr_subroutines/sizelookup.cpp
 
 hull_SRCS = dovoronoi.c clusterv.C
 
-hd_opt_SOURCES        = hd.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(rd_SRCS) $(cuda_SRCS)
+hd_opt_SOURCES        = hd.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(rd_SRCS) $(cuda_SRCS) $(hull_SRCS) 
 frc_sandbox_opt_SOURCES        = frc_sandbox.C $(interp_SRCS) $(complex_SRCS) $(hull_SRCS) $(util_SRCS) $(cuda_SRCS) 
-min_opt_SOURCES       = min.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS)
-subdivide_opt_SOURCES = subdivide.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS)
-scale_opt_SOURCES	  = scale.C  $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS)
+min_opt_SOURCES       = min.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS) $(hull_SRCS) 
+subdivide_opt_SOURCES = subdivide.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS) $(hull_SRCS)
+scale_opt_SOURCES	  = scale.C  $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS) $(hull_SRCS)
 icosahedron_opt_SOURCES = icosahedron.C $(util_SRCS)
 makeBud_opt_SOURCES   = makeBud.C $(hull_SRCS) $(util_SRCS)
 makePore_opt_SOURCES   = makePore.C $(hull_SRCS) $(util_SRCS) getCylinderMesh.C

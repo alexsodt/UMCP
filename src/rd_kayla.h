@@ -3,11 +3,13 @@
 
 #include "interp.h"
 #include "input.h"
-#include "2D.h"
+#include "fpr_subroutines/2D.h"
 
 typedef struct
 {
 	int id;
+	int sid1; // sub id 1 (of mine)
+	int sid2; // sub id 2 (of the complex with int id; above)
 	double prev_norm;
 	double prev_sep;
 	double curr_sep;
@@ -26,14 +28,17 @@ typedef struct
 struct RD
 {
 	RD_tracked **tracked;	
-
+	
+	double dt;
+	double Dtot;
 	double k_on;
 	double k_off;
 	double binding_radius;
+	double Rmax;
 	
-	void init(int ncomplex);
-	void get_tracked(surface *theSurface, double *rsurf, pcomplex **allComplexes, int ncomplex);
-	void do_rd(pcomplex **allComplexes, int ncomplex);
+	void init(Simulation *theSimulation, double time_step);
+	void get_tracked( Simulation *theSimulation );
+	void do_rd( Simulation *theSimulation );
 };
 
 #endif
