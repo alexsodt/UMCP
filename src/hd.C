@@ -711,13 +711,9 @@ int temp_main( int argc, char **argv )
 #endif
 	}
 
-	printf("SETUP PARALLEL ENTERING.\n");
-	MPI_Barrier(MPI_COMM_WORLD);
 	
 	setupParallel( theSimulation ); //theSurface, allComplexes, ncomplex, ( do_gen_q ? NQ : 0) );
 	
-	printf("SETUP PARALLEL COMPLETE.\n");
-	MPI_Barrier(MPI_COMM_WORLD);
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 	{
 		surface *useSurface = sRec->theSurface;
