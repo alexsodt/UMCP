@@ -1,4 +1,4 @@
-TESTS = energy_conservation.check
+TESTS = energy_conservation.check load_save.check
 
 all: $(TESTS)
 

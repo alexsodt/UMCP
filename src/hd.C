@@ -1563,7 +1563,7 @@ int temp_main( int argc, char **argv )
 			
 			if( t == 0 )
 			{
-				printf("t: %le ns o: %d T: %.8le V: %.8le T+V: %.14le TEMP: %le MEM_TEMP: %le AV_TEMP %le VR: %.3le VMEM: %le VP: %le", (cur_t * 1e9), o, T, V, T+V, TEMP, mem_T, sum_average_temp / n_temp,VR, VMEM, VP );
+				printf("t: %le ns o: %d T: %.8le V: %.12le T+V: %.14le TEMP: %le MEM_TEMP: %le AV_TEMP %le VR: %.3le VMEM: %le VP: %le", (cur_t * 1e9), o, T, V, T+V, TEMP, mem_T, sum_average_temp / n_temp,VR, VMEM, VP );
 				if( step_rate > 0 )
 					printf(" steps/s: %le", step_rate );
 				printf("\n");
@@ -1792,32 +1792,43 @@ int temp_main( int argc, char **argv )
 	if( ncomplex > 0 ) ParallelSyncComplexes( allComplexes, ncomplex );
 #endif
 
-#if 0 // pre-simulation change me
-	if( par_info.my_id == BASE_TASK )
+#if 1 // pre-simulation change me
+
+
+	/*********** COMPUTE ENERGY at SAVE ************/	
+
+	// limit context.
 	{
-		char fname[256];
+		V=0;
+		VR=0;
+		double VMEM = 0;
+		double VP = 0;
+		for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+			V += sRec->theSurface->energy(sRec->r,NULL);
 	
-		sprintf(fname, "%s.save", block.jobName );
-
-		FILE *saveFile = fopen( fname, "w");
-	
-		for( int x = 0; x < nv; x++ )
+		for( int cx = 0; cx < par_info.nc; cx++ )
 		{
-			if( do_gen_q )
-				fprintf( saveFile, "%lf %lf %lf\n", r[3*x+0], r[3*x+1], r[3*x+2]  );
-			else
-				fprintf( saveFile, "%lf %lf %lf %lf %lf %lf\n", r[3*x+0], r[3*x+1], r[3*x+2], pp[3*x+0], pp[3*x+1], pp[3*x+2] );
+			int c = par_info.complexes[cx];
+			VP += allComplexes[c]->V(theSimulation);	
+			VP += allComplexes[c]->AttachV(theSimulation);	
 		}
-		for( int x = nv; x < nv+1; x++ )
-			fprintf( saveFile, "%lf %lf %lf\n", r[3*x+0], r[3*x+1], r[3*x+2]  );
 	
-		for( int c = 0; c < ncomplex; c++ )
-			allComplexes[c]->saveComplex(saveFile);
+		V += VP;
+		V += Boxed_PP_V( theSimulation ); 
+		ParallelSum(&V,1);
 	
-		for( int Q = 0; Q < NQ; Q++ )
-			fprintf(saveFile, "GQ %.14le\n", pp[Q] );
-
-		fclose(saveFile);
+		printf("Energy at save: %.14le\n", V );
+		
+		if( par_info.my_id == BASE_TASK )
+		{
+			char fname[256];
+		
+			sprintf(fname, "%s.save", block.jobName );
+	
+			FILE *saveFile = fopen( fname, "w");
+			theSimulation->saveRestart(saveFile,-1);
+			fclose(saveFile);
+		}
 	}
 #endif
 
