@@ -13,8 +13,6 @@ set e2 = `grep -i "^t: " load.out | head -1 | awk '{ print $9; }'`
 
 set RESULT = `echo $e1 $e2 | awk '{ del = ($1 - $2); if( del < 1e-6 && del > -1e-6 ) { print "PASS"; } else { print "FAIL "; } }'`
 
-echo $e1 $e2
-
 
 if( $RESULT == "PASS" ) then
 	set str = "Load/save test PASSED (in parallel)."

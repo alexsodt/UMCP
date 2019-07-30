@@ -2234,7 +2234,7 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 {
 	pcomplex **allComplexes = theSimulation->allComplexes;
 	int ncomplex = theSimulation->ncomplex;
-	static double ncol = 0;
+	double ncol = 0;
 	static int icntr=0;
 	double *alphas = theSimulation->alpha;
 	int done = 0;
@@ -2397,6 +2397,9 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 	}
 
 	icntr++;
+
+	if( global_debug_mode && ncol > 0 )
+		printf("NCollisions: %lf\n", ncol );
 
 //	if( icntr % 100 == 0 )
 //		printf("NCollisions/check %le\n", ncol / icntr );

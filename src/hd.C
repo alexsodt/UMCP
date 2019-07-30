@@ -134,6 +134,7 @@ int temp_main( int argc, char **argv )
 	int do_bd_particles = block.do_bd_particles;
 	int do_rd = block.do_rd;
 	int debug = block.debug;
+	global_debug_mode = block.debug;
 	double kcal_mol_K = (5.92186663194E-01/298);
 	kT = (5.92186663194E-01/298) * (block.T);
 	double temperature = kcal_mol_K * (block.T);
@@ -607,8 +608,6 @@ int temp_main( int argc, char **argv )
 		
 		srd_i->init( av_edge_length, theSurface1->PBC_vec, temperature, eta_SI, time_step_collision, time_step_collision * AKMA_TIME, doPlanarTopology, min_mass_per_pt, block.srd_M, block.hard_z_boundary ); 
 		srd_i->initializeDistances( theSimulation, M, mlow, mhigh );
-		if( debug )
-			srd_i->activateDebugMode();
 		srdXYZFile = fopen("srd.xyz", "w" );
 	
 	}
@@ -743,7 +742,14 @@ int temp_main( int argc, char **argv )
 
 	double V = 0;
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
-		sRec->theSurface->energy( sRec->r,NULL);
+		V += sRec->theSurface->energy( sRec->r,NULL);
+	for( int cx = 0; cx < par_info.nc; cx++ )
+	{
+		int c = par_info.complexes[cx];
+		V += allComplexes[c]->V(theSimulation);	
+		V += allComplexes[c]->AttachV(theSimulation);	
+	}
+	V += Boxed_PP_V( theSimulation ); 
 #ifdef PARALLEL
 	ParallelSum(&V,1);
 #endif
@@ -784,22 +790,12 @@ int temp_main( int argc, char **argv )
 			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 				sRec->theSurface->put(sRec->r);
 			for( int c = 0; c < ncomplex; c++ ) allComplexes[c]->refresh(theSimulation);
-
 			if( par_info.my_id == BASE_TASK )
 	 			theSimulation->writeLimitingSurface(minFile);
 			if( par_info.my_id == BASE_TASK )
 			{
 				FILE *minSave = fopen("min.save","w");
 				theSimulation->saveRestart(minSave,-1);
-
-/*			
-				for( int x = 0; x < nv+1; x++ )
-					fprintf( minSave, "%lf %lf %lf\n", r[3*x+0], r[3*x+1], r[3*x+2] );
-	
-				for( int c = 0; c < ncomplex; c++ )
-					allComplexes[c]->saveComplex(minSave);
-				fclose(minSave);
-*/
 			}
 		}
 		if( par_info.my_id == BASE_TASK )
@@ -1328,7 +1324,7 @@ int temp_main( int argc, char **argv )
 
 				// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t), report properties for this state (perform Monte Carlo?)
 
-				if( !block.disable_mesh && (!debug || o < nequil) )
+				if( !block.disable_mesh && ( o < nequil) )
 				{
 
 					if( sRec->do_gen_q )
@@ -1403,7 +1399,7 @@ int temp_main( int argc, char **argv )
 
 			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 			{
-				if( !block.disable_mesh && (!debug || o < nequil) )
+				if( !block.disable_mesh && ( o < nequil) )
 				{
 					if( do_bd_membrane || do_ld || o < nequil )
 					{
@@ -1466,7 +1462,7 @@ int temp_main( int argc, char **argv )
 
 				// LEAPFROG: increment q by eps, we have q(t+eps), p(t+eps/2)
 
-				if( ! debug || o < nequil )
+				if( o < nequil )
 				{
 					for( int v1 = 0; v1 < sRec->theSurface->nv; v1++ )
 					{
