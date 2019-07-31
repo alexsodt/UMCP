@@ -1,0 +1,15 @@
+time_step 1e-13
+add NBAR nbound 1 outside
+jobname will_save
+planar_topology yes
+mesh planar.mesh
+bar_bond_k 0.1
+bar_theta_k 0.1 
+bar_phi_k 0.1
+do_ld yes 
+nmin 0
+o_lim 1
+nsteps 200
+movie		yes
+KA		0.2
+load start.save
