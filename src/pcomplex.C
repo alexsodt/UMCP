@@ -1203,6 +1203,7 @@ void pcomplex::init( surface *theSurface, double *rsurf, int f, double u, double
 	mass[0] = default_mass;
 
 
+
 	bound = 1;
 }
 
@@ -1598,6 +1599,9 @@ void surface::loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterB
 				prot->move_outside();
 
 			prot->init(this, rsurf, f,u,v); 				 
+
+			for( int t = 0; t < prot->nattach; t++ )
+				prot->sid[t] = surface_id; 
 
 			if( *ncomplex  == nspace )
 			{
