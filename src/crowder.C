@@ -84,9 +84,9 @@ void elasticCrowder::move_outside( void )
 	d = fabs(d);
 }
 
-double elasticCrowder::V( surface *theSurface, double *rsurf )
+double elasticCrowder::V( Simulation *theSimulation )
 {
-	double *alphas = rsurf+3*theSurface->nv;
+	double *alphas =theSimulation->alpha;
 	double r[6];
 	double n[6];
 
@@ -95,6 +95,10 @@ double elasticCrowder::V( surface *theSurface, double *rsurf )
 		// evaluate the real-space coordinates and normals based on the membrane surface coordinates.
 		for( int s = 0; s < nattach; s++ )
 		{
+			surface_record *sRec = theSimulation->fetch(sid[s]);
+			surface *theSurface = sRec->theSurface;
+			double *rsurf = sRec->r;
+
 			int f_1 = fs[s], nf = fs[s];
 			double uv1[2] = { 0.33, 0.33 };
 			double duv1[2] = { puv[2*s+0]-uv1[0], puv[2*s+1]-uv1[1] };
@@ -164,9 +168,9 @@ double elasticCrowder::V( surface *theSurface, double *rsurf )
 	return pot;
 }
 
-double elasticCrowder::grad(surface *theSurface, double *rsurf, double *surfacer_g, double *surfacen_g )
+double elasticCrowder::grad( Simulation *theSimulation,  double *surfacer_g, double *surfacen_g )
 {
-	double *alphas = rsurf+3*theSurface->nv;
+	double *alphas = theSimulation->alpha;
 	double r[6];
 	double n[6];
 
@@ -175,6 +179,9 @@ double elasticCrowder::grad(surface *theSurface, double *rsurf, double *surfacer
 		// evaluate the real-space coordinates and normals based on the membrane surface coordinates.
 		for( int s = 0; s < nattach; s++ )
 		{
+			surface_record *sRec = theSimulation->fetch(sid[s]);
+			surface *theSurface = sRec->theSurface;
+			double *rsurf = sRec->r;
 			int f_1 = fs[s], nf = fs[s];
 			double uv1[2] = { 0.33, 0.33 };
 			double duv1[2] = { puv[2*s+0]-uv1[0], puv[2*s+1]-uv1[1] };

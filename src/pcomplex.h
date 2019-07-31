@@ -199,8 +199,8 @@ struct dimer : pcomplex
 	 void bind( int f, double u, double v );
 	 void unbind( void );
 
-	virtual double V(surface *theSurface, double *rsurf);
-	virtual double grad( surface *theSurface, double *rsurf, double *surface_g, double *particle_g );
+	virtual double V( Simulation *theSimulation );
+	virtual double grad( Simulation*theSimulation, double *surface_g, double *particle_g );
 };
 
 struct MAB : dimer
@@ -214,8 +214,8 @@ struct MAB : dimer
 	void move_outside( void );
 
 	void loadParams( parameterBlock * block );
-	virtual double V( surface *theSurface, double *rsurf );
-	virtual double grad( surface *theSurface, double *rsurf, double *surface_g, double *particle_g );
+	virtual double V( Simulation *theSimulation );
+	virtual double grad( Simulation *theSimulation, double *surface_g, double *particle_g );
 };
 
 struct elasticCrowder : pcomplex
@@ -235,8 +235,8 @@ struct elasticCrowder : pcomplex
 	void move_outside( void );
 	int getNBonds( void ) { return 1; }
 	void putBonds( int *bond_list );
-	virtual double V( surface *theSurface, double *rsurf );
-	virtual double grad( surface *theSurface, double *rsurf, double *surface_g, double *particle_g );
+	virtual double V( Simulation *theSimulation );
+	virtual double grad( Simulation *theSimulation, double *surface_g, double *particle_g );
 };
 
 void propagateSolutionParticles( Simulation *theSimulation, double dt );

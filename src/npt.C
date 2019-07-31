@@ -61,6 +61,7 @@ void Simulation::area_MC_move( double beta, int move_type, parameterBlock *block
 
 #ifdef PARALLEL
 	ParallelSum( &PT, 1 );
+	ParallelSum( &n_bd_sol_p, 1 );
 #endif
 	double npt_KE0_mesh = npt_KE0;
 	double npt_KE0_p    = PT;
@@ -98,27 +99,6 @@ void Simulation::area_MC_move( double beta, int move_type, parameterBlock *block
 	MPI_Bcast( &dAlpha, 1, MPI_DOUBLE, BASE_TASK, MPI_COMM_WORLD );
 #endif
 
-//#define T_DEBUG
-#ifdef T_DEBUG
-	int nalpha = 100;
-	for( int ix = 0; ix < nalpha; ix++ )
-	{
-		r[3*nv+0] *= exp(0.001);
-		r[3*nv+1] *= exp(0.001);
-		r[3*nv+2] *= exp(-0.001);
-
-		double area0;
-		double cur_area;
-		area(r, -1, &cur_area, &area0 );
-		//printf("area: %le area0: %le\n", cur_area, area0 );
-		double E = 0;
-		for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
-			E+= sRec->theSurface->energy(sRec->r,NULL);
-
-		printf("%le %.14le VC: %.14le AVC: %le area: %le\n", r[3*nv+0], E, VC, AVC, cur_area ); 
-	}
-	exit(1);
-#endif
 	double scale_fac[3]={1,1,1};	
 	if( move_type == VOLUME_MOVE )
 	{
@@ -137,6 +117,13 @@ void Simulation::area_MC_move( double beta, int move_type, parameterBlock *block
 	alpha[0] *= scale_fac[0];
 	alpha[1] *= scale_fac[1];
 	alpha[2] *= scale_fac[2];
+	
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+	{
+		sRec->r[3*sRec->theSurface->nv+0] = alpha[0];
+		sRec->r[3*sRec->theSurface->nv+1] = alpha[1];
+		sRec->r[3*sRec->theSurface->nv+2] = alpha[2];
+	}
 
 //	for( int cx = 0; cx < par_info.nc; cx++ )
 //	{
@@ -287,15 +274,24 @@ void Simulation::area_MC_move( double beta, int move_type, parameterBlock *block
 		alpha[0] /= scale_fac[0];
 		alpha[1] /= scale_fac[1];
 		alpha[2] /= scale_fac[2];
+	
+		for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+		{
+			sRec->r[3*sRec->theSurface->nv+0] = alpha[0];
+			sRec->r[3*sRec->theSurface->nv+1] = alpha[1];
+			sRec->r[3*sRec->theSurface->nv+2] = alpha[2];
+		}
 
 		for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
-		for( int x = 0; x < sRec->theSurface->nv; x++ )
 		{
-			sRec->qdot[3*x+0] *= scale_fac[0]*scale_fac[0];
-			sRec->qdot[3*x+1] *= scale_fac[1]*scale_fac[1];
-			sRec->qdot[3*x+2] *= scale_fac[2]*scale_fac[2];
+			for( int x = 0; x < sRec->theSurface->nv; x++ )
+			{
+				sRec->qdot[3*x+0] *= scale_fac[0]*scale_fac[0];
+				sRec->qdot[3*x+1] *= scale_fac[1]*scale_fac[1];
+				sRec->qdot[3*x+2] *= scale_fac[2]*scale_fac[2];
+			}
 		}
-	
+
 		for( int c = 0; c < ncomplex; c++ )
 		{
 //			int c = par_info.complexes[cx];
@@ -351,6 +347,12 @@ void Simulation::area_MC_move( double beta, int move_type, parameterBlock *block
 	}
 #ifdef PARALLEL
 	ParallelBroadcast(alpha,3);	
+	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
+	{
+		sRec->r[3*sRec->theSurface->nv+0] = alpha[0];
+		sRec->r[3*sRec->theSurface->nv+1] = alpha[1];
+		sRec->r[3*sRec->theSurface->nv+2] = alpha[2];
+	}
 #endif
 
 //	if( block->alpha_restraint_k > 0 )

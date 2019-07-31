@@ -792,14 +792,13 @@ int temp_main( int argc, char **argv )
 			for( int c = 0; c < ncomplex; c++ ) allComplexes[c]->refresh(theSimulation);
 			if( par_info.my_id == BASE_TASK )
 	 			theSimulation->writeLimitingSurface(minFile);
-			if( par_info.my_id == BASE_TASK )
-			{
-				FILE *minSave = fopen("min.save","w");
-				theSimulation->saveRestart(minSave,-1);
-			}
 		}
 		if( par_info.my_id == BASE_TASK )
+		{
+			FILE *minSave = fopen("min.save","w");
+			theSimulation->saveRestart(minSave,-1);
 			fclose(minFile);
+		}
 		
 	}
 	
@@ -1305,7 +1304,7 @@ int temp_main( int argc, char **argv )
 				memcpy( sRec->next_pp, sRec->pp, sizeof(double) * sRec->NQ );
 				if( !block.disable_mesh )
 				{
-					if( do_bd_membrane || do_ld || o < nequil || (switched) )
+					if( do_bd_membrane || do_ld || (switched) )
 					{
 						if( sRec->do_gen_q )
 							GenQMatVecIncrScale( sRec->next_pp, sRec->pp, sRec->EFFM, -gamma_langevin*AKMA_TIME*time_step );
@@ -1324,7 +1323,7 @@ int temp_main( int argc, char **argv )
 
 				// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t), report properties for this state (perform Monte Carlo?)
 
-				if( !block.disable_mesh && ( o < nequil) )
+				if( !block.disable_mesh )
 				{
 
 					if( sRec->do_gen_q )
@@ -1399,9 +1398,9 @@ int temp_main( int argc, char **argv )
 
 			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 			{
-				if( !block.disable_mesh && ( o < nequil) )
+				if( !block.disable_mesh )
 				{
-					if( do_bd_membrane || do_ld || o < nequil )
+					if( do_bd_membrane || do_ld )
 					{
 #ifdef OLD_LANGEVIN
 						for( int Q = 0; Q < sRec->NQ; Q++ )
@@ -1462,15 +1461,12 @@ int temp_main( int argc, char **argv )
 
 				// LEAPFROG: increment q by eps, we have q(t+eps), p(t+eps/2)
 
-				if( o < nequil )
+				for( int v1 = 0; v1 < sRec->theSurface->nv; v1++ )
 				{
-					for( int v1 = 0; v1 < sRec->theSurface->nv; v1++ )
-					{
-						sRec->r[3*v1+0] += sRec->qdot[3*v1+0] * AKMA_TIME * time_step;
-						sRec->r[3*v1+1] += sRec->qdot[3*v1+1] * AKMA_TIME * time_step;
-						sRec->r[3*v1+2] += sRec->qdot[3*v1+2] * AKMA_TIME * time_step;
-					}
-				}	
+					sRec->r[3*v1+0] += sRec->qdot[3*v1+0] * AKMA_TIME * time_step;
+					sRec->r[3*v1+1] += sRec->qdot[3*v1+1] * AKMA_TIME * time_step;
+					sRec->r[3*v1+2] += sRec->qdot[3*v1+2] * AKMA_TIME * time_step;
+				}
 
 				if( sRec->do_gen_q )
 				{
