@@ -1,0 +1,24 @@
+#time_step 3e-12
+time_step 1e-10
+add NBAR nbound 25 outside
+jobname nbar
+planar_topology yes
+mesh pore.mesh
+bar_bond_k 0.01
+bar_theta_k 0.1
+bar_phi_k 0.1
+do_bd_particles yes
+do_ld yes 
+o_lim 1000
+nsteps 3000
+movie		yes	
+gamma_langevin 10000
+KA		0.2
+#lipid	inner	DOPS	46
+#lipid	inner	DOPE	30
+#lipid	inner	DOPC	24
+#lipid	outer	DOPS	46
+#lipid	outer	DOPE	30
+#lipid	outer	DOPC	24
+#lipid_mc_period	100
+load nbar.save
