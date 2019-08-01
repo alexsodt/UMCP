@@ -81,8 +81,11 @@ double PP_V( Simulation *theSimulation )
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c1 = par_info.complexes[cx];
+		if( allComplexes[c1]->disabled ) continue;
+
 		for( int c2 = c1+1; c2 < ncomplex; c2++ )
 		{
+			if( allComplexes[c2]->disabled ) continue;
 			for( int p1 = 0; p1 < allComplexes[c1]->nsites; p1++ )
 			{
 				double max_sigma1 = allComplexes[c1]->sigma[p1];
@@ -188,9 +191,11 @@ double PP_G( Simulation *theSimulation )
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c1 = par_info.complexes[cx];
+		if( allComplexes[c1]->disabled ) continue;
 
 		for( int c2 = 0; c2 < ncomplex; c2++ )
 		{
+			if( allComplexes[c2]->disabled ) continue;
 			if( c1 == c2 ) 
 				continue;
 			if( ourp[c1] && ourp[c2] && c2 < c1 ) 
@@ -430,6 +435,7 @@ double Boxed_PP_V( Simulation *theSimulation )
 	{
 		int c1 = par_info.complexes[cx];
 		
+		if( allComplexes[c1]->disabled ) continue;
 
 		for( int p1 = 0; p1 < allComplexes[c1]->nsites; p1++ )
 		{
@@ -449,6 +455,8 @@ double Boxed_PP_V( Simulation *theSimulation )
 			{
 				int c2 = complex_for_id[nearlist[x]];
 				int p2 = subp_for_id[nearlist[x]];
+		
+				if( allComplexes[c2]->disabled ) continue;
 			
 				if( c1 == c2 ) 
 					continue;
@@ -592,6 +600,7 @@ double Boxed_PP_G( Simulation *theSimulation )
 	{
 		int c1 = par_info.complexes[cx];
 		
+		if( allComplexes[c1]->disabled ) continue;
 
 		for( int p1 = 0; p1 < allComplexes[c1]->nsites; p1++ )
 		{
@@ -610,6 +619,7 @@ double Boxed_PP_G( Simulation *theSimulation )
 			for( int x = 0; x < np; x++ )
 			{
 				int c2 = complex_for_id[nearlist[x]];
+				if( allComplexes[c2]->disabled ) continue;
 				int p2 = subp_for_id[nearlist[x]];
 			
 				if( c1 == c2 ) 
@@ -859,6 +869,7 @@ double handleElasticCollisions( Simulation *theSimulation, pcomplex **allComplex
 
 		if( ! allComplexes[c1]->isElastic() ) 
 			continue;
+		if( allComplexes[c1]->disabled ) continue;
 
 		// starts at nattach: we only do solution elastic collisions.
 		for( int p1 = allComplexes[c1]->nattach; p1 < allComplexes[c1]->nsites; p1++ )
@@ -870,6 +881,7 @@ double handleElasticCollisions( Simulation *theSimulation, pcomplex **allComplex
 			for( int x = 0; x < np; x++ )
 			{
 				int c2 = complex_for_id[nearlist[x]];
+				if( allComplexes[c2]->disabled ) continue;
 				int p2 = subp_for_id[nearlist[x]];
 		
 				if( ! allComplexes[c2]->isElastic() ) 
@@ -1118,6 +1130,7 @@ double nElasticCollisions( Simulation *theSimulation, pcomplex **allComplexes, i
 
 		if( ! allComplexes[c1]->isElastic() ) 
 			continue;
+		if( allComplexes[c1]->disabled ) continue;
 
 		// starts at nattach: we only do solution elastic collisions.
 		for( int p1 = allComplexes[c1]->nattach; p1 < allComplexes[c1]->nsites; p1++ )
@@ -1136,6 +1149,7 @@ double nElasticCollisions( Simulation *theSimulation, pcomplex **allComplexes, i
 				int c2 = complex_for_id[nearlist[x]];
 				int p2 = subp_for_id[nearlist[x]];
 #endif		
+				if( allComplexes[c2]->disabled ) continue;
 				if( ! allComplexes[c2]->isElastic() ) 
 					continue;
 			
@@ -1248,6 +1262,7 @@ double timePrecedingElasticCollision( Simulation *theSimulation, pcomplex **allC
 
 		if( ! allComplexes[c1]->isElastic() ) 
 			continue;
+		if( allComplexes[c1]->disabled ) continue;
 
 		// starts at nattach: we only do solution elastic collisions.
 		for( int p1 = allComplexes[c1]->nattach; p1 < allComplexes[c1]->nsites; p1++ )
@@ -1264,6 +1279,7 @@ double timePrecedingElasticCollision( Simulation *theSimulation, pcomplex **allC
 				if( ! allComplexes[c2]->isElastic() ) 
 					continue;
 			
+				if( allComplexes[c2]->disabled ) continue;
 				if( c1 == c2 ) 
 					continue;
 

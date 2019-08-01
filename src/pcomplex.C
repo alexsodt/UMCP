@@ -261,6 +261,7 @@ void pcomplex::prepareForGradient( void )
 
 double pcomplex::update_dH_dq( Simulation *theSimulation, double time_step, double timestep_total)
 {
+	if( disabled ) return time_step;
 
 	double *alphas = theSimulation->alpha;
 
@@ -982,6 +983,9 @@ void pcomplex::compute_qdot( Simulation *theSimulation,  double frac_mult )
 
 void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 {
+	if( disabled )
+		return;
+
 	static double av_dstep = 0;
 	static double av_dstep2 = 0;
 	static double n_dstep = 0;
@@ -1120,7 +1124,9 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 
 void pcomplex::propagate_p( Simulation *theSimulation, double dt )
 {
-	// move a step.
+	if( disabled ) return;
+
+		// move a step.
 
 #if 0 // presim
 	double T_before = T(theSurface,rsurf);
@@ -1287,6 +1293,8 @@ int pcomplex::nparams( void )
 
 void pcomplex::refresh( Simulation *theSimulation )
 {
+	if( disabled ) return;
+
 	double *alphas = theSimulation->alpha;
 	double center_on[3] = { 0,0,0};
 	int update_attach = 1;
@@ -2245,6 +2253,8 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 
 	for( int c = 0; c < ncomplex; c++ )
 	{
+		if( allComplexes[c]->disabled ) continue;
+
 		if( allComplexes[c]->do_bd  )
 		{
 			for( int s = allComplexes[c]->nattach; s < allComplexes[c]->nsites; s++ )
@@ -2262,6 +2272,8 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 		
 	for( int c = 0; c < ncomplex; c++ )
 	{
+		if( allComplexes[c]->disabled ) continue;
+
 		for( int s = allComplexes[c]->nattach; s < allComplexes[c]->nsites; s++ )
 		{
 			allComplexes[c]->rall[3*s+0] += allComplexes[c]->qdot[3*s+0] * dt;
@@ -2290,6 +2302,7 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 //			for( int cx = 0; cx < par_info.nc; cx++ )
 			for( int c = 0; c < ncomplex; c++ )
 			{
+				if( allComplexes[c]->disabled ) continue;
 				for( int s = allComplexes[c]->nattach; s < allComplexes[c]->nsites; s++ )
 				{
 					allComplexes[c]->rall[3*s+0] -= allComplexes[c]->qdot[3*s+0] * toc;

@@ -98,6 +98,8 @@ void RD::get_tracked( Simulation *theSimulation  )
 		int p = tracked[t]->pid;
 		int s = tracked[t]->sid;
 
+		if( allComplexes[p]->disabled ) continue;
+
 		int npairs = 0;
 		int nnew = 0;
 		/////////// TO-DO: use max Rmax from this site's reactions.
@@ -109,6 +111,8 @@ void RD::get_tracked( Simulation *theSimulation  )
 			
 			int s2 = subp_for_id[id];
 			int p2 = complex_for_id[id];
+
+			if( allComplexes[p2]->disabled ) continue;
 
 			if( p == p2 )
 				continue;
@@ -232,12 +236,15 @@ void RD::do_rd( Simulation *theSimulation )
 	{
 		int p = tracked[t]->pid;
 		int s = tracked[t]->sid;
+			
+		if( theSimulation->allComplexes[p]->disabled ) continue;
 	
 		for( int n = 0; n < tracked[t]->ntracked; n++ )
 		{
 			int p2 = tracked[t]->tracked_info[n].id;	
 			int s2 = tracked[t]->tracked_info[n].sid2;
 	
+			if( theSimulation->allComplexes[p2]->disabled ) continue;
 			int rxn = rxnLookup( theSimulation->allComplexes[p]->stype[s], theSimulation->allComplexes[p2]->stype[s2] );
 			if( rxn == -1 ) continue; // should never be -1..
 	
@@ -273,6 +280,8 @@ void RD::do_rd( Simulation *theSimulation )
 			}
 		}
 	}
+
+	printf("After rd, ncomplex: %d\n", theSimulation->ncomplex );
 
 	// dissociation.
 
