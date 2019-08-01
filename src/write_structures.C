@@ -9,7 +9,7 @@
 #include "pcomplex.h"
 #include "mutil.h"
 	
-static int plim = 1;
+static int plim = 4;
 
 void surface::writeSurface( const char *fileName)
 {
