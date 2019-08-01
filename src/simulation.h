@@ -80,6 +80,10 @@ typedef struct Simulation
 	double alpha[3];
 	double PBC_vec[3][3];
 
+	// visualize_cache keeps an extra cache of single particles for visualization purposes.
+	int nsites_at_psfwrite;
+	int visualization_cache; 
+
 // BEGIN TRIVIAL UTILITY FUNCTIONS
 
 	void wrapPBC( double *dr, double *alphas );

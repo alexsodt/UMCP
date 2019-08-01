@@ -1,5 +1,5 @@
 #time_step 3e-12
-time_step 5e-12
+time_step 1e-11
 add NBAR nbound 25 outside
 jobname nbar
 planar_topology yes

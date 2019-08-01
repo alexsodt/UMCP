@@ -576,6 +576,7 @@ void surface::writeLimitingSurfacePSF( FILE *theFile, pcomplex **allComplexes, i
 
 	int *the_bonds = NULL;
 
+
 	for( int pass = 0; pass < 2; pass++ )
 	{
 		if( pass == 1 )
@@ -631,12 +632,12 @@ void surface::writeLimitingSurfacePSF( FILE *theFile, pcomplex **allComplexes, i
 			if( pass == 1 )
 			{
 				allComplexes[c]->putBonds( the_bonds + nbonds*2 );
-
+	
 				for( int x = 0; x < c_nbonds; x++ )
 				{
 					the_bonds[2*nbonds+2*x] += curp;
 					the_bonds[2*nbonds+2*x+1] += curp;
-
+	
 				}
 				nbonds += c_nbonds;
 		
@@ -651,6 +652,7 @@ void surface::writeLimitingSurfacePSF( FILE *theFile, pcomplex **allComplexes, i
 	int cpts = 0;
 	for( int c = 0; c < ncomplexes; c++ )
 		cpts += allComplexes[c]->nsites;
+
 
 	writePSF( theFile, npts+cpts, NULL, the_bonds, nbonds );
 
@@ -1358,8 +1360,7 @@ void Simulation::writeLimitingSurface( FILE *theFile )
 	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
 		npts += ppd * sRec->theSurface->nt;
 	
-	for( int c = 0; c < ncomplex; c++ )
-		npts += allComplexes[c]->nsites;
+	npts += nsites_at_psfwrite + visualization_cache;
 
 	fprintf(theFile, "%d\n", npts );
 	fprintf(theFile, "limiting surface\n");
@@ -1395,11 +1396,25 @@ void Simulation::writeLimitingSurface( FILE *theFile )
 
 		free(r);
 	}
+	
+	int nsites_written = 0;
 	for( int c = 0; c < ncomplex; c++ )
 	{
+		if( allComplexes[c]->disabled ) continue;
+
 		for( int p = 0; p < allComplexes[c]->nsites; p++ )
+		{
 			fprintf(theFile, "O %lf %lf %lf\n", allComplexes[c]->rall[3*p+0], allComplexes[c]->rall[3*p+1], allComplexes[c]->rall[3*p+2] );
+			nsites_written++;
+		}
 	}
+
+	for( int tx = nsites_written; tx < nsites_at_psfwrite + visualization_cache; tx++ )
+		fprintf(theFile, "O %lf %lf %lf\n", 
+			PBC_vec[0][0] * alpha[0],
+			PBC_vec[1][1] * alpha[1],
+			PBC_vec[2][2] * alpha[2] );
+
 	fflush(theFile);
 
 }
@@ -1438,6 +1453,8 @@ void Simulation::writeLimitingSurfacePSF(FILE *theFile )
 
 	int *the_bonds = NULL;
 	
+	int disable_complex_bonds = visualization_cache > 0;
+
 	for( int pass = 0; pass < 2; pass++ )
 	{
 		if( pass == 1 )
@@ -1487,33 +1504,39 @@ void Simulation::writeLimitingSurfacePSF(FILE *theFile )
 		}	
 		int curp = npts;
 
-		for( int c = 0; c < ncomplex; c++ )
+		if( !disable_complex_bonds )
 		{
-			int c_nbonds = allComplexes[c]->getNBonds();
-			
-			if( pass == 1 )
+			for( int c = 0; c < ncomplex; c++ )
 			{
-				allComplexes[c]->putBonds( the_bonds + nbonds*2 );
-
-				for( int x = 0; x < c_nbonds; x++ )
+				int c_nbonds = allComplexes[c]->getNBonds();
+				
+				if( pass == 1 )
 				{
-					the_bonds[2*nbonds+2*x] += curp;
-					the_bonds[2*nbonds+2*x+1] += curp;
-
-				}
-				nbonds += c_nbonds;
-		
-			}
-			else
-				nbonds += c_nbonds;
+					allComplexes[c]->putBonds( the_bonds + nbonds*2 );
+	
+					for( int x = 0; x < c_nbonds; x++ )
+					{
+						the_bonds[2*nbonds+2*x] += curp;
+						the_bonds[2*nbonds+2*x+1] += curp;
+	
+					}
+					nbonds += c_nbonds;
 			
-			curp += allComplexes[c]->nsites;
+				}
+				else
+					nbonds += c_nbonds;
+				
+				curp += allComplexes[c]->nsites;
+			}
 		}
 	}
 
 	int cpts = 0;
 	for( int c = 0; c < ncomplex; c++ )
 		cpts += allComplexes[c]->nsites;
+	
+	nsites_at_psfwrite = cpts;
+	cpts += visualization_cache;
 
 	writePSF( theFile, npts+cpts, NULL, the_bonds, nbonds );
 

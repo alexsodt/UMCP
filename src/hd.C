@@ -147,6 +147,7 @@ int temp_main( int argc, char **argv )
 	double dt = block.time_step;
 
 	Simulation *theSimulation = (Simulation *)malloc( sizeof(Simulation) );
+	theSimulation->visualization_cache = 0;
 
 	srd_integrator *srd_i = NULL;
 	theSimulation->allSurfaces = NULL;	
@@ -284,6 +285,13 @@ int temp_main( int argc, char **argv )
 		rd->init(theSimulation, dt, &block );
 		if(debug)
 			printf("debug RD 1st ncomplexes: %d\n", ncomplex);
+
+		int nsites_total = 0;
+		for( int c = 0; c < ncomplex; c++ )
+			nsites_total += allComplexes[c]->nsites;
+
+		theSimulation->nsites_at_psfwrite = nsites_total;
+		theSimulation->visualization_cache = 3 * nsites_total;
 	}
 
 	int nmodes = 8;
@@ -308,7 +316,7 @@ int temp_main( int argc, char **argv )
 	double Vtot = 0;
 	double Vtot2 = 0;
 	double NV = 0;
-	double area0;
+	double area0=0;
 
 	if( block.sphere )
 	{
@@ -316,7 +324,7 @@ int temp_main( int argc, char **argv )
 		{
 			double V0 = 0;
 			V0 =fabs(theSurface1->volume( sRec->r));
-			printf("Area: %lf (R: %lf)\n", area0, sqrt(area0/(4*M_PI))  );
+//			printf("Area: %lf (R: %lf)\n", area0, sqrt(area0/(4*M_PI))  );
 			printf("Volume: %lf (R: %lf)\n", V0, pow( V0/(4*M_PI/3.0), 1.0/3.0) );
 		}
 	}
@@ -354,7 +362,6 @@ int temp_main( int argc, char **argv )
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 		nsurfaces++;
 
-#if 1 
 	FILE *tpsf = NULL;
 	char fname[256];
 	sprintf(fname, "%s.psf", block.jobName );
@@ -363,35 +370,6 @@ int temp_main( int argc, char **argv )
 	FILE *tFile = fopen(fname,"w");
 	theSimulation->writeLimitingSurfacePSF(tpsf);
 	fclose(tpsf);
-#else
-	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
-	{	
-		sRec->tFile = NULL;
-		if( block.movie && par_info.my_id == BASE_TASK )
-		{
-			FILE *tpsf = NULL;
-			char fname[256];
-			if( nsurfaces > 0 )
-				sprintf(fname, "%s_%d.psf", block.jobName, sRec->id );
-			else
-				sprintf(fname, "%s.psf", block.jobName );
-
-			tpsf = fopen(fname,"w");
-			if( sRec->id == 0 )
-	        		sRec->theSurface->writeLimitingSurfacePSF(tpsf, allComplexes, ncomplex );
-			else
-	        		sRec->theSurface->writeLimitingSurfacePSF(tpsf, allComplexes, 0 );
-			fclose(tpsf);
-	
-			if( nsurfaces > 0 )	
-				sprintf(fname, "%s_%d.xyz", block.jobName, sRec->id );
-			else
-				sprintf(fname, "%s.xyz", block.jobName );
-
-			sRec->tFile = fopen(fname,"w");
-		}
-	}
-#endif
 	int o_lim = nsteps;
 
 	double hours = block.hours;
@@ -711,7 +689,7 @@ int temp_main( int argc, char **argv )
 	}
 
 	
-	setupParallel( theSimulation ); //theSurface, allComplexes, ncomplex, ( do_gen_q ? NQ : 0) );
+	setupParallel( theSimulation ); 
 	
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 	{

@@ -25,7 +25,7 @@ int Simulation::AddComplex( pcomplex *addMe )
 			free_spot = p;
 	}
 
-	if( free_spot )
+	if( free_spot != -1 )
 	{
 		added = free_spot;
 
@@ -60,9 +60,9 @@ int Simulation::AddComplex( pcomplex *addMe )
 	
 		if( task == par_info.my_id )
 		{
-			par_info.nc += 1;
-			par_info.complexes = (int *)realloc( par_info.complexes, par_info.nc );
+			par_info.complexes = (int *)realloc( par_info.complexes, sizeof(int) * (par_info.nc+1) );
 			par_info.complexes[par_info.nc] = added;
+			par_info.nc += 1;
 		}
 	}
 	return added;
