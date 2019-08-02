@@ -156,9 +156,7 @@ int temp_main( int argc, char **argv )
 	double *r1 = NULL;
 	theSurface1->loadLattice( block.meshName , 0. );
 
-	pcomplex **allComplexes = NULL;
 
-	int ncomplex = 0;
 
 	double Lx = theSurface1->PBC_vec[0][0];
 	double Ly = theSurface1->PBC_vec[1][1];
@@ -270,10 +268,8 @@ int temp_main( int argc, char **argv )
 	
 	// for now we are putting all complexes on the first surface.
 	
-	theSurface1->loadComplexes( &allComplexes, &ncomplex, &block ); 
-	theSimulation->allComplexes = allComplexes;
-	theSimulation->ncomplex = ncomplex;
-	theSimulation->ncomplexSpace = ncomplex;
+	theSurface1->loadComplexes( &(theSimulation->allComplexes), &(theSimulation->ncomplex), &block ); 
+	theSimulation->ncomplexSpace = theSimulation->ncomplex;
 
 	// for now only collect kc info from first surface.
 	// INITIALIZE REACTION DIFFUSION
@@ -284,11 +280,11 @@ int temp_main( int argc, char **argv )
 		rd = (RD *)malloc( sizeof(RD) );
 		rd->init(theSimulation, dt, &block );
 		if(debug)
-			printf("debug RD 1st ncomplexes: %d\n", ncomplex);
+			printf("debug RD 1st ncomplexes: %d\n", theSimulation->ncomplex);
 
 		int nsites_total = 0;
-		for( int c = 0; c < ncomplex; c++ )
-			nsites_total += allComplexes[c]->nsites;
+		for( int c = 0; c < theSimulation->ncomplex; c++ )
+			nsites_total += theSimulation->allComplexes[c]->nsites;
 
 		theSimulation->nsites_at_psfwrite = nsites_total;
 		theSimulation->visualization_cache = 3 * nsites_total;
@@ -660,8 +656,8 @@ int temp_main( int argc, char **argv )
 				}
 			}
 		}
-		for( int c = 0; c < ncomplex; c++ )
-			allComplexes[c]->loadComplex(xyzLoad,theSimulation,theSurface1->surface_id );
+		for( int c = 0; c < theSimulation->ncomplex; c++ )
+			theSimulation->allComplexes[c]->loadComplex(xyzLoad,theSimulation,theSurface1->surface_id );
 		
 		for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 		{
@@ -724,8 +720,8 @@ int temp_main( int argc, char **argv )
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
-		V += allComplexes[c]->V(theSimulation);	
-		V += allComplexes[c]->AttachV(theSimulation);	
+		V += theSimulation->allComplexes[c]->V(theSimulation);	
+		V += theSimulation->allComplexes[c]->AttachV(theSimulation);	
 	}
 	V += Boxed_PP_V( theSimulation ); 
 #ifdef PARALLEL
@@ -759,7 +755,7 @@ int temp_main( int argc, char **argv )
 
 		for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 			sRec->theSurface->put(sRec->r);
-		for( int c = 0; c < ncomplex; c++ ) allComplexes[c]->refresh(theSimulation );
+		for( int c = 0; c < theSimulation->ncomplex; c++ ) theSimulation->allComplexes[c]->refresh(theSimulation );
 		if( par_info.my_id == BASE_TASK )
 		 	theSimulation->writeLimitingSurface(minFile );
 		for( int m = 0; m < block.nmin; m++ )
@@ -767,7 +763,7 @@ int temp_main( int argc, char **argv )
 			theSimulation->minimize(any_do_gen_q);
 			for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 				sRec->theSurface->put(sRec->r);
-			for( int c = 0; c < ncomplex; c++ ) allComplexes[c]->refresh(theSimulation);
+			for( int c = 0; c < theSimulation->ncomplex; c++ ) theSimulation->allComplexes[c]->refresh(theSimulation);
 			if( par_info.my_id == BASE_TASK )
 	 			theSimulation->writeLimitingSurface(minFile);
 		}
@@ -781,14 +777,14 @@ int temp_main( int argc, char **argv )
 	}
 	
 //	if( block.timestep_analysis && taskid == BASE_TASK )
-//		theSurface->timestep_analysis( r, theForceSet, effective_mass, allComplexes, ncomplex, dt );
+//		theSurface->timestep_analysis( r, theForceSet, effective_mass, allComplexes, theSimulation->ncomplex, dt );
 
 	double	navc = 0;
 	double *avc = NULL;
 	if( block.record_curvature )
 	{
-		avc = (double *)malloc( sizeof(double) * ncomplex );
-		memset( avc, 0, sizeof(double) * ncomplex );
+		avc = (double *)malloc( sizeof(double) * theSimulation->ncomplex );
+		memset( avc, 0, sizeof(double) * theSimulation->ncomplex );
 	}
 
 	if( block.nsteps == 0 )
@@ -799,7 +795,7 @@ int temp_main( int argc, char **argv )
 		{
 			printf("Writing tachyon object file.\n");
 			theSurface->writeTachyon( block.jobName, block.tachyon_res, 1, 
-				r, allComplexes, ncomplex, &block, srd_i, block.tachyon_tri_center ); 
+				r, theSimulation->allComplexes, theSimulation->ncomplex, &block, srd_i, block.tachyon_tri_center ); 
 		}
 #endif
 		printf("Requested no dynamics, exiting.\n");
@@ -843,7 +839,7 @@ int temp_main( int argc, char **argv )
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
-		allComplexes[c]->compute_qdot( theSimulation );			
+		theSimulation->allComplexes[c]->compute_qdot( theSimulation );			
 	}
 #ifdef PARALLEL
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
@@ -861,11 +857,11 @@ int temp_main( int argc, char **argv )
 	{
 		int c = par_info.complexes[cx];
 		// NEEDS TO BE UPDATED FOR WHICH SURFACE THE PARTICLE IS ON.
-		allComplexes[c]->update_dH_dq( theSimulation );
+		theSimulation->allComplexes[c]->update_dH_dq( theSimulation );
 	}
 #ifdef PARALLEL
 	// synchronizes particle positions at this point for computing particle-particle interactions. does not synchronize their gradient.
-	if( ncomplex > 0 ) ParallelSyncComplexes( allComplexes, ncomplex );
+	if( theSimulation->ncomplex > 0 ) ParallelSyncComplexes( theSimulation->allComplexes, theSimulation->ncomplex );
 #endif
 			// particle-particle gradient, must be called in this order since save_grad is zero'd in update_dH_dq and added to here.
 #ifndef BOXED
@@ -915,8 +911,8 @@ int temp_main( int argc, char **argv )
 	
 	if( do_bd_particles )
 	{
-		for( int p = 0; p < ncomplex; p++ )
-			allComplexes[p]->activateBrownianDynamics();
+		for( int p = 0; p < theSimulation->ncomplex; p++ )
+			theSimulation->allComplexes[p]->activateBrownianDynamics();
 	}
 	FILE *alphaFile = NULL;
 
@@ -958,25 +954,6 @@ int temp_main( int argc, char **argv )
 		double last_wait_time = 0;
 		double last_complex_time = 0;
 		
-#if 0	
-		if( debug && par_info.my_id == BASE_TASK )
-		{
-			char fileName[256];
-			sprintf(fileName, "debug_%s.save", block.jobName );
-			FILE *debugSave = fopen(fileName,"w");
-		
-			for( int x = 0; x < nv+1; x++ )
-				fprintf( debugSave, "%lf %lf %lf\n", r[3*x+0], r[3*x+1], r[3*x+2] );
-	
-			for( int c = 0; c < ncomplex; c++ )
-				allComplexes[c]->saveComplex(debugSave);
-			int new_seed = rand();
-			fprintf(debugSave, "seed %d\n", new_seed );
-			srand(new_seed);
-			my_gsl_reseed(new_seed);
-			fclose(debugSave);
-		}
-#endif
 		for( int t = 0; t < block.o_lim; t++, cur_t += time_step, global_cntr++ )
 		{
 #ifdef SAVE_RESTARTS
@@ -1012,8 +989,8 @@ int temp_main( int argc, char **argv )
 			for( int cx = 0; cx < par_info.nc; cx++ )
 			{
 				int c = par_info.complexes[cx];
-				VP += allComplexes[c]->V(theSimulation);	
-				VP += allComplexes[c]->AttachV(theSimulation);	
+				VP += theSimulation->allComplexes[c]->V(theSimulation);	
+				VP += theSimulation->allComplexes[c]->AttachV(theSimulation);	
 			}
 
 
@@ -1025,12 +1002,12 @@ int temp_main( int argc, char **argv )
 #if 0 // PRESIMULATION, requires updating
 #ifdef SAVE_RESTARTS
 #ifdef PARALLEL
-			if( ncomplex > 0 ) ParallelSyncComplexes( allComplexes, ncomplex );
+			if( theSimulation->ncomplex > 0 ) ParallelSyncComplexes( allComplexes, theSimulation->ncomplex );
 #endif
 			if( buffer_cycle[cur_save] )
 				free(buffer_cycle[cur_save]);
 			if( par_info.my_id == BASE_TASK )
-				theSurface->saveRestart( buffer_cycle+cur_save, r, pp, allComplexes, ncomplex, (do_gen_q ? NQ : 0), save_seed );
+				theSurface->saveRestart( buffer_cycle+cur_save, r, pp, allComplexes, theSimulation->ncomplex, (do_gen_q ? NQ : 0), save_seed );
 			cur_save++;
 			if( cur_save == NUM_SAVE_BUFFERS )
 				cur_save = 0;
@@ -1045,7 +1022,7 @@ int temp_main( int argc, char **argv )
 					PartialSyncVertices(sRec->r,sRec->id);
 					if( global_cntr % block.lipid_mc_period == 0 )
 					{
-						sRec->theSurface->local_lipidMCMove( sRec->r, allComplexes, ncomplex, time_step, 1.0 / temperature );
+						sRec->theSurface->local_lipidMCMove( sRec->r, theSimulation->allComplexes, theSimulation->ncomplex, time_step, 1.0 / temperature );
 					}
 				}	 
 			
@@ -1105,14 +1082,14 @@ int temp_main( int argc, char **argv )
 			{
 				int c = par_info.complexes[cx];
 
-				allComplexes[c]->prepareForGradient();
-				allComplexes[c]->setrall(theSimulation);
+				theSimulation->allComplexes[c]->prepareForGradient();
+				theSimulation->allComplexes[c]->setrall(theSimulation);
 			}
-			if( ncomplex > 0 ) 
+			if( theSimulation->ncomplex > 0 ) 
 			{
 #ifdef PARALLEL
 				// synchronizes particle positions at this point for computing particle-particle interactions. does not synchronize their gradient.
-				ParallelSyncComplexes( allComplexes, ncomplex );
+				ParallelSyncComplexes( theSimulation->allComplexes, theSimulation->ncomplex );
 #endif
 #ifndef BOXED
 				V += PP_G( theSimulation ); 
@@ -1178,9 +1155,9 @@ int temp_main( int argc, char **argv )
 				int c = par_info.complexes[cx];
 				// currently has the PP gradient.
 
-				int nsites = allComplexes[c]->nsites;
+				int nsites = theSimulation->allComplexes[c]->nsites;
 				double save_grad[3*nsites];
-				memcpy( save_grad, allComplexes[c]->save_grad, sizeof(double)*3*nsites );		
+				memcpy( save_grad, theSimulation->allComplexes[c]->save_grad, sizeof(double)*3*nsites );		
 		
 
 				/*
@@ -1193,29 +1170,29 @@ int temp_main( int argc, char **argv )
 
 				while( time_remaining > 0 )
 				{
-					memcpy( allComplexes[c]->save_grad, save_grad, sizeof(double)*3*nsites );
+					memcpy( theSimulation->allComplexes[c]->save_grad, save_grad, sizeof(double)*3*nsites );
 
-					double dt = allComplexes[c]->update_dH_dq( theSimulation, time_remaining, time_step );
+					double dt = theSimulation->allComplexes[c]->update_dH_dq( theSimulation, time_remaining, time_step );
 			
 					if(  do_ld || o < nequil )
 					{					
-						allComplexes[c]->applyLangevinFriction( theSimulation, dt, gamma_langevin );
-						allComplexes[c]->applyLangevinNoise( theSimulation, dt,  gamma_langevin, temperature );
+						theSimulation->allComplexes[c]->applyLangevinFriction( theSimulation, dt, gamma_langevin );
+						theSimulation->allComplexes[c]->applyLangevinNoise( theSimulation, dt,  gamma_langevin, temperature );
 					}
 
-					if( !allComplexes[c]->do_bd )
+					if( !theSimulation->allComplexes[c]->do_bd )
 					{
-						allComplexes[c]->propagate_p( theSimulation, dt/2 );
-						allComplexes[c]->compute_qdot( theSimulation, dt/time_step );			
+						theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
+						theSimulation->allComplexes[c]->compute_qdot( theSimulation, dt/time_step );			
 			
 						// close enough.
-						PT += allComplexes[c]->T(theSimulation)  * (dt/time_step);
+						PT += theSimulation->allComplexes[c]->T(theSimulation)  * (dt/time_step);
 	
-						allComplexes[c]->propagate_p( theSimulation, dt/2 );
-						allComplexes[c]->compute_qdot( theSimulation,  dt/time_step );			
+						theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
+						theSimulation->allComplexes[c]->compute_qdot( theSimulation,  dt/time_step );			
 					}
 						
-					allComplexes[c]->propagate_surface_q( theSimulation, dt );
+					theSimulation->allComplexes[c]->propagate_surface_q( theSimulation, dt );
 
 					time_remaining -= dt;
 				}
@@ -1254,7 +1231,7 @@ int temp_main( int argc, char **argv )
 			{
 				int nv = sRec->theSurface->nv;
 #ifdef PARALLEL
-				if( ncomplex == 0 )
+				if( theSimulation->ncomplex == 0 )
 				{
 					if( sRec->do_gen_q )
 					{
@@ -1475,13 +1452,13 @@ int temp_main( int argc, char **argv )
 			{	
 				// get_tracked
 				if(debug)
-					printf("debug RD 2nd ncomplexes: %d\n", ncomplex);
+					printf("debug RD 2nd ncomplexes: %d\n", theSimulation->ncomplex);
 
 				rd->do_rd(theSimulation); 
 
 				if(debug)
 				{
-					for(int p = 0; p < ncomplex; p++)
+					for(int p = 0; p < theSimulation->ncomplex; p++)
 					{
 						printf("debug RD 3rd id: %d ntracked: %d\n", p, rd->tracked[p]->ntracked);
 					}
@@ -1509,14 +1486,14 @@ int temp_main( int argc, char **argv )
 			T += PT;
 			T += srd_T;
 			dof += srd_dof;
-			for( int c = 0; c < ncomplex; c++ )
+			for( int c = 0; c < theSimulation->ncomplex; c++ )
 			{
-				if( ! allComplexes[c]->do_bd ) 
+				if( ! theSimulation->allComplexes[c]->do_bd ) 
 				{	
 #ifdef DISABLE_ON_MEMBRANE_T
-					dof += 3 * (allComplexes[c]->nsites - allComplexes[c]->nattach);
+					dof += 3 * (theSimulation->allComplexes[c]->nsites - theSimulation->allComplexes[c]->nattach);
 #else
-					dof += 3 * allComplexes[c]->nsites - allComplexes[c]->nattach;
+					dof += 3 * theSimulation->allComplexes[c]->nsites - theSimulation->allComplexes[c]->nattach;
 #endif
 				}
 			}
@@ -1548,8 +1525,8 @@ int temp_main( int argc, char **argv )
 
 			if( block.record_curvature && o >= nequil  )
 			{
-				for( int c = 0; c < ncomplex; c++ )
-					avc[c] += allComplexes[c]->local_curvature( theSimulation );
+				for( int c = 0; c < theSimulation->ncomplex; c++ )
+					avc[c] += theSimulation->allComplexes[c]->local_curvature( theSimulation );
 				navc+=1;
 			}
 
@@ -1666,7 +1643,7 @@ int temp_main( int argc, char **argv )
 #endif
 	
 #ifdef PARALLEL
-		if( ncomplex > 0 ) ParallelSyncComplexes( allComplexes, ncomplex );
+		if( theSimulation->ncomplex > 0 ) ParallelSyncComplexes( theSimulation->allComplexes, theSimulation->ncomplex );
 #endif
 
 		if( tFile && par_info.my_id == BASE_TASK )
@@ -1692,7 +1669,7 @@ int temp_main( int argc, char **argv )
 		if( block.tachyon && par_info.my_id == BASE_TASK )
 		{
 			theSurface->writeTachyon( block.jobName, block.tachyon_res, block.tachyon_interp, 
-				r, allComplexes, ncomplex, &block, srd_i, block.tachyon_tri_center ); 
+				r, allComplexes,theSimulation->ncomplex, &block, srd_i, block.tachyon_tri_center ); 
 		}
 #endif			
 
@@ -1759,7 +1736,7 @@ int temp_main( int argc, char **argv )
 	}
 
 #ifdef PARALLEL
-	if( ncomplex > 0 ) ParallelSyncComplexes( allComplexes, ncomplex );
+	if( theSimulation->ncomplex > 0 ) ParallelSyncComplexes( theSimulation->allComplexes, theSimulation->ncomplex );
 #endif
 
 #if 1 // pre-simulation change me
@@ -1779,8 +1756,8 @@ int temp_main( int argc, char **argv )
 		for( int cx = 0; cx < par_info.nc; cx++ )
 		{
 			int c = par_info.complexes[cx];
-			VP += allComplexes[c]->V(theSimulation);	
-			VP += allComplexes[c]->AttachV(theSimulation);	
+			VP += theSimulation->allComplexes[c]->V(theSimulation);	
+			VP += theSimulation->allComplexes[c]->AttachV(theSimulation);	
 		}
 	
 		V += VP;
@@ -1804,10 +1781,10 @@ int temp_main( int argc, char **argv )
 
 	if( block.record_curvature )
 	{
-		for( int c = 0; c < ncomplex; c++ )
+		for( int c = 0; c < theSimulation->ncomplex; c++ )
 		{
 			char *typeName = NULL;
-			allComplexes[c]->print_type(&typeName);
+			theSimulation->allComplexes[c]->print_type(&typeName);
 			printf("Complex %d type %s average curvature %lf\n", c, typeName, avc[c]/(navc+1e-11) );
 			if( typeName) free(typeName);
 		}
