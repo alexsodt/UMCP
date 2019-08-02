@@ -350,11 +350,11 @@ int temp_main( int argc, char **argv )
 	}
 
 
-	static gsl_rng * rng_x = NULL;
-	static const gsl_rng_type *rng_T = gsl_rng_default;
-        rng_x = gsl_rng_alloc(rng_T);
-        gsl_rng_env_setup();	
-	gsl_rng_set( rng_x, block.random_seed );
+//	static gsl_rng * rng_x = NULL;
+//	static const gsl_rng_type *rng_T = gsl_rng_default;
+  //      rng_x = gsl_rng_alloc(rng_T);
+ //       gsl_rng_env_setup();	
+//	gsl_rng_set( rng_x, block.random_seed );
 
 	double time_step = block.time_step; // one nanosecond.
 	double time_step_collision = block.time_step_collision; // one nanosecond.
