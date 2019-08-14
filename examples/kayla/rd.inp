@@ -5,6 +5,7 @@ c0			-0.03
 mesh 			sphere.mesh
 sphere 			yes
 do_bd_particles 			yes
+do_ld			yes
 do_rd			yes
 rxn_diffusion		rxn_info.inp
 o_lim 			10
@@ -13,3 +14,4 @@ nsteps			5000
 movie			yes	
 gamma_langevin 		100	
 KA			0.2
+seed			354651

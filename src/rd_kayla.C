@@ -264,6 +264,7 @@ void RD::do_rd( Simulation *theSimulation )
 	
 				struct surface_record *sRec = theSimulation->fetch( theSimulation->allComplexes[p]->sid[s] );
 				product->init( sRec->theSurface, sRec->r, theSimulation->allComplexes[p]->fs[s], theSimulation->allComplexes[p]->puv[2*s+0], theSimulation->allComplexes[p]->puv[2*s+1] );
+				product->copyParentParameters( theSimulation->allComplexes[p] );
 				theSimulation->AddComplex( product );
 	 
 				// this stops the complex from being propagated, simulated, etc. leaves it for garbage collection later.

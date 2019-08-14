@@ -39,6 +39,11 @@ void pcomplex::base_init( void )
 	disabled = 0;
 }
 
+void pcomplex::copyParentParameters( pcomplex *parent )
+{
+	do_bd = parent->do_bd;
+}
+
 /* general routines */
 
 void pcomplex::alloc( void )

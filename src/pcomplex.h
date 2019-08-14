@@ -113,6 +113,7 @@ struct pcomplex
 	//void compute_qdot( surface *theSurface, double *rsurf, double *mesh_qdot0, double *mesh_qdot, double frac_mult=1.0 );
 	void compute_qdot( Simulation *theSimulation,  double frac_mult=1.0 );
 	void propagate_surface_q( Simulation *theSimulation, double dt );
+	void copyParentParameters( pcomplex *parent );
 
 	void debug_dPinv_dq( surface * theSurface, double *rsurf  );
 	void getMeshQxdot( surface *theSurface, double *rsurf, double *Minv, double *mesh_p, double *mesh_qdot, double *mesh_qdot0, double *mesh_der_qdot );
