@@ -1,6 +1,11 @@
-TESTS = energy_conservation.check
+TESTS = energy_conservation.check load_save.check elastic_collisions.check
 
-all: $(TESTS)
+all: 
+	@rm -f test.log
+	@make $(TESTS)
+	@echo "---FINAL TEST LOG---"
+	@cat test.log
+	@echo "---FINAL TEST LOG---"
 
 %.check:
 	cd $* ; csh setup.csh

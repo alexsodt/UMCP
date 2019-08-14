@@ -16,6 +16,11 @@ static global_boxing *boxing = NULL;
 
 void RD::init( Simulation * theSimulation, double time_step_in, parameterBlock *block )
 {
+	nreactants = 0;
+	nreactantsSpace = 10;
+	reactants = (ReactantType *)malloc( sizeof(ReactantType) * nreactantsSpace );
+	rxn_lookup_table = NULL;
+
 	nreactionsSpace = 10;
 	nreactions = 0;
 
@@ -98,6 +103,8 @@ void RD::get_tracked( Simulation *theSimulation  )
 		int p = tracked[t]->pid;
 		int s = tracked[t]->sid;
 
+		if( allComplexes[p]->disabled ) continue;
+
 		int npairs = 0;
 		int nnew = 0;
 		/////////// TO-DO: use max Rmax from this site's reactions.
@@ -109,6 +116,8 @@ void RD::get_tracked( Simulation *theSimulation  )
 			
 			int s2 = subp_for_id[id];
 			int p2 = complex_for_id[id];
+
+			if( allComplexes[p2]->disabled ) continue;
 
 			if( p == p2 )
 				continue;
@@ -232,12 +241,15 @@ void RD::do_rd( Simulation *theSimulation )
 	{
 		int p = tracked[t]->pid;
 		int s = tracked[t]->sid;
+			
+		if( theSimulation->allComplexes[p]->disabled ) continue;
 	
 		for( int n = 0; n < tracked[t]->ntracked; n++ )
 		{
 			int p2 = tracked[t]->tracked_info[n].id;	
 			int s2 = tracked[t]->tracked_info[n].sid2;
 	
+			if( theSimulation->allComplexes[p2]->disabled ) continue;
 			int rxn = rxnLookup( theSimulation->allComplexes[p]->stype[s], theSimulation->allComplexes[p2]->stype[s2] );
 			if( rxn == -1 ) continue; // should never be -1..
 	
@@ -265,6 +277,8 @@ void RD::do_rd( Simulation *theSimulation )
 				struct surface_record *sRec = theSimulation->fetch( theSimulation->allComplexes[p]->sid[s] );
 				product->init( sRec->theSurface, sRec->r, theSimulation->allComplexes[p]->fs[s], theSimulation->allComplexes[p]->puv[2*s+0], theSimulation->allComplexes[p]->puv[2*s+1] );
 				product->copyParentParameters( theSimulation->allComplexes[p] );
+				for( int s = 0; s < product->nattach; s++ )
+					product->sid[s] = sRec->id;
 				theSimulation->AddComplex( product );
 	 
 				// this stops the complex from being propagated, simulated, etc. leaves it for garbage collection later.
@@ -272,8 +286,11 @@ void RD::do_rd( Simulation *theSimulation )
 				theSimulation->RemoveComplexDelayed(p);
 				theSimulation->RemoveComplexDelayed(p2);			
 			}
+				
 		}
 	}
+
+//	printf("After rd, ncomplex: %d\n", theSimulation->ncomplex );
 
 	// dissociation.
 
@@ -408,7 +425,7 @@ void RD::registerSite( pcomplex *theComplex, int pid, int sid )
 				if( r1 < nreactants-1 && r2 < nreactants-1 )
 					new_rxn_table[r1*nreactants+r2] = rxn_lookup_table[r1*(nreactants-1)+r2]; 
 			} 
-			free(rxn_lookup_table);
+			if( rxn_lookup_table ) free(rxn_lookup_table);
 			rxn_lookup_table = new_rxn_table;
 
 			for( int r = 0; r < nreactions; r++ )

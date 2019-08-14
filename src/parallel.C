@@ -226,7 +226,7 @@ void setupParallel( Simulation *theSimulation )
 		// partition processors between the surfaces.
 		// we need to judge the approximate workload.
 
-		int **regions_for_tri = (int **)malloc( sizeof(int) * nSurfaces );
+		int **regions_for_tri = (int **)malloc( sizeof(int*) * nSurfaces );
 		for( int s = 0; s < nSurfaces; s++ )
 			regions_for_tri[s] = (int *)malloc( sizeof(int) * ntri[s] );
 

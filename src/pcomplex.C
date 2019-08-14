@@ -55,6 +55,9 @@ void pcomplex::alloc( void )
 	memset( rall, 0, sizeof(double) * 3 * nsites );
 
 	sid = (int*)malloc( sizeof(int) * nsites );
+	for( int s = 0; s < nsites; s++ )
+		sid[s] = -1;
+
 	stype = (int*)malloc( sizeof(int) * nsites );
 
 	fs = (int *)malloc( sizeof(int) * nsites );
@@ -266,6 +269,7 @@ void pcomplex::prepareForGradient( void )
 
 double pcomplex::update_dH_dq( Simulation *theSimulation, double time_step, double timestep_total)
 {
+	if( disabled ) return time_step;
 
 	double *alphas = theSimulation->alpha;
 
@@ -987,6 +991,9 @@ void pcomplex::compute_qdot( Simulation *theSimulation,  double frac_mult )
 
 void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 {
+	if( disabled )
+		return;
+
 	static double av_dstep = 0;
 	static double av_dstep2 = 0;
 	static double n_dstep = 0;
@@ -1125,7 +1132,9 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 
 void pcomplex::propagate_p( Simulation *theSimulation, double dt )
 {
-	// move a step.
+	if( disabled ) return;
+
+		// move a step.
 
 #if 0 // presim
 	double T_before = T(theSurface,rsurf);
@@ -1206,6 +1215,7 @@ void pcomplex::init( surface *theSurface, double *rsurf, int f, double u, double
 	grad_puv[1] = puv[1] = v;
 	
 	mass[0] = default_mass;
+
 
 
 	bound = 1;
@@ -1291,6 +1301,8 @@ int pcomplex::nparams( void )
 
 void pcomplex::refresh( Simulation *theSimulation )
 {
+	if( disabled ) return;
+
 	double *alphas = theSimulation->alpha;
 	double center_on[3] = { 0,0,0};
 	int update_attach = 1;
@@ -1603,6 +1615,9 @@ void surface::loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterB
 				prot->move_outside();
 
 			prot->init(this, rsurf, f,u,v); 				 
+
+			for( int t = 0; t < prot->nattach; t++ )
+				prot->sid[t] = surface_id; 
 
 			if( *ncomplex  == nspace )
 			{
@@ -2239,13 +2254,15 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 {
 	pcomplex **allComplexes = theSimulation->allComplexes;
 	int ncomplex = theSimulation->ncomplex;
-	static double ncol = 0;
+	double ncol = 0;
 	static int icntr=0;
 	double *alphas = theSimulation->alpha;
 	int done = 0;
 
 	for( int c = 0; c < ncomplex; c++ )
 	{
+		if( allComplexes[c]->disabled ) continue;
+
 		if( allComplexes[c]->do_bd  )
 		{
 			for( int s = allComplexes[c]->nattach; s < allComplexes[c]->nsites; s++ )
@@ -2263,6 +2280,8 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 		
 	for( int c = 0; c < ncomplex; c++ )
 	{
+		if( allComplexes[c]->disabled ) continue;
+
 		for( int s = allComplexes[c]->nattach; s < allComplexes[c]->nsites; s++ )
 		{
 			allComplexes[c]->rall[3*s+0] += allComplexes[c]->qdot[3*s+0] * dt;
@@ -2291,6 +2310,7 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 //			for( int cx = 0; cx < par_info.nc; cx++ )
 			for( int c = 0; c < ncomplex; c++ )
 			{
+				if( allComplexes[c]->disabled ) continue;
 				for( int s = allComplexes[c]->nattach; s < allComplexes[c]->nsites; s++ )
 				{
 					allComplexes[c]->rall[3*s+0] -= allComplexes[c]->qdot[3*s+0] * toc;
@@ -2402,6 +2422,9 @@ void propagateSolutionParticles( Simulation *theSimulation, double dt )
 	}
 
 	icntr++;
+
+	if( global_debug_mode && ncol > 0 )
+		printf("NCollisions: %lf\n", ncol );
 
 //	if( icntr % 100 == 0 )
 //		printf("NCollisions/check %le\n", ncol / icntr );

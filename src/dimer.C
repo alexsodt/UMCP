@@ -124,7 +124,7 @@ void dimer::init( surface *theSurface, double *rsurf, int f, double u, double v 
 }
 
 
-double dimer::V( surface *theSurface, double *rsurf )
+double dimer::V( Simulation *theSimulation )
 {
 	double pot = 0;
 
@@ -136,6 +136,9 @@ double dimer::V( surface *theSurface, double *rsurf )
 		// evaluate the real-space coordinates and normals based on the membrane surface coordinates.
 		for( int s = 0; s < nattach; s++ )
 		{
+			surface_record *sRec = theSimulation->fetch(sid[s]);
+			surface *theSurface = sRec->theSurface;
+			double *rsurf = sRec->r;
 			int f_1 = fs[s], nf = fs[s];
 			double uv1[2] = { 0.33, 0.33 };
 			double duv1[2] = { puv[2*s+0]-uv1[0], puv[2*s+1]-uv1[1] };
@@ -162,7 +165,7 @@ double dimer::V( surface *theSurface, double *rsurf )
 	}
 	double dr1[3] = { r[0] - r[3], r[1] - r[4], r[2] - r[5] };	
 
-	theSurface->wrapPBC( dr1, rsurf+3*theSurface->nv );
+	theSimulation->wrapPBC( dr1, theSimulation->alpha );
 
 	//lengths of bonds and normal	
 	double dr1_length = sqrt((dr1[0]*dr1[0]) + (dr1[1]*dr1[1]) + (dr1[2]*dr1[2]));
@@ -177,7 +180,7 @@ double dimer::V( surface *theSurface, double *rsurf )
 
 // gets derivative of internal energy relative to position (surfacer_g) and the normal (surfacen_g).
 
-double dimer::grad(surface *theSurface, double *rsurf, double *surfacer_g, double *surfacen_g )
+double dimer::grad(Simulation *theSimulation, double *surfacer_g, double *surfacen_g )
 {
 	double pot = 0;
 
@@ -188,6 +191,9 @@ double dimer::grad(surface *theSurface, double *rsurf, double *surfacer_g, doubl
 	{
 		for( int s = 0; s < nattach; s++ )
 		{
+			surface_record *sRec = theSimulation->fetch(sid[s]);
+			surface *theSurface = sRec->theSurface;
+			double *rsurf = sRec->r;
 			int f_1 = fs[s], nf = fs[s];
 			double uv1[2] = { 0.33, 0.33 };
 			double duv1[2] = { puv[2*s+0]-uv1[0], puv[2*s+1]-uv1[1] };
@@ -217,7 +223,7 @@ double dimer::grad(surface *theSurface, double *rsurf, double *surfacer_g, doubl
 		
 		double dr1[3] = { r[0] - r[3], r[1] - r[4], r[2] - r[5] };	
 	
-		theSurface->wrapPBC( dr1, rsurf+3*theSurface->nv );
+		theSimulation->wrapPBC( dr1, theSimulation->alpha );
 	
 			// nx ny nz n[3] n[4] n[5]
 		
@@ -243,7 +249,7 @@ double dimer::grad(surface *theSurface, double *rsurf, double *surfacer_g, doubl
  	
 		double dr1[3] = { r[0] - r[3], r[1] - r[4], r[2] - r[5] };	
 		
-		theSurface->wrapPBC( dr1, rsurf+3*theSurface->nv );
+		theSimulation->wrapPBC( dr1, theSimulation->alpha );
 	
 			// nx ny nz n[3] n[4] n[5]
 		
@@ -303,16 +309,20 @@ MAB
 
 */
 
-double MAB::V( surface *theSurface, double *rsurf )
+double MAB::V(  Simulation *theSimulation  )
 {
 	double v = 0;
 
-	v += dimer::V( theSurface, rsurf );
+	v += dimer::V( theSimulation  );
 
 	// additional potential for their normals.
 	
 	double r[6];
 	double n[6];
+
+	surface_record *sRec = theSimulation->fetch(sid[0]);
+	surface *theSurface = sRec->theSurface;
+	double *rsurf = sRec->r;
 
 	loadCoords( theSurface, rsurf, r, n );
 
@@ -335,11 +345,14 @@ double MAB::V( surface *theSurface, double *rsurf )
 	return v;
 }
 
-double MAB::grad( surface *theSurface, double *rsurf, double *surface_g, double *normal_g)
+double MAB::grad( Simulation *theSimulation, double *surface_g, double *normal_g)
 {
 	double v = 0;
+	surface_record *sRec = theSimulation->fetch(sid[0]);
+	surface *theSurface = sRec->theSurface;
+	double *rsurf = sRec->r;
 
-	v += dimer::grad( theSurface, rsurf, surface_g, normal_g );
+	v += dimer::grad( theSimulation, surface_g, normal_g );
 	
 	double r[6];
 	double n[6];

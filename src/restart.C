@@ -20,9 +20,22 @@ void Simulation::saveRestart( char **buf, int seed)
 	int buffer_size = 4096;
 	int put = 0;
 
+
 	char *theBuffer = (char *)malloc( sizeof(char) * buffer_size );
 	char *tbuf = (char *)malloc( sizeof(char) * 4096 );
-
+	
+	sprintf(tbuf, "%lf %lf %lf\n", alpha[0], alpha[1], alpha[2] );
+		
+	while( put + strlen(tbuf) >= buffer_size )
+	{
+		buffer_size *= 2;
+		buffer_size += strlen(tbuf);
+	
+		theBuffer = (char *)realloc( theBuffer, buffer_size ); 
+	}
+	
+	strcpy( theBuffer+put, tbuf );
+	put += strlen(tbuf);
 	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
 	{
 		surface *theSurface = sRec->theSurface;
@@ -72,20 +85,23 @@ void Simulation::saveRestart( char **buf, int seed)
 
 	for( surface_record *sRec = allSurfaces; sRec; sRec = sRec->next )
 	{
-		for( int Q = 0; Q < sRec->NQ; Q++ )
+		if( sRec->do_gen_q )
 		{
-			sprintf( tbuf, "GQ %.14le\n", sRec->pp[Q] );
-	
-			if( put + strlen(tbuf) >= buffer_size )
+			for( int Q = 0; Q < sRec->NQ; Q++ )
 			{
-				buffer_size *= 2;
-				buffer_size += strlen(tbuf);
-	
-				theBuffer = (char *)realloc( theBuffer, buffer_size ); 
+				sprintf( tbuf, "GQ %.14le\n", sRec->pp[Q] );
+		
+				if( put + strlen(tbuf) >= buffer_size )
+				{
+					buffer_size *= 2;
+					buffer_size += strlen(tbuf);
+		
+					theBuffer = (char *)realloc( theBuffer, buffer_size ); 
+				}
+		
+				strcpy( theBuffer+put, tbuf );
+				put += strlen(tbuf);
 			}
-	
-			strcpy( theBuffer+put, tbuf );
-			put += strlen(tbuf);
 		}
 	}
 		
@@ -131,7 +147,7 @@ void Simulation::loadRestart( FILE *loadFile, int *seed )
 			if( sRec->NQ == 0 && pp )
 				nr = sscanf( buffer, "%lf %lf %lf %lf %lf %lf\n", rsurf+3*v+0, rsurf+3*v+1, rsurf+3*v+2, pp+3*v+0, pp+3*v+1, pp+3*v+2 );
 			else
-				nr = sscanf( buffer, "%lf %lf %lf\n", rsurf[3*v+0], rsurf[3*v+1], rsurf[3*v+2] );
+				nr = sscanf( buffer, "%lf %lf %lf\n", rsurf+3*v+0, rsurf+3*v+1, rsurf+3*v+2 );
 		}
 	}
 		
@@ -143,7 +159,7 @@ void Simulation::loadRestart( FILE *loadFile, int *seed )
 		for( int Q = 0; Q < sRec->NQ; Q++ )
 		{
 			getLine(loadFile, buffer );
-			sprintf( buffer, "GQ %.14le\n", sRec->pp+Q );
+			sprintf( buffer, "GQ %.14le\n", sRec->pp[Q] );
 		}
 	}	
 	nr = sscanf( buffer, "seed %d",seed );

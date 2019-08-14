@@ -9,7 +9,7 @@
 #include "random_global.h"
 #define MOVE_CHECK
 
-static double THRESH = 1e-8;
+static double THRESH = 1e-4;
 
 void surface::get_pt_coeffs( int f, double u, double v, double *coeffs, int *coord_list, int *ncoords )
 {
