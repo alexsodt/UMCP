@@ -666,6 +666,20 @@ int main( int argc, char **argv )
 		alignStructuresOnAtomSet( rvals, reverse_cyl_path2, r2, path2, pathLen2, theSurface2->nv );
 	}
 
+#define REDO_BACKPATH2
+
+#ifdef REDO_BACKPATH2
+	if( mesh2_has_pbc )
+	{
+		for( int p = 0; p < pathLen2; p++ )
+			back_path2[reverse_cyl_path2[p]] = p;
+	}
+	else
+	{
+		for( int p = 0; p < pathLen2; p++ )
+			back_path2[reverse_cyl_path2[p]] = p;
+	}
+#endif
 
 #ifdef DEBUG_ALL
 	for( int i = 0; i < theSurface1->nv; i++ )
@@ -816,9 +830,11 @@ int main( int argc, char **argv )
 					if( path[tv] == v )
 						my_index = tv;
 				}
+					
 
 				for( int e = 0; e < nedges[cylPath[my_index]]; e++ )
 				{	// cylinder indices are offset by the first object, nmap1-pathLen1.
+
 					new_edges[nnew] = nmap1 - pathLen1 + edges[cylPath[my_index]*MAX_EDGES+e];
 					nnew++;
 				}
@@ -840,10 +856,7 @@ int main( int argc, char **argv )
 				{
 					theMesh[write_to].edges[e] = new_edges[e];
 					
-					if( theMesh[write_to].edges[e] == 832 && write_to == 2117 )
-					{
-						printf("check.\n");
-					}
+					
 				}
 				write_to++;
 #if 0 
@@ -885,6 +898,11 @@ int main( int argc, char **argv )
 						theMesh[write_to].edges[e] = cyl_map[edges[tv*MAX_EDGES+e]];
 					else
 						theMesh[write_to].edges[e] = cur_offset + cyl_map[edges[tv*MAX_EDGES+e]];
+					
+					if( theMesh[write_to].edges[e] == 264 && write_to == 197 )
+					{
+						printf("check.\n");
+					}
 				}
 				write_to++;
 				
@@ -1032,10 +1050,32 @@ int main( int argc, char **argv )
 		}
 	}
 
-	if( n_flaws > 1 )
-		printf("There are %d flawed triangles with two irregular vertices. The mesh must be subdivided or the input to join adjusted.\n", n_flaws ); 
-	else if( n_flaws == 1 )
-		printf("There is %d flawed triangle with two irregular vertices. The mesh must be subdivided or the input to join slightly adjusted.\n", n_flaws ); 
+	for( int e = 0; e < total_verts; e++ )
+	{	
+		int val = edge_valence[e*(MAX_EDGES+1)+0];
+
+		for( int ex = 0; ex < edge_valence[e*(MAX_EDGES+1)+0]; ex++ )
+		{
+			int e2 = edge_valence[e*(MAX_EDGES+1)+1+ex];
+		
+			int gotit = 0;
+			int val2 = edge_valence[e2*(MAX_EDGES+1)+0];
+			for( int ex2 = 0; ex2 < edge_valence[e2*(MAX_EDGES+1)+0]; ex2++ )
+			{
+				if( edge_valence[e2*(MAX_EDGES+1)+1+ex2] == e )
+					gotit=1;
+			}
+
+			if( !gotit )
+			{
+				printf("PROBLEM: vertex %d is bonded to %d but it is not reciprocated.\n", e, e2);
+				exit(1);
+			}
+		}
+	}
+
+	if( n_flaws >= 1 )
+		printf("There %s %d flawed %s with two irregular vertices. The mesh must be subdivided or the input to join adjusted.\n", (n_flaws > 1 ? "are" : "is" ), n_flaws, (n_flaws > 1 ? "triangles" : "triangle")  ); 
 	else
 		printf("This mesh can be used without subdivision.\n");
 	return 0;

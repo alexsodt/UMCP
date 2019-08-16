@@ -534,7 +534,11 @@ struct surface
 	void readLipidComposition( FILE *inputFile );
 	void debugDeformation( double *r);
 	void createAllAtom( parameterBlock *block );
-	int evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf, int leaflet, double strain );
+	int evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf, int leaflet, double strain, 
+	double *dx_duv=NULL, double *dy_duv=NULL, double w_use=1.0, double w_rim=0.0, double *rimp=NULL, double *rimn = NULL );
+	int getCoordinateSystem( int source_f,   double *source_u,  double *source_v, 
+				double *dr, double strain, int leaflet,
+				  double *dx_duv, double *dy_duv, double *rsurf );
 };
 
 struct volel

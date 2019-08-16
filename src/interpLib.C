@@ -1531,15 +1531,7 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 				if( k == i ) continue;
 			
 				if( k < j ) continue;
-			if( i == 35 && vi == 8 && j == 139 && k == 197 )
-			{
-				printf("here");
-			}
 			
-				if( i ==35 && vi == 8 )
-				{
-					printf("35,8 valence36: %d, j: %d k: %d\n", theVertices[36].valence, j, k  );
-				}
 				int gotit = 0;
 
 				for( int vk = 0; vk < theVertices[k].valence; vk++ )
@@ -1550,34 +1542,6 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 						gotit = 1;
 				}
 
-#ifdef DECLINE_SHARE // I take care of this below where I look for edges with three faces.
-				int bad = 0;
-		
-				if( gotit )
-				{
-					// make sure they do not all share a vertex.
-
-					for( int x = 0; x < theVertices[i].valence; x++ )
-					{
-						int l = theVertices[i].edges[x];
-						
-						for( int y = 0; y < theVertices[j].valence; y++ )
-						{
-							if( theVertices[j].edges[y] != l ) continue;
-						
-							for( int z = 0; z < theVertices[k].valence; z++ )
-							{
-								if( theVertices[k].edges[z] != l ) continue;
-				
-								printf("i: %d j: %d k: %d bad\n", i, j, k );						
-								bad = 1;
-							}
-						}
-					}
-				}	
-		
-				if( bad ) continue;
-#endif
 				if( gotit )
 				{
 					if( nt == nts )
@@ -1605,6 +1569,49 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 							gotit[2] = 1+e; 
 					}
 
+					int codes[3] = { 2, 1, 0 };
+					int edge_code[3] = {0,2,1};
+					int vput[3][2] = { {i,j}, {i,k}, {j,k} };
+					for( int parse = 0; parse < 3; parse++ )
+					{
+						if( !gotit[parse] )
+						{
+							if( nedges == nedgesSpace )
+							{
+								printf("Something is wrong with the mesh. The program is trying to create more edges than the valence would have indicated.\n");
+								exit(1);
+							}
+
+							theEdges[nedges].sense = 0;
+							theEdges[nedges].fix_sense = 0;
+							theEdges[nedges].vertices[0] = vput[parse][0];
+							theEdges[nedges].vertices[1] = vput[parse][1];
+
+
+	
+							theEdges[nedges].faces[0] = nt;
+							theEdges[nedges].faces[1] = -1;
+							theEdges[nedges].faces[2] = -1;
+							theEdges[nedges].code[0] = codes[parse];
+							theTriangles[nt].edges[edge_code[parse]] = nedges;
+							nedges++;
+						}
+						else
+						{
+							if( theEdges[gotit[parse]-1].faces[1]  == -1 )
+							{
+								theEdges[gotit[parse]-1].faces[1] = nt;
+								theEdges[gotit[parse]-1].code[1] = codes[parse];
+							}
+							else
+							{
+								theEdges[gotit[parse]-1].faces[2] = nt;
+								theEdges[gotit[parse]-1].code[2] = codes[parse];
+							}
+							theTriangles[nt].edges[edge_code[parse]] = gotit[parse]-1;
+						}
+					}
+#if 0
 					if( !gotit[0]  )
 					{
 						theEdges[nedges].vertices[0] = i;
@@ -1657,6 +1664,7 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 					}
 					if( !gotit[2]  )
 					{
+
 						theEdges[nedges].vertices[0] = j;
 						theEdges[nedges].vertices[1] = k;
 						theEdges[nedges].faces[0] = nt;
@@ -1680,6 +1688,7 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 						}
 						theTriangles[nt].edges[1] = gotit[2]-1;
 					}
+#endif
 					nt++;
 				}
 			}

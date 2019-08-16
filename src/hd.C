@@ -156,6 +156,13 @@ int temp_main( int argc, char **argv )
 	double *r1 = NULL;
 	theSurface1->loadLattice( block.meshName , 0. );
 
+	for( int t = 0; t < theSurface1->nv; t++ )
+	{
+		theSurface1->theVertices[t].r[0] += block.shift[0];
+		theSurface1->theVertices[t].r[1] += block.shift[1];
+		theSurface1->theVertices[t].r[2] += block.shift[2];
+	}
+
 
 
 	double Lx = theSurface1->PBC_vec[0][0];
@@ -188,6 +195,13 @@ int temp_main( int argc, char **argv )
 	
 		surface *addSurface = (surface *)malloc( sizeof(surface) );
 		addSurface->loadLattice( block.meshName2, 0. );
+	
+		for( int t = 0; t < addSurface->nv; t++ )
+		{
+			addSurface->theVertices[t].r[0] += block.shift[0];
+			addSurface->theVertices[t].r[1] += block.shift[1];
+			addSurface->theVertices[t].r[2] += block.shift[2];
+		}
 	
 		surface_record *newSurface = (struct surface_record*)malloc( sizeof(surface_record) );
 		newSurface->theSurface = addSurface;
@@ -686,33 +700,35 @@ int temp_main( int argc, char **argv )
 
 	
 	setupParallel( theSimulation ); 
+
+	if( nsteps > 0 )
+	{	
+		for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+		{
+			surface *useSurface = sRec->theSurface;
+			int nv = useSurface->nv;
+			int NQ = sRec->NQ;
 	
-	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
-	{
-		surface *useSurface = sRec->theSurface;
-		int nv = useSurface->nv;
-		int NQ = sRec->NQ;
-
-		sRec->EFFM = NULL;
-		sRec->MMat = NULL;
-
-		int max_mat = nv;
-
-		if( NQ > nv )
-			max_mat = NQ;
-		int *sparse_use = (int *)malloc( sizeof(int) * (NQ > nv ? NQ : nv) );
-		int n_vuse = 0;
-		double *mass_scaling = NULL;
+			sRec->EFFM = NULL;
+			sRec->MMat = NULL;
 	
-		useSurface->getSparseEffectiveMass( sRec->theForceSet, sparse_use, &n_vuse, &sRec->EFFM, sRec->gen_transform, NQ, mass_scaling );	
-		if( do_bd_membrane )
-			useSurface->getSparseRoot( sRec->theForceSet, &sRec->MMat ); 
-
-		free(sparse_use);
-	}
+			int max_mat = nv;
+	
+			if( NQ > nv )
+				max_mat = NQ;
+			int *sparse_use = (int *)malloc( sizeof(int) * (NQ > nv ? NQ : nv) );
+			int n_vuse = 0;
+			double *mass_scaling = NULL;
 		
-	setupSparseVertexPassing( theSimulation );
-
+			useSurface->getSparseEffectiveMass( sRec->theForceSet, sparse_use, &n_vuse, &sRec->EFFM, sRec->gen_transform, NQ, mass_scaling );	
+			if( do_bd_membrane )
+				useSurface->getSparseRoot( sRec->theForceSet, &sRec->MMat ); 
+	
+			free(sparse_use);
+		}
+			
+		setupSparseVertexPassing( theSimulation );
+	}
 
 	double V = 0;
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
@@ -787,7 +803,7 @@ int temp_main( int argc, char **argv )
 		memset( avc, 0, sizeof(double) * theSimulation->ncomplex );
 	}
 
-	if( block.nsteps == 0 )
+	if( nsteps == 0 )
 	{
 
 #ifdef MULTISURFACE_TACHYON

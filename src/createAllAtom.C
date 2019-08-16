@@ -7,6 +7,7 @@
 #include <math.h>
 
 static double solvation_cutoff = 2.5;
+static double ion_cutoff = 5.0;
 static double PP = 15.0;
 static int debug_on = 0;
 
@@ -38,13 +39,13 @@ const char *charmm_footer =
 "\n"
 "stop\n";
 
+void generateRimRing( surface *theSurface, double *rsurf, double **rim_triangles, int *ntri);
 
 struct crd_psf_pair
 {
 	char CRDfileName[256];
 	char PSFfileName[256];
 };
-
 
 
 void surface::createAllAtom( parameterBlock *block )
@@ -72,25 +73,28 @@ void surface::createAllAtom( parameterBlock *block )
 	
 	fprintf(charmmFile, charmm_header );
 
-	struct atom_rec *master_at[2] = {NULL,NULL};
-	int nat[2] = {0,0};
+	struct atom_rec *master_at[3] = {NULL,NULL,NULL};
+	int nat[3] = {0,0,0};
 		
-	int *master_lipid_start[2] = {NULL,NULL};
+	int *master_lipid_start[3] = {NULL,NULL,NULL};
 	// the index where a lipid's atoms stop
-	int *master_lipid_stop[2] = {NULL,NULL};
+	int *master_lipid_stop[3] = {NULL,NULL,NULL};
 	// the coordinates of that lipid.
-	double *master_lipid_xyz[2] = {NULL,NULL};
-	int *master_leaflet[2] = {NULL,NULL};
-	int master_nlipids[2] = {0,0};
-	double master_Lx[2]={0,0},master_Ly[2]={0,0},master_Lz[2]={0,0},alpha,beta,gamma;
-		
+	double *master_lipid_xyz[3] = {NULL,NULL,NULL};
+	int *master_leaflet[3] = {NULL,NULL,NULL};
+	int master_nlipids[3] = {0,0,0};
+	double master_Lx[3]={0,0,0},master_Ly[3]={0,0,0},master_Lz[3]={0,0,0},alpha,beta,gamma;
+	
+	// the code for inner leaflet (x_leaflet == 0 )	
+	int inner_leaflet = 0;
+
 	if( !block->innerPatchPDB && !block->outerPatchPDB)
 	{
 		printf("Structure building requires a valid pdb file, \"patchPDB\", \"innerPatchPDB\", or \"outerPatchPDB\"\n");
 		exit(1); 
 	}
 
-	int do_leaflet[2] = { 0,0 };
+	int do_leaflet[3] = { 0,0 };
 	
 	struct atom_rec *protein;
 	int nprotein=0;
@@ -102,7 +106,7 @@ void surface::createAllAtom( parameterBlock *block )
 
 	double total_charge       = 0;
 	double total_protein_charge       = 0;
-	double total_lipid_charge = 0;
+	double total_lipid_charge[3] = {0,0};
 
 	if( block->addProteinPDB )
 	{
@@ -200,7 +204,7 @@ void surface::createAllAtom( parameterBlock *block )
 	}
 
 
-	for( int pass = 0; pass < 2; pass++ )
+	for( int pass = 0; pass < 3; pass++ )
 	{
 		FILE *pdbFile;	
 	
@@ -254,6 +258,32 @@ void surface::createAllAtom( parameterBlock *block )
 			else
 				loadPSFfromPDB( pdbFile );
 		}
+		else if( pass == 2 && block->altPatchPDB )
+		{
+			pdbFile = fopen(block->altPatchPDB, "r" );
+			do_leaflet[2] = 1;
+
+			if( !pdbFile )
+			{
+				printf("Couldn't open file \"%s\"\n", block->altPatchPDB );
+				exit(1);
+			}
+
+			if( block->altPatchPSF )
+			{
+				FILE *psfFile = fopen(block->altPatchPSF,"r");
+			
+				if( !psfFile )
+				{
+					printf("Couldn't open file \"%s\"\n", block->altPatchPSF );
+					exit(1);
+				}
+	
+				loadPSF( psfFile );
+			}
+			else
+				loadPSFfromPDB( pdbFile );
+		}
 		else if( block->patchPDB )
 		{
 			do_leaflet[pass] = -1;
@@ -298,8 +328,8 @@ void surface::createAllAtom( parameterBlock *block )
 		}
 		
 		double Lx = master_Lx[pass];
-		double Ly = master_Lx[pass];
-		double Lz = master_Lx[pass];
+		double Ly = master_Ly[pass];
+		double Lz = master_Lz[pass];
 
 		// the index where a lipid's atoms start
 		master_lipid_start[pass] = (int *)malloc( sizeof(int) * curNAtoms() );
@@ -423,21 +453,22 @@ void surface::createAllAtom( parameterBlock *block )
 	
 		for( int l = 0; l < nlipids; l++ )
 		{
-			while( at[lipid_start[l]].z - wrapto < -Lz/2 ) at[lipid_start[l]].z += Lz;
-			while( at[lipid_start[l]].z - wrapto > Lz/2 ) at[lipid_start[l]].z -= Lz;
+			int midlipid = (lipid_start[l]+lipid_stop[l])/2;
+			while( at[midlipid].z - wrapto < -Lz/2 ) at[midlipid].z += Lz;
+			while( at[midlipid].z - wrapto > Lz/2 ) at[midlipid].z -= Lz;
 	
 			double lcom_z = 0;
 	
 			for( int p = lipid_start[l]; p <= lipid_stop[l]; p++ )
 			{
-				while( at[p].x - at[lipid_start[l]].x < -Lx/2 ) at[p].x += Lx;
-				while( at[p].x - at[lipid_start[l]].x >  Lx/2 ) at[p].x -= Lx;
+				while( at[p].x - at[midlipid].x < -Lx/2 ) at[p].x += Lx;
+				while( at[p].x - at[midlipid].x >  Lx/2 ) at[p].x -= Lx;
 				
-				while( at[p].y - at[lipid_start[l]].y < -Ly/2 ) at[p].y += Ly;
-				while( at[p].y - at[lipid_start[l]].y >  Ly/2 ) at[p].y -= Ly;
+				while( at[p].y - at[midlipid].y < -Ly/2 ) at[p].y += Ly;
+				while( at[p].y - at[midlipid].y >  Ly/2 ) at[p].y -= Ly;
 				
-				while( at[p].z - at[lipid_start[l]].z < -Lz/2 ) at[p].z += Lz;
-				while( at[p].z - at[lipid_start[l]].z >  Lz/2 ) at[p].z -= Lz;
+				while( at[p].z - at[midlipid].z < -Lz/2 ) at[p].z += Lz;
+				while( at[p].z - at[midlipid].z >  Lz/2 ) at[p].z -= Lz;
 		
 				lcom_z += (at[p].z - wrapto);
 			}
@@ -451,8 +482,10 @@ void surface::createAllAtom( parameterBlock *block )
 		// subtract off wrapto
 	
 		for( int a = 0; a < curNAtoms(); a++ )
+		{
 			at[a].z -= wrapto;
-	
+			if( at[a].atname[0] == 'N' ) printf("res %d z %lf\n", at[a].res, at[a].z );
+		}
 		// fill lipid positions
 	
 		for( int l = 0; l < nlipids; l++ )
@@ -482,6 +515,36 @@ void surface::createAllAtom( parameterBlock *block )
 	else if( do_leaflet[1] > 0 && do_leaflet[0] == -1 )
 		do_leaflet[0] = 0;
 
+	int nrim = 0;
+	double *rimt = NULL;
+	double rim_center[3]={0,0,0};
+	double rim_extent = 0;
+	if( block->do_rim )
+	{
+		generateRimRing( this, rsurf, &rimt, &nrim );
+
+		for( int t = 0; t < nrim*3; t++ )
+		{
+			rim_center[0] += rimt[3*t+0];	
+			rim_center[1] += rimt[3*t+1];	
+			rim_center[2] += rimt[3*t+2];	
+		}
+
+		rim_center[0] /= nrim*3;
+		rim_center[1] /= nrim*3;
+		rim_center[2] /= nrim*3;
+
+		for( int t = 0; t < nrim*3; t++ )
+		{
+			double dr[3] = { rimt[3*t+0] - rim_center[0],
+					 rimt[3*t+1] - rim_center[1],
+					 rimt[3*t+2] - rim_center[2] };
+			double r = normalize(dr);
+
+			if( r > rim_extent )
+				rim_extent = r;
+		}
+	}
 	// get regions of the bilayer which we will map collectively attempting to leave a minimum of seams.
 
 	int *regions_for_face = (int *)malloc( sizeof(int) * nt );
@@ -527,11 +590,11 @@ void surface::createAllAtom( parameterBlock *block )
 	
 	int nregions = 0;
 	if( do_leaflet[0] && do_leaflet[1] )
-		nregions = 3*area0 / ( (use_area_lower+use_area_upper)/8);
+		nregions = area0 / ( (use_area_lower+use_area_upper)/8);
 	else if( do_leaflet[0] )
-		nregions = 3*area0 / ( (use_area_lower)/4);
-	else	
-		nregions = 3*area0 / ( (use_area_upper)/4);
+		nregions = area0 / ( (use_area_lower)/4);
+	else
+		nregions = area0 / ( (use_area_upper)/4);
 		
 
 	// target one fourth of the area?
@@ -605,6 +668,54 @@ void surface::createAllAtom( parameterBlock *block )
 
 	double av_P_xy[2] = {0,0};
 	double nav_P[2] = {0,0};
+	
+	double rel_vol[2] = {0,0};
+
+	double *M5 = (double *)malloc( sizeof(double) * 4 * 11 * 12 ); 
+	double *M6 = (double *)malloc( sizeof(double) * 4 * 12 * 12 ); 
+	double *M7 = (double *)malloc( sizeof(double) * 4 * 13 * 13 );
+	double *M[3] = { M5, M6, M7 };
+	int mlow = 5;
+	int mhigh = 7;
+
+	generateSubdivisionMatrices( M, mlow, mhigh );
+	
+	if( block->addSalt )
+	{
+		printf("Computing relative volumes inside/outside.\n");
+
+		int n_vol_mc = 1000;
+
+		for( int i = 0; i < n_vol_mc; i++ )
+		{
+			double rpt[3] = { rand()/(double)RAND_MAX * PBC_vec[0][0],
+					  rand()/(double)RAND_MAX * PBC_vec[1][1],
+					  rand()/(double)RAND_MAX * PBC_vec[2][2] };
+		
+			int f;
+			double u, v;
+			double distance;
+
+			nearPointOnBoxedSurface( rpt, &f, &u, &v, M, mlow, mhigh, &distance, 0 );	
+			double nearp[3], nearn[3];
+                	evaluateRNRM( f, u, v, nearp, nearn, rsurf );
+
+			double dr[3] = { rpt[0] - nearp[0], rpt[1] - nearp[1], rpt[2] - nearp[2] };
+			wrapPBC( dr, rsurf+3*nv );
+	
+			double io = dr[0] * nearn[0] + dr[1] * nearn[1] + dr[2] * nearn[2];
+
+			if( io < 0 ) // displacement and normal are oppositely aligned, inside the surface (relative to the normal convention) 
+				rel_vol[0] += 1;
+			else
+				rel_vol[1] += 1;	
+		}
+
+
+		printf("rel vol: %lf %lf\n", rel_vol[0], rel_vol[1] );
+	}
+
+
 
 	for( int pass = 0; pass < 2; pass++ )
 	{
@@ -751,9 +862,86 @@ void surface::createAllAtom( parameterBlock *block )
 					double main_u_cen = spot_u;
 					double main_v_cen = spot_v;
 	
+
 					// everything must be evaluated at this spot to retain the x,y to u/v mapping.
+#if METHOD_ONE
 					int fout = evaluate_at( eval_cen, use_r, f, &spot_u, &spot_v, rsurf, leaflet[l], -strain[x_leaflet] );
+#else
+					// get the x/y/z coordinate system transported to the distance spot (as determined by use_r)
+					double dx_uv[2], dy_uv[2];
+					double source_r[3] = { alpha * dx, alpha * dy, lipid_xyz[3*l+2] };
+					int fout = getCoordinateSystem( f, &spot_u, &spot_v, source_r, -strain[x_leaflet], leaflet[l],
+							dx_uv, dy_uv, rsurf ); 
+#endif
+					
+					double w_use = 1.0;
+					double w_rim = 0.0;
+					double rimp[3] = {0,0,0};
+					double rimn[3] = {0,0,0};
+
+					int debug_mode = 0;
+					if( !strcasecmp( cur_segname, "IN8" ) )
+					{	
+						debug_mode = 1;
+					}
+
+					if( nrim > 0 )
+					{
+						double nrm[3];
+						double rpt[3];
+					
 		
+						evaluateRNRM( fout, spot_u, spot_v, rpt, nrm, rsurf );
+		
+						// check the distance to each triangle, see if it's less than PP.
+					
+						double testp[3] = { 
+							rpt[0] + nrm[0] * (x_leaflet ? 1 : -1 ) * PP,
+							rpt[1] + nrm[1] * (x_leaflet ? 1 : -1 ) * PP,
+							rpt[2] + nrm[2] * (x_leaflet ? 1 : -1 ) * PP };
+
+						int neart = -1;
+						double neard = 1e10;
+						double rim_fudge = PP;
+
+						for( int rt = 0; rt < nrim; rt++ )
+						{
+							double nearp[3];
+							double output[3];
+							if( nearInteriorPointOnTriangle( testp, rimt+9*rt, rimt+9*rt+3, rimt+9*rt+6, output ) )
+							{
+								double check_dr[3] = { testp[0] - output[0], testp[1] - output[1], testp[2] - output[2] };
+								double lc = normalize(check_dr);
+
+								if( lc < neard && lc < PP + rim_fudge )
+								{
+									neard = lc;
+									neart = rt;
+				
+									w_use = pow(1.0 / PP,1.0);
+									w_rim = pow(1.0 / lc,1.0);
+
+									double wsum = w_use+w_rim;
+
+									w_use /= wsum;
+									w_rim /= wsum;
+
+									rimp[0] = (output[0] - rpt[0]) * w_rim;
+									rimp[1] = (output[1] - rpt[1]) * w_rim;
+									rimp[2] = (output[2] - rpt[2]) * w_rim;
+
+									rimn[0] = 0;
+									rimn[1] = 0;
+									rimn[2] = 1;
+
+									if( testp[2] < output[2] )
+										rimn[2] = -1; 
+								}
+							}	
+						}
+
+					}			
+			
 		
 					if( regions_for_face[fout] == r )
 					{
@@ -846,45 +1034,24 @@ void surface::createAllAtom( parameterBlock *block )
 							double transp_u = main_u_cen;
 							double transp_v = main_v_cen;
 							
-						
-							if( !strcasecmp( cur_segname, "SEG165") && cur_res == 4 && !strcasecmp( at[xa].atname, "C21" ) )
-							{ 
-								printf("target C21 f: %d u: %lf v: %lf use_r: %lf %lf %lf\n",
-										main_f_eval, transp_u, transp_v, use_r[0], use_r[1], use_r[2] );
-								debug_on = 1;
-	/*							int nbins = 10000;
-	
-								double cstart[3] = { use_r[0], use_r[1], use_r[2] };
-								double cstop[3] = { -7.721910, 3.841090, -13.352065 };
-								for( int b = 0; b < nbins; b++ )
-								{
-									if( b == 2807 )
-									{
-										printf("debug here.\n");
-									}
-									double ceval[3] = { 	
-									cstart[0] + (cstop[0]-cstart[0])*(b+0.5)/(double)nbins,
-									cstart[1] + (cstop[1]-cstart[1])*(b+0.5)/(double)nbins,
-									cstart[2] + (cstop[2]-cstart[2])*(b+0.5)/(double)nbins };
-									
-									double t_transp_u = main_u_cen;
-									double t_transp_v = main_v_cen;
-									double teval[3];
-									evaluate_at( teval, ceval, main_f_eval, &t_transp_u, &t_transp_v, rsurf, leaflet[l] );
-									printf("%d %lf %lf %lf to %lf %lf %lf\n", b, ceval[0],ceval[1],ceval[2], teval[0], teval[1], teval[2] );
-								}
-								exit(1);
-	*/
-							}
-							if( at[xa].atname[0] == 'P' )
-								debug_on = 1;
-							evaluate_at( eval, use_r, main_f_eval, &transp_u, &transp_v, rsurf, leaflet[l], -strain[x_leaflet] );
+							if( !strcasecmp( cur_segname, "OUT41") && cur_res == 35 )	
+							{
+								printf("35\n");
+							}		
+							if( !strcasecmp( cur_segname, "OUT41") && cur_res == 36 )	
+							{
+								printf("36\n");
+							}		
+					
+#ifdef METHOD_ONE
+							evaluate_at( eval, use_r, main_f_eval, &transp_u, &transp_v, rsurf, leaflet[l], -strain[x_leaflet],NULL, NULL, w_use, w_rim, rimp, rimn );
+#else
+							double m1_r[3] = { use_r[0] - source_r[0], use_r[1] - source_r[1], use_r[2] };
+							double local_u = spot_u, local_v = spot_v;
+							evaluate_at( eval, m1_r, fout, &local_u, &local_v, rsurf, leaflet[l], -strain[x_leaflet],dx_uv, dy_uv, w_use, w_rim, rimp, rimn );
+
+#endif
 							debug_on = 0;
-	
-							if( !strcasecmp( cur_segname, "SEG165") && cur_res == 4 && !strcasecmp( at[xa].atname, "C21" ) ) 
-								printf("eval: %lf %lf %lf\n", eval[0], eval[1], eval[2] );
-							if( !strcasecmp( cur_segname, "SEG165") && cur_res == 4 && !strcasecmp( at[xa].atname, "O21" ) ) 
-								printf("eval: %lf %lf %lf\n", eval[0], eval[1], eval[2] );
 					
 							at[xa].x = eval[0];
 							at[xa].y = eval[1];
@@ -955,7 +1122,7 @@ void surface::createAllAtom( parameterBlock *block )
 							at[xa].z = zsave;
 		
 							cur_atom++;
-							total_lipid_charge += at[xa].charge;
+							total_lipid_charge[x_leaflet] += at[xa].charge;
 						}
 					
 						cur_res++;
@@ -1017,6 +1184,251 @@ void surface::createAllAtom( parameterBlock *block )
 				}
 			}
 			
+			if( nrim > 0 )
+			{
+				int alt_leaflet = 2;
+
+				int *leaflet = master_leaflet[alt_leaflet];
+				double *lipid_xyz = master_lipid_xyz[alt_leaflet];
+				struct atom_rec *at = master_at[alt_leaflet];
+				int *lipid_stop = master_lipid_stop[alt_leaflet];
+				int *lipid_start = master_lipid_start[alt_leaflet];
+				int nlipids = master_nlipids[alt_leaflet];
+				double Lx = master_Lx[alt_leaflet];
+				double Ly = master_Ly[alt_leaflet];
+				double Lz = master_Lz[alt_leaflet];
+
+				alpha = alpha_inside;
+				// put bilayer into the rim region.
+				
+				int l_cen = rand() % nlipids;
+	
+				while( leaflet[l_cen] != (x_leaflet ? 1 : -1 ) )
+					l_cen = rand() % nlipids; 
+				
+				double upper_cen[3] = { lipid_xyz[3*l_cen+0], lipid_xyz[3*l_cen+1], lipid_xyz[3*l_cen+2] };
+				
+				for( int ix = -1; ix <= 1; ix++ )
+				for( int iy = -1; iy <= 1; iy++ )
+				{
+					for( int l = 0; l < nlipids; l++ )
+					{
+						if( leaflet[l] != leaflet[l_cen] ) continue;
+	
+					// map the r coords to u/v
+			
+						double dx = lipid_xyz[3*l+0]-upper_cen[0];
+						double dy = lipid_xyz[3*l+1]-upper_cen[1];
+		
+						double shift[2] = {0,0};
+						while( dx < -Lx/2 ) {dx += Lx; shift[0] += Lx; }
+						while( dx >  Lx/2 ) {dx -= Lx; shift[0] -= Lx; }
+						while( dy < -Ly/2 ) {dy += Ly; shift[1] += Ly; }
+						while( dy >  Ly/2 ) {dy -= Ly; shift[1] -= Ly; }
+				
+						double use_r[3] = { alpha * dx + ix * Lx, alpha * dy + iy * Ly, lipid_xyz[3*l+2] };
+				
+						double ur = sqrt(use_r[0]*use_r[0]+use_r[1]*use_r[1]+use_r[2]*use_r[2]);
+
+						if( ur < rim_extent - PP * 0.5 )
+						{
+							// print it out
+						
+							double wrap_to[3] = { 0,0,0};
+						
+							if( !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) || cur_res > 50 || switched )
+							{	
+								// ALWAYS terminate the current segment, regardless.
+								
+								if( cur_size > 0 )
+								{
+									fprintf(charmmFile, 
+									"\n"
+									"open read card unit 10 name \"%s\"\n"
+									"read sequence coor card unit 10\n"
+									"generate %s setup warn first none last none\n"
+									"open read unit 10 card name \"%s\"\n"
+									"read coor unit 10 card resid\n"						
+									"\n"
+									"open write unit 10 card name \"%s.psf\"\n"
+									"write psf  unit 10 card\n"
+									"delete atom sele atom * * * end\n"
+									, cur_filename, cur_segname, cur_filename, cur_segname );
+		
+									FILE *crdFile = fopen( cur_filename, "w");
+									printCRDHeader( crdFile, cur_natoms );
+									fprintf(crdFile, "%s", cur_segment );
+									fclose(crdFile);
+		
+									if( npairs == npair_space )
+									{
+										npair_space *= 2;
+		
+										pairs = (crd_psf_pair *)realloc( pairs, sizeof(crd_psf_pair) * npair_space );
+									}
+		
+									strcpy( pairs[npairs].CRDfileName, cur_filename );
+									char psf_file[256];
+									sprintf(psf_file, "%s.psf", cur_segname );
+									strcpy( pairs[npairs].PSFfileName, psf_file ); 
+		
+									npairs++;
+								
+									seg_cntr++;		
+								}					
+									
+								sprintf(cur_filename, "segment_%s%d.crd", out_in[x_leaflet], seg_cntr );
+								sprintf(cur_segname, "%s%d", out_in[x_leaflet], seg_cntr ); 
+							
+								cur_size = 0;
+								cur_natoms = 0;
+								cur_segment[0] = '\0';
+								cur_atom = 1;
+								cur_res  = 1;
+								switched=0;
+							}
+						
+							int pres = at[lipid_start[l]].res;
+							for( int xa = lipid_start[l]; xa <= lipid_stop[l]; xa++ )
+							{
+								if( at[xa].res != pres )
+									cur_res++; 
+								pres = at[xa].res;
+		
+								double xsave = at[xa].x;
+								double ysave = at[xa].y;
+								double zsave = at[xa].z;
+								int at_save = at[xa].bead;
+								int res_save = at[xa].res;
+			
+								double use_r[3] = { dx, dy, zsave };
+		
+								at[xa].x = dx + xsave - lipid_xyz[3*l+0];
+								at[xa].y = dy + ysave - lipid_xyz[3*l+1];
+							
+								at[xa].x += rim_center[0];
+								at[xa].y += rim_center[1];
+								at[xa].z += rim_center[2];
+
+								if( xa > lipid_start[l] )
+								{
+									double dr[3] = { at[xa].x - wrap_to[0], at[xa].y - wrap_to[1], at[xa].z - wrap_to[2] };
+									wrapPBC( dr, rsurf+3*nv );
+			
+									at[xa].x = wrap_to[0] + dr[0];
+									at[xa].y = wrap_to[1] + dr[1];
+									at[xa].z = wrap_to[2] + dr[2];
+								}
+								else
+								{
+									wrap_to[0] = at[xa].x;
+									wrap_to[1] = at[xa].y;
+									wrap_to[2] = at[xa].z;
+								}	
+			
+								at[xa].bead = cur_atom;
+								at[xa].res  = cur_res;
+								at[xa].segRes = cur_res;
+		
+								char temp_segid[256];
+								sprintf(temp_segid, "MEMB");
+								char *tmp = at[xa].segid;
+								at[xa].segid = cur_segname;
+			
+								if( cur_size + 1024 > cur_space )
+								{	
+									cur_space += 1024;
+									cur_segment = (char *)realloc( cur_segment, sizeof(char) * cur_space );
+								}
+		
+								printSingleCRD( cur_segment+cur_size, at+xa );
+	
+								cur_size += strlen(cur_segment+cur_size);
+	
+								if( nplaced == nplacedSpace )
+								{
+									nplacedSpace *= 2;
+									placed_atoms = (double *)realloc( placed_atoms, sizeof(double)*3*nplacedSpace );
+								}
+	
+								placed_atoms[3*nplaced+0] = at[xa].x;
+								placed_atoms[3*nplaced+1] = at[xa].y;
+								placed_atoms[3*nplaced+2] = at[xa].z;
+								nplaced++;
+	
+								cur_natoms++;
+		//						printSingleCRD( tempFile, at+xa ); 
+								at[xa].segid = tmp;
+								at[xa].bead = at_save;
+								at[xa].res = res_save;
+			
+								at[xa].x = xsave;
+								at[xa].y = ysave;
+								at[xa].z = zsave;
+			
+								cur_atom++;
+								total_lipid_charge[inner_leaflet] += at[xa].charge;
+							}
+						
+							cur_res++;
+						
+							if( !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) )
+							{
+								fprintf(charmmFile, 
+								"\n"
+								"open read card unit 10 name \"%s\"\n"
+								"read sequence coor card unit 10\n"
+								"generate %s setup warn first none last none\n"
+								"open read unit 10 card name \"%s\"\n"
+								"read coor unit 10 card resid\n"						
+								"\n", cur_filename, cur_segname, cur_filename );
+		
+								fprintf(charmmFile, "patch CERB %s %d %s %d setup warn\n", cur_segname, 2, cur_segname, 1 );
+								fprintf(charmmFile, "patch 14BB %s %d %s %d setup warn\n",  cur_segname,2,  cur_segname,3 );
+								fprintf(charmmFile, "patch 14BA %s %d %s %d setup warn\n",  cur_segname,3,  cur_segname,4 );
+								fprintf(charmmFile, "patch 13BB %s %d %s %d setup warn\n",  cur_segname,4,  cur_segname,5 );
+								fprintf(charmmFile, "patch SA23AB %s %d %s %d setup warn\n",  cur_segname,3,  cur_segname,6 );
+		
+								fprintf(charmmFile, 
+								"open write unit 10 card name \"%s.psf\"\n"
+								"write psf  unit 10 card\n"
+								"delete atom sele atom * * * end\n"
+								, cur_segname );
+								
+								FILE *crdFile = fopen( cur_filename, "w");
+								printCRDHeader( crdFile, cur_natoms );
+								fprintf(crdFile, "%s", cur_segment );
+								fclose(crdFile);
+								
+		
+								if( npairs == npair_space )
+								{
+									npair_space *= 2;
+		
+									pairs = (crd_psf_pair *)realloc( pairs, sizeof(crd_psf_pair) * npair_space );
+								}
+		
+								strcpy( pairs[npairs].CRDfileName, cur_filename );
+								char psf_file[256];
+								sprintf(psf_file, "%s.psf", cur_segname );
+								strcpy( pairs[npairs].PSFfileName, psf_file ); 
+		
+								npairs++;
+								cur_natoms = 0;
+								cur_size = 0;
+								cur_segment[0] = '\0';	
+								cur_atom = 1;
+								cur_res  = 1;
+								seg_cntr++;		
+									
+								sprintf(cur_filename, "segment_%s%d.crd", out_in[x_leaflet], seg_cntr );
+								sprintf(cur_segname, "%s%d", out_in[x_leaflet], seg_cntr ); 
+							}	
+						}
+					}	
+				}
+			}
+
 			switched = 1;
 		}
 
@@ -1160,8 +1572,8 @@ void surface::createAllAtom( parameterBlock *block )
 	char waterFileName[256];
 	char waterPSFName[256];
 	int water_atom = 1;
-	int nK = 0;
-	int nCl = 0;
+	int nK[2] = {0,0};
+	int nCl[2] = {0,0};
 	if( nsolvate > 0 )
 	{
 		// we need to loop over a sufficient number of solvent periodic boxes to cover the main PBC cell.
@@ -1405,140 +1817,164 @@ void surface::createAllAtom( parameterBlock *block )
 		free(solvent_res_size);
 	}
 
-	total_charge = total_protein_charge + total_lipid_charge;
+	total_charge = total_protein_charge + total_lipid_charge[0] + total_lipid_charge[1];
 
 	int wrote_salt = 0;
 
 	if( block->addSalt )
 	{	
-		printf("Total charge: %lf, %lf protein %lf lipid.\n", total_charge, total_protein_charge, total_lipid_charge );
+		printf("Total charge: %lf, %lf protein %lf lipid (inner) %lf lipid (outer).\n", total_charge, total_protein_charge, total_lipid_charge[0], total_lipid_charge[1] );
 		// exterior and interior concentrations.
 
-#define SALT_HACK
-
-#ifdef SALT_HACK
-		printf("BUILDING WITHOUT SALT IN THE INTERIOR: a total hack for the Frost project. Remove before release.\n");
-#endif
 		double nwaters = (water_atom/3); 
 		double water_vol_A3 = nwaters * 29; // cubic angstroms.
 		double water_vol_L = water_vol_A3 * (1e-27);
 	
-		// mMole:
-		double nKCl_mMole = block->outerKCL * water_vol_L; 
-		double nKCl = nKCl_mMole * (6.022e20); // atoms per millimole.
+		double water_vol[2]  = { 
+			water_vol_L * (rel_vol[0] /(rel_vol[0]+rel_vol[1])),
+			water_vol_L * (rel_vol[1] /(rel_vol[0]+rel_vol[1])) };
 
-		nK = nKCl;
-		nCl = nKCl;
+		double conc[2] = { block->innerKCL, block->outerKCL };
 
-		if( total_charge < 0 )
-			nK += lround(fabs(total_charge));
-		else
-			nCl += lround(fabs(total_charge));
+		double total_charge[2] = { total_lipid_charge[0], total_lipid_charge[1] + total_protein_charge };
 
-		printf("Adding %d K %d Cl.\n", nK, nCl);
-
-
+		for( int leaflet = 0; leaflet < 2; leaflet++ )
+		{
+			// mMole:
+			double nKCl_mMole = conc[leaflet] * water_vol[leaflet]; 
+			double nKCl = nKCl_mMole * (6.022e20); // atoms per millimole.
+		
+			nK[leaflet] = nKCl;
+			nCl[leaflet] = nKCl;
+		
+			if( total_charge[leaflet] < 0 )
+				nK[leaflet] += lround(fabs(total_charge[leaflet]));
+			else
+				nCl[leaflet] += lround(fabs(total_charge[leaflet]));
+		
+			printf("Adding %d K %d Cl to the %s region.\n", nK[leaflet], nCl[leaflet], (leaflet == 0 ? "inner" : "outer") );
+		}
 		for( int pass = 0; pass < 2; pass++ )
 		{
 			int res = 1;	
 			if( pass == 0 )
 			{
-				if( nK > 0 )
+				if( nK[0] + nK[1] > 0 )
 				{
-					fprintf(charmmFile, "read sequence POT %d\n", nK );
+					fprintf(charmmFile, "read sequence POT %d\n", nK[0] + nK[1] );
 					fprintf(charmmFile, "generate POT warn\n" );
 				}
 			}
 			else
 			{
-				if( nCl > 0 )
+				if( nCl[0] + nCl[1] > 0 )
 				{
-					fprintf(charmmFile, "read sequence CLA %d\n", nCl );
+					fprintf(charmmFile, "read sequence CLA %d\n", nCl[0] + nCl[1] );
 					fprintf(charmmFile, "generate CLA warn\n" );
 				}
 			}
-			for( int tk = 0; tk < (pass == 0 ? nK : nCl); tk++ )
+			for( int leaflet = 0; leaflet < 2; leaflet++ )
 			{
-				int done = 0;
-	
-				double rp[3];
-	
-				while(!done)
+				for( int tk = 0; tk < (pass == 0 ? nK[leaflet] : nCl[leaflet]); tk++ )
 				{
-					rp[0] = -PBC_vec[0][0]/2 + PBC_vec[0][0] * rand()/(double)RAND_MAX;
-					rp[1] = -PBC_vec[1][1]/2 + PBC_vec[1][1] * rand()/(double)RAND_MAX;
-					rp[2] = -PBC_vec[2][2]/2 + PBC_vec[2][2] * rand()/(double)RAND_MAX; 
-					int bx = rp[0] * nx / PBC_vec[0][0];
-					int by = rp[1] * ny / PBC_vec[1][1];
-					int bz = rp[2] * nz / PBC_vec[2][2];
-				
-					if( bx >= nx ) bx -= nx;
-					if( bx < 0 ) bx += nx;
-					if( by >= ny ) by -= ny;
-					if( by < 0 ) by += ny;
-					if( bz >= nz ) bz -= nz;
-					if( bz < 0 ) bz += nz;
+					int done = 0;
 		
-					int b = bx*ny*nz+by*nz+bz;
-					int bad_res = 0;
-
-#ifdef SALT_HACK
-					double rxy = sqrt(rp[0]*rp[0]+rp[1]*rp[1]);
-					if( rxy < 50. )
-						continue;
-#endif			
-					for( int dx = -1; dx <= 1; dx++ )
-					for( int dy = -1; dy <= 1; dy++ )
-					for( int dz = -1; dz <= 1; dz++ )
+					double rp[3];
+		
+					while(!done)
 					{
-						int n_b_x = bx + dx;
-						int n_b_y = by + dy;
-						int n_b_z = bz + dz;
+						rp[0] = -PBC_vec[0][0]/2 + PBC_vec[0][0] * rand()/(double)RAND_MAX;
+						rp[1] = -PBC_vec[1][1]/2 + PBC_vec[1][1] * rand()/(double)RAND_MAX;
+						rp[2] = -PBC_vec[2][2]/2 + PBC_vec[2][2] * rand()/(double)RAND_MAX; 
+						int bx = rp[0] * nx / PBC_vec[0][0];
+						int by = rp[1] * ny / PBC_vec[1][1];
+						int bz = rp[2] * nz / PBC_vec[2][2];
 					
-						if( n_b_x >= nx ) n_b_x -= nx;
-						if( n_b_x < 0 ) n_b_x += nx;
-						if( n_b_y >= ny ) n_b_y -= ny;
-						if( n_b_y < 0 ) n_b_y += ny;
-						if( n_b_z >= nz ) n_b_z -= nz;
-						if( n_b_z < 0 ) n_b_z += nz;
-	
-						int nb = n_b_x*ny*nz+n_b_y*nz+n_b_z;
-	
-	
-						for( int px = 0; px < theBoxes[nb].np; px++ )
-						{
-							int p = theBoxes[nb].plist[px];
-							double dr[3] = { 
-								placed_atoms[3*p+0] - rp[0], 
-								placed_atoms[3*p+1] - rp[1],
-								placed_atoms[3*p+2] - rp[2] };
-							while( dr[0] < -PBC_vec[0][0]/2 ) dr[0] += PBC_vec[0][0]; 
-							while( dr[1] < -PBC_vec[1][1]/2 ) dr[1] += PBC_vec[1][1]; 
-							while( dr[2] < -PBC_vec[2][2]/2 ) dr[2] += PBC_vec[2][2]; 
-							while( dr[0] >  PBC_vec[0][0]/2 ) dr[0] -= PBC_vec[0][0]; 
-							while( dr[1] >  PBC_vec[1][1]/2 ) dr[1] -= PBC_vec[1][1]; 
-							while( dr[2] >  PBC_vec[2][2]/2 ) dr[2] -= PBC_vec[2][2];
-	
-							double dist = normalize(dr);
-	
-							if( dist < solvation_cutoff )
-								bad_res = 1; 
-						}
-						if( bad_res ) break;
-					}
-	
-					if( !bad_res )
-						done = 1;
-				}
+						if( bx >= nx ) bx -= nx;
+						if( bx < 0 ) bx += nx;
+						if( by >= ny ) by -= ny;
+						if( by < 0 ) by += ny;
+						if( bz >= nz ) bz -= nz;
+						if( bz < 0 ) bz += nz;
 			
-				fprintf(charmmFile, "coor set xdir %lf ydir %lf zdir %lf select resid %d end\n",
-					rp[0], rp[1], rp[2], res );
-				res++;
-			}
+						int b = bx*ny*nz+by*nz+bz;
+						int bad_res = 0;
 	
+						for( int dx = -1; dx <= 1; dx++ )
+						for( int dy = -1; dy <= 1; dy++ )
+						for( int dz = -1; dz <= 1; dz++ )
+						{
+							int n_b_x = bx + dx;
+							int n_b_y = by + dy;
+							int n_b_z = bz + dz;
+						
+							if( n_b_x >= nx ) n_b_x -= nx;
+							if( n_b_x < 0 ) n_b_x += nx;
+							if( n_b_y >= ny ) n_b_y -= ny;
+							if( n_b_y < 0 ) n_b_y += ny;
+							if( n_b_z >= nz ) n_b_z -= nz;
+							if( n_b_z < 0 ) n_b_z += nz;
+		
+							int nb = n_b_x*ny*nz+n_b_y*nz+n_b_z;
+		
+		
+							for( int px = 0; px < theBoxes[nb].np; px++ )
+							{
+								int p = theBoxes[nb].plist[px];
+								double dr[3] = { 
+									placed_atoms[3*p+0] - rp[0], 
+									placed_atoms[3*p+1] - rp[1],
+									placed_atoms[3*p+2] - rp[2] };
+								while( dr[0] < -PBC_vec[0][0]/2 ) dr[0] += PBC_vec[0][0]; 
+								while( dr[1] < -PBC_vec[1][1]/2 ) dr[1] += PBC_vec[1][1]; 
+								while( dr[2] < -PBC_vec[2][2]/2 ) dr[2] += PBC_vec[2][2]; 
+								while( dr[0] >  PBC_vec[0][0]/2 ) dr[0] -= PBC_vec[0][0]; 
+								while( dr[1] >  PBC_vec[1][1]/2 ) dr[1] -= PBC_vec[1][1]; 
+								while( dr[2] >  PBC_vec[2][2]/2 ) dr[2] -= PBC_vec[2][2];
+		
+								double dist = normalize(dr);
+		
+								if( dist < ion_cutoff)
+									bad_res = 1; 
+							}
+							if( bad_res ) break;
+						}
+		
+						if( !bad_res )
+						{
+							// is the point inside or outside?
+
+							int f;
+							double u, v;
+							double distance;
+				
+							nearPointOnBoxedSurface( rp, &f, &u, &v, M, mlow, mhigh, &distance, 0 );	
+							double nearp[3], nearn[3];
+				                	evaluateRNRM( f, u, v, nearp, nearn, rsurf );
+				
+							double dr[3] = { rp[0] - nearp[0], rp[1] - nearp[1], rp[2] - nearp[2] };
+							wrapPBC( dr, rsurf+3*nv );
+					
+							int io = dr[0] * nearn[0] + dr[1] * nearn[1] + dr[2] * nearn[2];
+				
+							if( io > 0 && leaflet == 0 )
+								done = 0;
+							else if( io < 0 && leaflet == 1 )
+								done = 0;
+							else	
+								done = 1;
+						}
+					}
+				
+					fprintf(charmmFile, "coor set xdir %lf ydir %lf zdir %lf select resid %d end\n",
+						rp[0], rp[1], rp[2], res );
+					res++;
+				}
+			}
+			
 			if( pass == 0 )
 			{
-				if( nK > 0 )
+				if( nK[0] + nK[1] > 0 )
 				{
 					fprintf(charmmFile, "write psf card name pot.psf\n");
 					fprintf(charmmFile, "write coor card name pot.crd\n");
@@ -1547,7 +1983,7 @@ void surface::createAllAtom( parameterBlock *block )
 			}	
 			else
 			{
-				if( nCl > 0 )
+				if( nCl[0] + nCl[1] > 0 )
 				{
 					fprintf(charmmFile, "write psf card name cla.psf\n");
 					fprintf(charmmFile, "write coor card name cla.crd\n");
@@ -1605,7 +2041,7 @@ void surface::createAllAtom( parameterBlock *block )
 
 	if( wrote_salt )
 	{
-		if( nK>0)
+		if( nK[0] + nK[1] >0)
 		{
 			fprintf(charmmFile, "open unit 10 card read name pot.psf\n");
 			fprintf(charmmFile, "read psf card append unit 10\n" );	
@@ -1616,7 +2052,7 @@ void surface::createAllAtom( parameterBlock *block )
 			fprintf(charmmFile, "\n");	
 		}
 
-		if( nCl > 0 )
+		if( nCl[0] + nCl[1] > 0 )
 		{
 			fprintf(charmmFile, "open unit 10 card read name cla.psf\n");
 			fprintf(charmmFile, "read psf card append unit 10\n" );	
@@ -1637,10 +2073,242 @@ void surface::createAllAtom( parameterBlock *block )
 	for( int b = 0; b < nx*ny*nz; b++ )
 		free(theBoxes[b].plist);
 	free(theBoxes);
+		
+	free(M5);
+	free(M6);
+	free(M7);
+}
+
+// getCoordinateSystem
+// 
+// We need to have a coordinate system that is transported smoothly from one central location
+// We also want to have a robust representation of a lipid far from that location
+// These are somewhat incompatible on a complicated surface: the coordinate system becomes non-orthogonal and may have a very different metric.
+// This function gets x and y from the principal curvatures at one face
+// it smoothly transports the x coordinate onto the new point
+// y is then determined by orthogonality with the normal
+// this determines the xyz coordinate system mapping at the distance point where the lipid can be reconstructed.
+int surface::getCoordinateSystem( int source_f,   double *source_u,  double *source_v, 
+//				  int distance_f, double distant_u, double distant_v, 
+				  double dr[3], double strain, int leaflet,
+				  double *dx_duv, double *dy_duv, double *rsurf )
+{
+	double drdu[3]={0,0,0}, drdv[3]={0,0,0};	
+	double u_cen = *source_u;
+	double v_cen = *source_v;
+
+	double transp_cen[3]={0,0,0}, transp_nrm[3]={0,0,1};
+
+	if( source_f >= nf_faces )	
+	{
+//		printf("Using irregular vertex.\n");
+	}
+
+	evaluateRNRM( source_f, u_cen, v_cen, transp_cen, transp_nrm, rsurf ); 
+
+	ru( source_f, u_cen, v_cen,  rsurf, drdu ); 
+	rv( source_f, u_cen, v_cen,  rsurf, drdv ); 
+
+	double lru = sqrt(drdu[0]*drdu[0]+drdu[1]*drdu[1]+drdu[2]*drdu[2]);
+	double lrv = sqrt(drdv[0]*drdv[0]+drdv[1]*drdv[1]+drdv[2]*drdv[2]);
+	
+	double dp = (drdu[0]*drdv[0] + drdu[1]*drdv[1] + drdu[2]*drdv[2]);
+	
+	// drdu and o_drdv are orthonormal unit vectors.
+	// they are paired with coordinates up and vp.
+	
+	double o_drdu[3] = { drdu[0] / lru, drdu[1] / lru, drdu[2] / lru };
+	double o_drdv[3] = { drdv[0] / lrv - o_drdu[0]*dp/lru/lrv, 
+		             drdv[1] / lrv - o_drdu[1]*dp/lru/lrv, 
+		             drdv[2] / lrv - o_drdu[2]*dp/lru/lrv };
+	double lscale = normalize(o_drdv);
+
+	// solve u drdu + v drdv == up o_drdu + vp o_drdv in general:
+	
+	double tr_22 = (o_drdv[0] * o_drdv[0] + o_drdv[1] * o_drdv[1] + o_drdv[2] * o_drdv[2])/(o_drdv[0] * drdv[0] + o_drdv[1] * drdv[1] + o_drdv[2] * drdv[2]);
+	
+	// this is the transform from up,vp to u, v.
+	
+	double transform[4] = { 
+		1 / (lru),	-tr_22 * dp/(lru*lru),
+		0,		tr_22 
+	};
+	
+	// get curvature information
+
+	double c1=0, c2=0;
+	double cvec1[2], cvec2[2];
+
+	double ctot = c(source_f,u_cen,v_cen,rsurf,cvec1,cvec2,&c1,&c2);
+
+	// use the cvec1 and cvec2 as the x/y coordinate system.
+
+	double vec_c1[3] = { cvec1[0] * drdu[0] + cvec1[1] * drdv[0],
+			     cvec1[0] * drdu[1] + cvec1[1] * drdv[1],
+			     cvec1[0] * drdu[2] + cvec1[1] * drdv[2] };
+	double vec_c2[3] = { cvec2[0] * drdu[0] + cvec2[1] * drdv[0],
+			     cvec2[0] * drdu[1] + cvec2[1] * drdv[1],
+			     cvec2[0] * drdu[2] + cvec2[1] * drdv[2] };
+	
+	double vdp  = vec_c1[0] * vec_c2[0] + vec_c1[1] * vec_c2[1] + vec_c1[2] * vec_c2[2];
+	double lv1 = normalize(vec_c1);
+	double lv2 = normalize(vec_c2);
+
+	double crp[3];
+	cross( vec_c1, vec_c2, crp);
+	double dp_sign = crp[0] * transp_nrm[0] + crp[1] * transp_nrm[1] + crp[2] * transp_nrm[2];
+
+	double dx[2] = { cvec1[0], cvec1[1] }; 
+	
+	double dc1 = dr[0] / lv1;
+	double dc2 = dr[1] / lv2;
+	double du=0,dv=0;
+	double z_scaled = dr[2];	
+	
+	double use_PP = exp(strain)*PP;
+	
+	if( leaflet == 1 )
+	{
+		// these are scalings needed for displacement at the bilayer midplane to get the proper distances at the neutral surface (PP)
+		double scale1 = (1- c1 * (use_PP-dr[2]))/(1+c1*use_PP);
+		double scale2 = (1- c2 * (use_PP-dr[2]))/(1+c2*use_PP);
+
+		// if scale1 is less than 1, it means that the z length has shrunk (the x dimension is larger at the midplane and so the particle's midplane displacement must be scaled down).
+
+		double lat_scale = scale1*scale2;
+
+		dc1 *= scale1;
+		dc2 *= scale2;
+
+		double z =dr[2]*exp(strain);
+		double scale = (1+c1*use_PP) * (1+c2*use_PP);
+		z_scaled = scale * use_PP - (use_PP -z) * (1+(use_PP-z)*c1)*(1+(use_PP-z)*c2);
+	
+		du = cvec1[0] * dc1 + cvec2[0] * dc2; 
+		dv = cvec1[1] * dc1 + cvec2[1] * dc2; 
+	}
+	else
+	{
+		double scale1 = (1+ c1 * (-use_PP-dr[2]))/(1-c1*(-use_PP));
+		double scale2 = (1+ c2 * (-use_PP-dr[2]))/(1-c2*(-use_PP));
+
+		double lat_scale = scale1*scale2;
+		dc1 *= scale1;
+		dc2 *= scale2;
+		//z_scaled = dr[2] * (1+c1*dr[2]) * (1+c2*dr[2]);
+		double z =dr[2]*exp(strain);
+		double scale = (1-c1*use_PP) * (1-c2*use_PP);
+		//z_scaled = -scale * use_PP - (-use_PP -z) * scale1 * scale2;
+		z_scaled = -scale * use_PP - (-use_PP -z) * (1-(-use_PP-z)*c1)*(1-(-use_PP-z)*c2);
+	
+		du = cvec1[0] * dc1 + cvec2[0] * dc2; 
+		dv = cvec1[1] * dc1 + cvec2[1] * dc2; 
+	}
+
+
+	int done = 0;
+
+	int fp = source_f;
+
+	while( ! done )
+	{
+		int f_pre = source_f;
+		double upre = u_cen;
+		double vpre = v_cen;
+		double du_pre = du;
+		double dv_pre = dv;
+
+		int f2 = nextFace( fp, &u_cen, &v_cen, &du, &dv, rsurf, dx );	
+
+		if( f2 == fp ) 
+			done = 1;
+
+		fp = f2;
+	}
+
+	// dx is the smoothly transported x coordinate.
+
+	// the new drdu/drdv
+	ru( fp, u_cen, v_cen,  rsurf, drdu ); 
+	rv( fp, u_cen, v_cen,  rsurf, drdv ); 
+
+	double vec_x[3] = { drdu[0] * dx[0] + drdv[0] * dx[1],
+			    drdu[1] * dx[0] + drdv[1] * dx[1],
+			    drdu[2] * dx[0] + drdv[2] * dx[1] };
+	double lv = normalize(vec_x);
+
+	// dx is now unit system.
+	dx[0] /= lv;
+	dx[1] /= lv;
+
+	double RuRu = drdu[0]*drdu[0]+drdu[1]*drdu[1]+drdu[2]*drdu[2];
+	double RuRv = drdu[0]*drdv[0]+drdu[1]*drdv[1]+drdu[2]*drdv[2];
+	double RvRv = drdv[0]*drdv[0]+drdv[1]*drdv[1]+drdv[2]*drdv[2];
+
+	double xu = dx[0];
+	double xv = dx[1];
+	double yu = 1;
+	double yv = (-RuRu * xu * yu - RuRv * xv * yu) / (RuRv * xu + RvRv * xv);
+	
+	double dy[2] = { yu, yv };
+	double vec_y[3] = { drdu[0] * dy[0] + drdv[0] * dy[1],
+			    drdu[1] * dy[0] + drdv[1] * dy[1],
+			    drdu[2] * dy[0] + drdv[2] * dy[1] };
+	lv = normalize(vec_y);
+
+	dy[0] /= lv;
+	dy[1] /= lv;
+
+	double final_cen[3];
+	double final_nrm[3];
+
+	evaluateRNRM( fp, u_cen, v_cen, final_cen, final_nrm, rsurf ); 
+	
+	double fcrp[3];
+	cross( vec_x, vec_y, fcrp );
+
+	double dp_final = fcrp[0] * final_nrm[0] + fcrp[1] * final_nrm[1] + fcrp[2] * final_nrm[2];
+
+	if( dp_final * dp_sign < 0 )
+	{
+		dy[0] *= -1;
+		dy[1] *= -1;
+	}
+
+	dx_duv[0] = dx[0];
+	dx_duv[1] = dx[1];
+
+	dy_duv[0] = dy[0];
+	dy_duv[1] = dy[1];
+
+	*source_u = u_cen;
+	*source_v = v_cen;
+
+	// vec_x = dx[0] * drdu + dx[1] * drdv
+	// vec_y is perpendicular 
+	return fp;
+	
+
+	// x is now d
+
+/*
+	// this is u-prime and v-prime:	
+
+	double up = dr[0];
+	double vp = dr[1];
+
+	// up uvec = uvec up 
+
+	double du = up * transform[0] + vp * transform[1];
+	double dv = up * transform[2] + vp * transform[3];
+*/
+
+	
 }
 
 
-int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf, int leaflet, double strain)
+
+int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf, int leaflet, double strain, double *dx_duv, double *dy_duv, double w_use, double w_rim, double *rimp, double *rimn)
 {
 	double drdu[3]={0,0,0}, drdv[3]={0,0,0};
 	
@@ -1651,7 +2319,7 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 
 	if( f >= nf_faces )	
 	{
-		printf("Using irregular vertex.\n");
+//		printf("Using irregular vertex.\n");
 	}
 
 	evaluateRNRM( f, u_cen, v_cen, transp_cen, transp_nrm, rsurf ); 
@@ -1707,6 +2375,43 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 	double vdp  = vec_c1[0] * vec_c2[0] + vec_c1[1] * vec_c2[1] + vec_c1[2] * vec_c2[2];
 	double lv1 = normalize(vec_c1);
 	double lv2 = normalize(vec_c2);
+
+	if( dx_duv && dy_duv )
+	{
+		// replace with these vectors.
+	
+		cvec1[0] = dx_duv[0];
+		cvec1[1] = dx_duv[1];
+	
+		cvec2[0] = dy_duv[0];
+		cvec2[1] = dy_duv[1];
+
+		double old_c1 = c1;
+		double old_c2 = c2;
+
+		double new_vec_c1[3] = {  cvec1[0] * drdu[0] + cvec1[1] * drdv[0],
+			   		  cvec1[0] * drdu[1] + cvec1[1] * drdv[1],
+			   		  cvec1[0] * drdu[2] + cvec1[1] * drdv[2] };
+		
+		double new_vec_c2[3] = {  cvec2[0] * drdu[0] + cvec2[1] * drdv[0],
+			   		  cvec2[0] * drdu[1] + cvec2[1] * drdv[1],
+			   		  cvec2[0] * drdu[2] + cvec2[1] * drdv[2] };
+		double dp11 = new_vec_c1[0] * vec_c1[0] + new_vec_c1[1] * vec_c1[1] + new_vec_c1[2] * vec_c1[2];
+		double dp12 = new_vec_c1[0] * vec_c2[0] + new_vec_c1[1] * vec_c2[1] + new_vec_c1[2] * vec_c2[2];
+		double dp21 = new_vec_c2[0] * vec_c1[0] + new_vec_c2[1] * vec_c1[1] + new_vec_c2[2] * vec_c1[2];
+		double dp22 = new_vec_c2[0] * vec_c2[0] + new_vec_c2[1] * vec_c2[1] + new_vec_c2[2] * vec_c2[2];
+
+		double l1n = normalize(new_vec_c1);
+		double l1o = normalize(vec_c1);
+		double l2n = normalize(new_vec_c2);
+		double l2o = normalize(vec_c2);
+
+		c1 = dp11 * old_c1/l1n/l1o + dp12 * old_c2/l1n/l2o;
+		c2 = dp21 * old_c1/l2n/l1o + dp22 * old_c2/l2n/l2o;
+
+		lv1 = l1n;
+		lv2 = l2n;	
+	}
 
 
 /*
@@ -1842,10 +2547,25 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 		printf("eval_z: %lf use_PP: %lf\n", z_scaled, use_PP );
 	}
 
-	eval[0] = rp[0] + np[0] * z_scaled; 
-	eval[1] = rp[1] + np[1] * z_scaled; 
-	eval[2] = rp[2] + np[2] * z_scaled; 
-	
+	if( rimp && w_use < 1.0 )
+	{
+		double usen[3] = { 
+//			np[0] * w_use + rimn[0] * w_rim,
+//			np[1] * w_use + rimn[1] * w_rim,
+//			np[2] * w_use + rimn[2] * w_rim	
+			np[0], np[1], np[2] };
+		normalize(usen);
+		eval[0] = rp[0]+rimp[0] + usen[0] * z_scaled; 
+		eval[1] = rp[1]+rimp[1] + usen[1] * z_scaled; 
+		eval[2] = rp[2]+rimp[2] + usen[2] * z_scaled; 
+	}
+	else
+	{
+		eval[0] = rp[0] + np[0] * z_scaled; 
+		eval[1] = rp[1] + np[1] * z_scaled; 
+		eval[2] = rp[2] + np[2] * z_scaled; 
+	}
+
 	double dr_out[3] = { eval[0] - eval_in[0], eval[1] - eval_in[1], eval[2] - eval_in[2] };
 	double rout = normalize(dr_out);
 	double rin = sqrt(dr[0]*dr[0]+dr[1]*dr[1]);
@@ -1857,6 +2577,334 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 
 	return fp;
 }
+
+
+static surface *rim_min_surface = NULL;
+static double *rim_min_rsurf = NULL;
+static int *rim_min_f = NULL;
+static double *rim_min_uv_start = NULL;
+static int rim_min_npts = 0;
+static double *output_rim_triangles = NULL;
+
+double rim_min_en( double *p )
+{
+	double *rp = (double *)malloc( sizeof(double) * 3 * rim_min_npts );
+
+	for( int i = 0; i < rim_min_npts; i++ )
+	{
+		int f_start = rim_min_f[i];
+		double u_start = rim_min_uv_start[2*i+0];
+		double v_start = rim_min_uv_start[2*i+1];
+		
+		double duv[2] = { p[1+2*i+0], p[1+2*i+1] };
+
+
+		int test_f = f_start;
+		int f2 = f_start;
+
+		do {
+			test_f = f2;
+			f2 = rim_min_surface->nextFace( test_f, &u_start, &v_start, duv, duv+1, rim_min_rsurf );	
+		} while( f2 != test_f );
+
+		double orp[3], np[3];
+		rim_min_surface->evaluateRNRM( f_start, u_start, v_start, orp, np, rim_min_rsurf );
+
+		rp[3*i+0] = orp[0];	
+		rp[3*i+1] = orp[1];	
+		rp[3*i+2] = orp[2];	
+	}
+
+	double chi2 = 0;
+	for( int i = 0; i < rim_min_npts; i++ )
+	{
+		int ip1 = i+1;
+		if( ip1 >= rim_min_npts ) ip1 -= rim_min_npts;
+		double dr[3] = { 
+			rp[3*i+0] - rp[3*ip1+0],
+			rp[3*i+1] - rp[3*ip1+1],
+			rp[3*i+2] - rp[3*ip1+2] };
+
+		chi2 += dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2];
+	}
+
+//#define DEBUG_RIM
+
+	static int cntr=0;
+	static int period = 100;
+
+#ifdef DEBUG_RIM
+	if( cntr % period == 0 )
+	{
+		printf("%d\n", rim_min_npts );
+		printf("rim minimization\n");
+		for( int i = 0; i < rim_min_npts; i++ )
+			printf("O %lf %lf %lf\n", rp[3*i+0], rp[3*i+1], rp[3*i+2] );
+	}
+
+	cntr++;
+#endif
+
+	if( output_rim_triangles )
+	{
+		double com[3] = {0,0,0};
+		for( int i = 0; i < rim_min_npts; i++ )
+		{
+			com[0] += rp[3*i+0];
+			com[1] += rp[3*i+1];
+			com[2] += rp[3*i+2];
+		}
+
+		com[0] /= rim_min_npts;
+		com[1] /= rim_min_npts;
+		com[2] /= rim_min_npts;
+
+				
+		for( int i = 0; i < rim_min_npts; i++ )
+		{
+			int ip1 = i+1;
+			if( ip1 >= rim_min_npts )
+				ip1 -= rim_min_npts;
+
+			output_rim_triangles[3*3*i+0] = rp[3*i+0];
+			output_rim_triangles[3*3*i+1] = rp[3*i+1];
+			output_rim_triangles[3*3*i+2] = rp[3*i+2];
+			
+			output_rim_triangles[3*3*i+3] = rp[3*ip1+0];
+			output_rim_triangles[3*3*i+4] = rp[3*ip1+1];
+			output_rim_triangles[3*3*i+5] = rp[3*ip1+2];
+			
+			output_rim_triangles[3*3*i+6] = com[0];
+			output_rim_triangles[3*3*i+7] = com[1];
+			output_rim_triangles[3*3*i+8] = com[2];
+
+		}
+	}	
+
+	free(rp);
+
+	return chi2;
+}
+
+
+void generateRimRing( surface *theSurface, double *rsurf, double **rim_triangles, int *ntri)
+{
+	rim_min_surface = theSurface;
+	rim_min_rsurf = rsurf;
+
+	double cur_u = 1.0/3.0, cur_v=1.0/3.0;
+	int cur_f = 0;
+
+	double close_zero = 1e10;
+
+	for( int tp = 0; tp < 100; tp++ )
+	{
+		int f = rand() % theSurface->nf_faces;
+
+		double rp[3],np[3];
+
+		theSurface->evaluateRNRM( f, cur_u, cur_v, rp, np, rsurf );
+
+		double rc = normalize(rp);
+		if( rc < close_zero )
+		{
+			cur_f = f;
+			close_zero = rc;
+		}
+	}
+
+	double hop_mag = 0.4;
+
+	double best_dp = 1e10;
+
+	for( int mc = 0; mc < 10000; mc++ )
+	{
+		double test_u = cur_u ;
+		double test_v = cur_v ;
+		double duv[2] = { hop_mag * 2 * (rand()/RAND_MAX-0.5), hop_mag * 2 * (rand()/RAND_MAX-0.5) };
+		int test_f = cur_f, f2 = cur_f;
+
+		do {
+			test_f = f2;
+			f2 = theSurface->nextFace( test_f, &test_u, &test_v, duv, duv+1, rsurf );	
+		} while( f2 != test_f );
+		
+		double c1=0, c2=0;
+		double cvec1[2], cvec2[2];
+	
+		double ctot = theSurface->c(test_f,test_u, test_v,rsurf,cvec1,cvec2,&c1,&c2);
+
+		double drdu[3], drdv[3];
+		theSurface->ru( test_f, test_u, test_v,  rsurf, drdu ); 
+		theSurface->rv( test_f, test_u, test_v,  rsurf, drdv ); 
+	
+		// use the cvec1 and cvec2 as the x/y coordinate system.
+	
+		double vec_c1[3] = { cvec1[0] * drdu[0] + cvec1[1] * drdv[0],
+				     cvec1[0] * drdu[1] + cvec1[1] * drdv[1],
+				     cvec1[0] * drdu[2] + cvec1[1] * drdv[2] };
+		double vec_c2[3] = { cvec2[0] * drdu[0] + cvec2[1] * drdv[0],
+				     cvec2[0] * drdu[1] + cvec2[1] * drdv[1],
+				     cvec2[0] * drdu[2] + cvec2[1] * drdv[2] };
+		
+		double vdp  = vec_c1[0] * vec_c2[0] + vec_c1[1] * vec_c2[1] + vec_c1[2] * vec_c2[2];
+		double lv1 = normalize(vec_c1);
+		double lv2 = normalize(vec_c2);
+	
+		// we want the direction to be perpendicular to z.
+		
+		if( fabs(vec_c1[2]) < best_dp || fabs(vec_c2[2]) < best_dp )
+		{
+			best_dp = fabs(vec_c1[2]);
+			if( fabs(vec_c2[2]) < best_dp )
+				best_dp = fabs(vec_c2[2]);
+
+			printf("Accepting!\n");
+
+			// accept
+		
+			cur_u = test_u;
+			cur_v = test_v;
+			cur_f = test_f;
+		}	
+	}
+
+	double drdu[3]={0,0,0}, drdv[3]={0,0,0};
+	theSurface->ru( cur_f, cur_u, cur_v,   rsurf, drdu ); 
+	theSurface->rv( cur_f, cur_u, cur_v,   rsurf, drdv ); 
+	
+	double rp[3],np[3];
+	theSurface->evaluateRNRM( cur_f, cur_u, cur_v, rp, np, rsurf ); 
+	
+	double r = sqrt(rp[0]*rp[0]+rp[1]*rp[1]);
+	double c1=0, c2=0;
+	double cvec1[2], cvec2[2];
+	
+	double ctot = theSurface->c( cur_f, cur_u, cur_v, rsurf,cvec1,cvec2,&c1,&c2);
+
+	// now cast out!
+
+	int nsprings = 20;
+	double circumf = 2*M_PI * r;
+	double lspring = circumf / nsprings;
+
+	double vec_c1[3] = { cvec1[0] * drdu[0] + cvec1[1] * drdv[0],
+			     cvec1[0] * drdu[1] + cvec1[1] * drdv[1],
+			     cvec1[0] * drdu[2] + cvec1[1] * drdv[2] };
+	double vec_c2[3] = { cvec2[0] * drdu[0] + cvec2[1] * drdv[0],
+			     cvec2[0] * drdu[1] + cvec2[1] * drdv[1],
+			     cvec2[0] * drdu[2] + cvec2[1] * drdv[2] };
+	
+	double vdp  = vec_c1[0] * vec_c2[0] + vec_c1[1] * vec_c2[1] + vec_c1[2] * vec_c2[2];
+	double lv1 = normalize(vec_c1);
+	double lv2 = normalize(vec_c2);
+
+	double du,dv;
+
+	if( fabs(vec_c1[2]) < fabs(vec_c2[2]) )
+	{
+		du = cvec1[0];
+		dv = cvec1[1];
+
+		du *= lspring / lv1; 
+		dv *= lspring / lv1; 
+	}
+	else
+	{
+		du = cvec2[0];
+		dv = cvec2[1];
+
+		du *= lspring / lv2; 
+		dv *= lspring / lv2; 
+	}
+
+	rim_min_f = (int *)malloc( sizeof(int) * nsprings );
+	rim_min_uv_start = (double *)malloc( sizeof(double) * 2 * nsprings );
+
+	for( int i = 0; i < nsprings/2; i++ )
+	{
+		double test_u = cur_u;
+		double test_v = cur_v;
+		double duv[2] = { du * i, dv * i};
+		int test_f = cur_f, f2 = cur_f;
+
+		do {
+			test_f = f2;
+			f2 = theSurface->nextFace( test_f, &test_u, &test_v, duv, duv+1, rsurf );	
+		} while( f2 != test_f );
+		
+		double rprint[3],np[3];
+		theSurface->evaluateRNRM( test_f,test_u,test_v, rprint, np, rsurf ); 
+	
+		rim_min_f[i] = test_f;
+		rim_min_uv_start[2*i+0] = test_u;
+		rim_min_uv_start[2*i+1] = test_v;
+	}
+	
+	for( int i = nsprings/2; i < nsprings; i++ )
+	{
+		double test_u = cur_u;
+		double test_v = cur_v;
+		double duv[2] = { -du * (nsprings-i), -dv * (nsprings-i) };
+		int test_f = cur_f, f2 = cur_f;
+
+		do {
+			test_f = f2;
+			f2 = theSurface->nextFace( test_f, &test_u, &test_v, duv, duv+1, rsurf );	
+		} while( f2 != test_f );
+	
+		double rprint[3],np[3];
+		theSurface->evaluateRNRM( test_f,test_u,test_v, rprint, np, rsurf ); 
+		rim_min_f[i] = test_f;
+		rim_min_uv_start[2*i+0] = test_u;
+		rim_min_uv_start[2*i+1] = test_v;
+	}
+	rim_min_npts = nsprings;
+ 
+	void amoeba(double **p, double y[], int ndim, double ftol,
+               double (*funk)(double []), int *nfunk);
+
+	int nparams = nsprings*2;
+	
+	double **p = (double **)malloc( sizeof(double*) * (2+nparams) );
+	for( int i = 0; i <= 1+nparams; i++ )
+	        p[i] = (double *)malloc( sizeof(double) * (1+nparams) );
+	double *y = (double *)malloc( sizeof(double) * (nparams+2) );
+
+	double vals[2*nsprings+1];
+	memset( vals, 0, sizeof(double)*(2*nsprings+1) );
+		
+	for( int i = 1; i <= 1+nparams; i++ )
+	for( int j = 1; j <= nparams; j++ )
+	{
+	        if( i == 1 )
+	                p[i][j] = vals[j];
+	        else if( i-1 == j )
+	                p[i][j] = vals[j] + 0.02;
+	        else
+	                p[i][j] = vals[j];
+	}
+	
+	
+	for( int i = 1; i <= nparams+1; i++ )
+	        y[i] = rim_min_en(p[i]);
+
+	int nfunk = 0;
+
+	*rim_triangles = (double *)malloc( sizeof(double) * 3 * 3 * nsprings );
+	*ntri = nsprings;
+	amoeba( p, y, nparams, 1e-10, rim_min_en, &nfunk );
+	
+	output_rim_triangles = *rim_triangles;
+
+	rim_min_en(p[1]);	
+	
+	for( int i = 0; i <= 1+nparams; i++ )
+		free(p[i]);
+
+	free(p);
+	free(y);	
+} 
 
 
 		

@@ -719,3 +719,66 @@ void MatVec( double *a, double *b, double *c, int n, int m)
 	dgemv( &transy, &m, &n, &one, a, &m, b, &incr, &zero, c, &incr );
 }
 
+int nearInteriorPointOnTriangle( double *test_pt, double *vert1, double *vert2, double *vert3, double *output)
+{
+	double vec1[3] = { vert1[0] - vert2[0],
+			   vert1[1] - vert2[1],
+			   vert1[2] - vert2[2] };
+	
+	double vec2[3] = { vert3[0] - vert2[0],
+			   vert3[1] - vert2[1],
+			   vert3[2] - vert2[2] };
+	
+	double vec3[3] = { vert3[0] - vert1[0],
+			   vert3[1] - vert1[1],
+			   vert3[2] - vert1[2] };
+	
+	// triangle is convex so this must be interior point.
+	double interior_pt[3] = { 
+		(vert1[0]+vert2[0]+vert3[0])/3,
+		(vert1[1]+vert2[1]+vert3[1])/3,
+		(vert1[2]+vert2[2]+vert3[2])/3 };
+
+	double nrm[3];
+	cross( vec1, vec2, nrm );
+	normalize(nrm);
+
+	double dp = nrm[0] * vert2[0] + nrm[1] * vert2[1] + nrm[2] * vert2[2];
+	// defines the tangent plane.
+	
+	double dpp = nrm[0] * test_pt[0] + nrm[1] * test_pt[1] + nrm[2] * test_pt[2];
+	double dist_to_plane = fabs(dpp-dp);
+	
+	output[0] = test_pt[0] + (dp-dpp) * nrm[0];
+	output[1] = test_pt[1] + (dp-dpp) * nrm[1];
+	output[2] = test_pt[2] + (dp-dpp) * nrm[2];
+	
+	// is the output interior?
+
+	double check_vec1[3];
+	cross( vec1, nrm, check_vec1 );
+	double tvec1[3] = { interior_pt[0] - vert1[0], interior_pt[1] - vert1[1], interior_pt[2] - vert1[2] };
+	double cvec1[3] = { output[0] - vert1[0], output[1] - vert1[1], output[2] - vert1[2] };
+	double sign1 = tvec1[0] * check_vec1[0] + tvec1[1] * check_vec1[1] + tvec1[2] * check_vec1[2];
+	double csign1 = cvec1[0] * check_vec1[0] + cvec1[1] * check_vec1[1] + cvec1[2] * check_vec1[2];
+	if( csign1 * sign1 < 0 ) return 0;
+	
+	double check_vec2[3];
+	cross( vec2, nrm, check_vec2 );
+	double tvec2[3] = { interior_pt[0] - vert2[0], interior_pt[1] - vert2[1], interior_pt[2] - vert2[2] };
+	double cvec2[3] = { output[0] - vert2[0], output[1] - vert2[1], output[2] - vert2[2] };
+	double sign2 = tvec2[0] * check_vec2[0] + tvec2[1] * check_vec2[1] + tvec2[2] * check_vec2[2];
+	double csign2 = cvec2[0] * check_vec2[0] + cvec2[1] * check_vec2[1] + cvec2[2] * check_vec2[2];
+	if( csign2 * sign2 < 0 ) return 0;
+	
+	double check_vec3[3];
+	cross( vec3, nrm, check_vec3 );
+	double tvec3[3] = { interior_pt[0] - vert3[0], interior_pt[1] - vert3[1], interior_pt[2] - vert3[2] };
+	double cvec3[3] = { output[0] - vert3[0], output[1] - vert3[1], output[2] - vert3[2] };
+	double sign3 = tvec3[0] * check_vec3[0] + tvec3[1] * check_vec3[1] + tvec3[2] * check_vec3[2];
+	double csign3 = cvec3[0] * check_vec3[0] + cvec3[1] * check_vec3[1] + cvec3[2] * check_vec3[2];
+	if( csign3 * sign3 < 0 ) return 0;
+
+	return 1;
+}
+

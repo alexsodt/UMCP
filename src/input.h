@@ -218,10 +218,15 @@ class parameterBlock
 	char *innerPatchPSF;
 	char *outerPatchPDB;
 	char *outerPatchPSF;
+	char *altPatchPDB;
+	char *altPatchPSF;
 	char *patchPSF;
 	char *patchPDB;
 	int create_all_atom;
 	int create_flip;
+	int do_rim;
+
+	double shift[3];
 
 	// END section for creating all-atom structures
 

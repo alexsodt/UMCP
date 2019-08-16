@@ -21,4 +21,5 @@ double Power( double, int );
 double Mul22( double *A, double *B, double *out );
 void CartMatVecIncrScale( double *vec_out, double *vec_in, double *Mat, double scale, int nv, double *alphas  );
 void MatVec( double *a, double *b, double *c, int m, int n);
+int nearInteriorPointOnTriangle( double *test_pt, double *vert1, double *vert2, double *vert3, double *output);
 #endif
