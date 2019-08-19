@@ -7,7 +7,7 @@
 #include "global_boxing.h"
 #include "units.h"
 #include "mutil.h"
-#include "rd_kayla.h"
+#include "rd.h"
 #include "fpr_subroutines/2D.h"
 #include "random_global.h"
 #include "util.h"
