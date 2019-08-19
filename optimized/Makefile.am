@@ -31,7 +31,7 @@ cuda_SRCS = cuda.cu
 else
 cuda_SRCS =
 endif
-rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutines/pirr_pfree_ratio_psF.cpp fpr_subroutines/2D.cpp fpr_subroutines/DDmatrixcreate.cpp fpr_subroutines/DDpsur.cpp fpr_subroutines/TBLnorm.cpp fpr_subroutines/TBLpirr.cpp fpr_subroutines/TBLsur.cpp fpr_subroutines/fpir.cpp fpr_subroutines/fsur.cpp fpr_subroutines/integrator.cpp fpr_subroutines/fnorm.cpp rd_kayla.C fpr_subroutines/sizelookup.cpp
+rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutines/pirr_pfree_ratio_psF.cpp fpr_subroutines/2D.cpp fpr_subroutines/DDmatrixcreate.cpp fpr_subroutines/DDpsur.cpp fpr_subroutines/TBLnorm.cpp fpr_subroutines/TBLpirr.cpp fpr_subroutines/TBLsur.cpp fpr_subroutines/fpir.cpp fpr_subroutines/fsur.cpp fpr_subroutines/integrator.cpp fpr_subroutines/fnorm.cpp rd.C fpr_subroutines/sizelookup.cpp
 
 hull_SRCS = dovoronoi.c clusterv.C
 
@@ -50,7 +50,6 @@ writeBiasPotential_opt_SOURCES = writeBiasPotential.C $(util_SRCS)
 writeCylRTraj_opt_SOURCES      = writeCylRTraj.C $(util_SRCS) 
 
 hd_opt_LDFLAGS		  = $(AM_LDFLAGS) 
-#rd_opt_LDADD		  = $(AM_LDADD) $(AM_QHULL) -lstdc++ 
 hd_opt_LDADD              = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
 frc_sandbox_opt_LDADD     = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
 min_opt_LDADD             = $(AM_LDADD) $(AM_QHULL) -lstdc++
