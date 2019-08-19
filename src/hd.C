@@ -26,7 +26,7 @@
 #endif
 #include "simulation.h"
 #include "meshCollisionLib.h"
-#include "rd_kayla.h"
+#include "rd.h"
 
 #define MM_METHOD_1
 #define BOXED
