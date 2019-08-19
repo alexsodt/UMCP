@@ -1396,7 +1396,59 @@ void Simulation::writeLimitingSurface( FILE *theFile )
 
 		free(r);
 	}
+
+#define RD_HACK_REMOVE_ME
+#ifdef RD_HACK_REMOVE_ME
+	// first pass, oxygen
 	
+	int extra = 0;
+	for( int pass = 0; pass < 2; pass++ )
+	{
+		int nsites_written = extra;
+
+		for( int c = 0; c < ncomplex; c++ )
+		{
+			if( allComplexes[c]->disabled ) continue;
+	
+			if( pass == 0 && !strcasecmp( allComplexes[c]->complex_name, "simpleLipid" ) )
+			{
+				for( int p = 0; p < allComplexes[c]->nsites; p++ )
+				{
+					fprintf(theFile, "O %lf %lf %lf\n", allComplexes[c]->rall[3*p+0], allComplexes[c]->rall[3*p+1], allComplexes[c]->rall[3*p+2] );
+					nsites_written++;
+				}
+			} 
+			else if( pass == 1 && strcasecmp( allComplexes[c]->complex_name, "simpleLipid" ) )
+			{
+				for( int p = 0; p < allComplexes[c]->nsites; p++ )
+				{
+					fprintf(theFile, "N %lf %lf %lf\n", allComplexes[c]->rall[3*p+0], allComplexes[c]->rall[3*p+1], allComplexes[c]->rall[3*p+2] );
+					nsites_written++;
+				}
+			} 
+		}
+
+		if( pass == 0 )
+		{
+			if( nsites_written > nsites_at_psfwrite )
+				extra = nsites_written - nsites_at_psfwrite;
+
+			for( int tx = nsites_written; tx < nsites_at_psfwrite; tx++ )
+				fprintf(theFile, "O %lf %lf %lf\n", 
+					PBC_vec[0][0] * alpha[0],
+					PBC_vec[1][1] * alpha[1],
+					PBC_vec[2][2] * alpha[2] );
+		}
+		else
+		{
+			for( int tx = nsites_written; tx < visualization_cache; tx++ )
+				fprintf(theFile, "N %lf %lf %lf\n", 
+					PBC_vec[0][0] * alpha[0],
+					PBC_vec[1][1] * alpha[1],
+					PBC_vec[2][2] * alpha[2] );
+		}
+	}
+#else	
 	int nsites_written = 0;
 	for( int c = 0; c < ncomplex; c++ )
 	{
@@ -1414,7 +1466,7 @@ void Simulation::writeLimitingSurface( FILE *theFile )
 			PBC_vec[0][0] * alpha[0],
 			PBC_vec[1][1] * alpha[1],
 			PBC_vec[2][2] * alpha[2] );
-
+#endif
 	fflush(theFile);
 
 }

@@ -33,8 +33,6 @@ void RD::init( Simulation * theSimulation, double time_step_in, parameterBlock *
         // for now K debugs on these great values.
 	double Dtot	       = 1e10; // for initial development.
 	dt	       	       = time_step_in;
-	// TO-DO: set this based on the largest rmax of our system
-	Rmax_test 	       = 10 + 3 * sqrt( 6 * Dtot * dt );
 
 	nsites_tracked = 0;
 	nsites_tracked_space = theSimulation->ncomplex;
@@ -47,6 +45,27 @@ void RD::init( Simulation * theSimulation, double time_step_in, parameterBlock *
 		for( int s = 0; s < theSimulation->allComplexes[p]->nsites; s++ )
 			registerSite( theSimulation->allComplexes[p], p, s );
 	}
+
+	double max_binding_radius = 0;
+
+	double max_diff_c = 0;
+
+	for( int t = 0; t < nsites_tracked; t++ )
+	{
+		int pid = tracked[t]->pid;
+		int sid = tracked[t]->sid;
+
+		if( theSimulation->allComplexes[pid]->DC[sid] > max_diff_c )
+			max_diff_c = theSimulation->allComplexes[pid]->DC[sid];
+	}
+
+	for( int r = 0; r < nreactions; r++ )
+	{
+		if( allReactions[r].binding_radius > max_binding_radius )
+			max_binding_radius = allReactions[r].binding_radius;
+	}
+
+	max_Rmax = max_binding_radius + 3 * sqrt( 2 * max_diff_c * dt ); 
 }
 
 void RD::get_tracked( Simulation *theSimulation  )
@@ -56,41 +75,8 @@ void RD::get_tracked( Simulation *theSimulation  )
 
 	// set up the system boxing
 	double *alphas = theSimulation->alpha;
-	for( int c = 0; c < ncomplex; c++ )
-		allComplexes[c]->setrall(theSimulation);
-	if( !boxing )
-	{
-		boxing = (global_boxing *)malloc( sizeof(global_boxing) );
-		boxing->setup_boxing(Rmax_test, theSimulation->PBC_vec); //box the system
-	}
-	boxing->setPBC(theSimulation->PBC_vec, alphas); // add periodic boundary conditions
-
-	int ntotp = nsites_tracked;
-	int *to_clear = (int *)malloc( sizeof(int) * ntotp );
-	int *complex_for_id = (int *)malloc( sizeof(int) * ntotp );
-        int *subp_for_id = (int *)malloc( sizeof(int) * ntotp );
-
         int id = 0;
 
-	//////////////// TO DO:
-	// from list of particles that can do a binding reaction, only add those to this list:
-	// currently we are adding all particles (suitable for initial test of lipid-lipid dimerization)
-
-	for( int t = 0; t < nsites_tracked; t++ )
-	{
-		int p = tracked[t]->pid;
-		int s = tracked[t]->sid;
-			
-		complex_for_id[t] = p;
-		subp_for_id[t] = s;
-		to_clear[t] = boxing->addp(allComplexes[p]->rall+3*s, t );
-	} 
-	
-	// find particles that are near you, keep track of the "new" tracked particles and update the "previously" tracked particles in the tracked structure
-	int *nearlist = (int *)malloc( sizeof(int) * ntotp );
-
-
-	
 	// reset info flag on previously tracked data.
 	for( int t = 0; t < nsites_tracked; t++ )
 	{
@@ -108,7 +94,7 @@ void RD::get_tracked( Simulation *theSimulation  )
 		int npairs = 0;
 		int nnew = 0;
 		/////////// TO-DO: use max Rmax from this site's reactions.
-		int near = boxing->getNearPts(allComplexes[p]->rall+3*s, nearlist, Rmax_test);
+		int near = boxing->getNearPts(allComplexes[p]->rall+3*s, nearlist, max_Rmax);
 	
 		for(int np = 0; np < near; np++)
 		{
@@ -217,12 +203,6 @@ void RD::get_tracked( Simulation *theSimulation  )
 		tracked[t]->tracked_info = tracked[t]->tracked_new;
 		tracked[t]->tracked_new = temp;
 	}
-	
-	boxing->clearBoxing(to_clear, ntotp);
-	free(to_clear);
-	free(complex_for_id);
-	free(subp_for_id);
-	free(nearlist);
 }
 
 void RD::do_rd( Simulation *theSimulation )
@@ -234,8 +214,9 @@ void RD::do_rd( Simulation *theSimulation )
 	double prob;
 	int ncomplex = theSimulation->ncomplex;
 
+	// box_reactants MUST be called before get_tracked, sets up boxing across function calls.
+	box_reactants(theSimulation);
 	get_tracked( theSimulation  );
-
 
 	for( int t = 0; t < nsites_tracked; t++ )
 	{
@@ -282,7 +263,6 @@ void RD::do_rd( Simulation *theSimulation )
 				theSimulation->AddComplex( product );
 	 
 				// this stops the complex from being propagated, simulated, etc. leaves it for garbage collection later.
-				// NYI, I haven't stopped disabled particles from doing anything.
 				theSimulation->RemoveComplexDelayed(p);
 				theSimulation->RemoveComplexDelayed(p2);			
 			}
@@ -293,6 +273,92 @@ void RD::do_rd( Simulation *theSimulation )
 //	printf("After rd, ncomplex: %d\n", theSimulation->ncomplex );
 
 	// dissociation.
+
+	for( int p = 0; p < theSimulation->ncomplex; p++ )
+	for( int r = 0; r < nreactions; r++ )
+	{   
+		if( !strcasecmp( theSimulation->allComplexes[p]->complex_name, allReactions[r].productName ) ) 
+		{   
+			double pr = allReactions[r].k_off * dt; 
+			double rn = gsl_rng_uniform(rng_x);
+
+			if( rn < pr ) 
+			{
+				// creates the reactants.
+
+				// HACK: now only working for single-site attachment.
+				int s = 0;
+	
+				printf("Dissociated! p: %le\n", prob );
+				// binding reaction between these two complexes... 
+				// possible outcomes are to add to a previous complex (likely case with Actin polymerization) or create a new one.	
+				// for now: create new complex.
+	
+				pcomplex *reactant1 = loadComplex( allReactions[r].pcomplex_name1 );
+				pcomplex *reactant2 = loadComplex( allReactions[r].pcomplex_name2 );
+	
+				struct surface_record *sRec = theSimulation->fetch( theSimulation->allComplexes[p]->sid[s] );
+
+				int trial_f = theSimulation->allComplexes[p]->fs[s];
+				double trial_u = theSimulation->allComplexes[p]->puv[2*s+0];
+				double trial_v = theSimulation->allComplexes[p]->puv[2*s+1];
+
+				int rd_blocked = 0;
+
+
+
+				reactant1->init( sRec->theSurface, sRec->r, theSimulation->allComplexes[p]->fs[s], theSimulation->allComplexes[p]->puv[2*s+0], theSimulation->allComplexes[p]->puv[2*s+1] );
+				// reactant placement.
+
+				reactant2->init( sRec->theSurface, sRec->r, theSimulation->allComplexes[p]->fs[s], theSimulation->allComplexes[p]->puv[2*s+0], theSimulation->allComplexes[p]->puv[2*s+1] );
+				reactant1->copyParentParameters( theSimulation->allComplexes[p] );
+				reactant2->copyParentParameters( theSimulation->allComplexes[p] );
+
+				for( int s = 0; s < reactant1->nattach; s++ )
+					reactant1->sid[s] = sRec->id;
+				int padd1 = theSimulation->AddComplex( reactant1 );
+				
+				// this stops the complex from being propagated, simulated, etc. leaves it for garbage collection later.
+				theSimulation->RemoveComplexDelayed(p);
+					
+				// Eventually we will place the reactants based on Boltzmann probabilities.
+				// for now, just don't block RD.
+
+				do {
+					int rd_blocked = check_RD_blocked( theSimulation, padd1, 0 ); 	
+
+					if( rd_blocked )
+						theSimulation->allComplexes[padd1]->propagate_surface_q( theSimulation, dt );
+
+				} while( rd_blocked );
+				
+				for( int s = 0; s < reactant2->nattach; s++ )
+					reactant2->sid[s] = sRec->id;
+				int padd2 = theSimulation->AddComplex( reactant2 );
+				
+				do {
+					int rd_blocked = check_RD_blocked( theSimulation, padd2, 0 ); 	
+
+					if( rd_blocked )
+						theSimulation->allComplexes[padd2]->propagate_surface_q( theSimulation, dt );
+
+					double dr[3] = { 
+							theSimulation->allComplexes[padd2]->rall[0] - theSimulation->allComplexes[padd1]->rall[0],
+							theSimulation->allComplexes[padd2]->rall[1] - theSimulation->allComplexes[padd1]->rall[1],
+							theSimulation->allComplexes[padd2]->rall[2] - theSimulation->allComplexes[padd1]->rall[2] };
+					double lr =normalize(dr);
+
+					if( lr < allReactions[r].binding_radius )
+						rd_blocked = 1;
+
+				} while( rd_blocked );
+				
+	 
+			}
+		}   
+	}   
+	
+	unbox_reactants();
 
 }
 
@@ -382,6 +448,8 @@ void RD::registerSite( pcomplex *theComplex, int pid, int sid )
 		}
 	}
 
+	double max_Rmax = 0;
+
 	if( entry == -1 )
 	{
 		// not entered, does it have any reactions?
@@ -390,10 +458,13 @@ void RD::registerSite( pcomplex *theComplex, int pid, int sid )
 
 		for( int r = 0; r < nreactions; r++ )
 		{
+			int l_got_reaction = 0;
 			if( allReactions[r].site1 == site_type1 && !strcasecmp( allReactions[r].pcomplex_name1, theComplex->complex_name) )
-				got_reaction = 1;			
+				l_got_reaction = 1;			
 			if( allReactions[r].site2 == site_type1 && !strcasecmp( allReactions[r].pcomplex_name2, theComplex->complex_name) )
-				got_reaction = 1;			
+				l_got_reaction = 1;			
+			if( l_got_reaction ) 
+				got_reaction = 1;
 		}
 
 		if( got_reaction )
@@ -481,7 +552,7 @@ void RD::registerSite( pcomplex *theComplex, int pid, int sid )
 		tracked[nsites_tracked]->sid = sid; 
                 tracked[nsites_tracked]->tracked_info = (RD_tracked_info *)malloc(sizeof(RD_tracked_info) * tracked[nsites_tracked]->ntracked_space);
                 tracked[nsites_tracked]->tracked_new = (RD_tracked_info *)malloc(sizeof(RD_tracked_info) * tracked[nsites_tracked]->ntracked_space);
-	
+
 		nsites_tracked++;
 
 		theComplex->watch();
@@ -530,5 +601,94 @@ void RD::registerReaction( int site_type1, const char *pcomplex_name1,
 }
 
 
+void RD::box_reactants( Simulation *theSimulation )
+{
+	pcomplex **allComplexes = theSimulation->allComplexes;
+	int ncomplex = theSimulation->ncomplex;
+	// set up the system boxing
+	double *alphas = theSimulation->alpha;
+	for( int c = 0; c < ncomplex; c++ )
+		allComplexes[c]->setrall(theSimulation);
+	if( !boxing )
+	{
+		boxing = (global_boxing *)malloc( sizeof(global_boxing) );
+		boxing->setup_boxing(max_Rmax, theSimulation->PBC_vec); //box the system
+	}
+
+	ntotp = nsites_tracked;
+
+	boxing->setPBC(theSimulation->PBC_vec, alphas); // add periodic boundary conditions
+	to_clear = (int *)malloc( sizeof(int) * ntotp );
+	complex_for_id = (int *)malloc( sizeof(int) * ntotp );
+        subp_for_id = (int *)malloc( sizeof(int) * ntotp );
+        int id = 0;
+	for( int t = 0; t < nsites_tracked; t++ )
+	{
+		int p = tracked[t]->pid;
+		int s = tracked[t]->sid;
+			
+		complex_for_id[t] = p;
+		subp_for_id[t] = s;
+		to_clear[t] = boxing->addp(allComplexes[p]->rall+3*s, t );
+	} 
+	
+	nearlist = (int *)malloc( sizeof(int) * ntotp );
+}
+
+void RD::unbox_reactants( void )
+{
+	boxing->clearBoxing(to_clear, ntotp);
+	free(to_clear);
+	free(complex_for_id);
+	free(subp_for_id);
+	free(nearlist);
+
+	to_clear = NULL;
+	complex_for_id = NULL;
+	subp_for_id = NULL;
+	nearlist = NULL;
+	ntotp = 0;
+}
+
+int RD::check_RD_blocked( Simulation *theSimulation, int p, int s)
+{
+	double *alphas = theSimulation->alpha;
+	int near = boxing->getNearPts(theSimulation->allComplexes[p]->rall+3*s, nearlist, max_binding_radius );
+
+	for(int np = 0; np < near; np++)
+	{
+		int id = nearlist[np];
+		
+		int s2 = subp_for_id[id];
+		int p2 = complex_for_id[id];
+
+		if( theSimulation->allComplexes[p2]->disabled ) continue;
+
+		if( p == p2 )
+			continue;
+		if( p2 < p )
+			continue;
+
+		int rxn = rxnLookup( theSimulation->allComplexes[p]->stype[s], theSimulation->allComplexes[p2]->stype[s2] );
+	
+		if( rxn == -1 ) continue;
+
+		double binding_radius = allReactions[rxn].binding_radius;
+
+		double dr[3] = {
+			theSimulation->allComplexes[p]->rall[3*s+0] - theSimulation->allComplexes[p2]->rall[3*s2+0],
+			theSimulation->allComplexes[p]->rall[3*s+1] - theSimulation->allComplexes[p2]->rall[3*s2+1],
+			theSimulation->allComplexes[p]->rall[3*s+2] - theSimulation->allComplexes[p2]->rall[3*s2+2] };
+
+		theSimulation->wrapPBC( dr, alphas );
+
+		double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+
+		if( r < binding_radius )
+			return 1;	
+	}	
+
+	return 0;
+}
 
 

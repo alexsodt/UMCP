@@ -47,6 +47,7 @@ typedef struct
         int ntracked_space;
         RD_tracked_info *tracked_info;
 	RD_tracked_info *tracked_new;
+	double Rmax_for_site;
 } RD_tracked;
 
 typedef struct
@@ -63,7 +64,10 @@ struct RD
 	
 	double dt;
 	double Rmax_test;
-	
+
+	double max_binding_radius;
+	double max_Rmax;	
+
 	ReactantType *reactants;
 	int nreactants;
 	int nreactantsSpace;
@@ -72,21 +76,36 @@ struct RD
 	int nreactions;
 	int nreactionsSpace;	
 	int *rxn_lookup_table;
-
+	
+	// BEGIN temporary storage for boxed particle tracking
+	int ntotp;
+	int *to_clear;
+	int *complex_for_id;
+        int *subp_for_id;
+	int *nearlist;
+	// END temporary storage for boxed particle tracking
+	
+	void do_rd( Simulation *theSimulation );
+	void init(Simulation *theSimulation, double time_step, parameterBlock *pblock );
+	
+	// RD Setup:
 	void parseRDFile( const char *fileName );
 	void registerReaction( int site_type1, const char *pcomplex_name1,
 			       int site_type2, const char *pcomplex_name2,
 					double k_on, double k_off, double binding_radius, const char *productName );
 	void registerSite( pcomplex *theComplex, int pid, int sid );
 	
-	// returns -1 for no reaction, otherwise, site in the allReactions
-	int rxnLookup( int code1, int code2 );
-	int siteLookup( const char *pname, int site_type );
-	
-	int getPComplexSiteID( const char *pcomplex_name, int site_type );
-	void init(Simulation *theSimulation, double time_step, parameterBlock *pblock );
+
+	// Tracking reactions/collisions
 	void get_tracked( Simulation *theSimulation );
-	void do_rd( Simulation *theSimulation );
+	void box_reactants( Simulation *theSimulation  );
+	void unbox_reactants( void ); // cleans up boxing.
+	int check_RD_blocked( Simulation *theSimulation, int p, int s);
+	
+	// Utility
+	int rxnLookup( int code1, int code2 ); // returns -1 for no reaction, otherwise, site in the allReactions
+	int siteLookup( const char *pname, int site_type );
+	int getPComplexSiteID( const char *pcomplex_name, int site_type );
 };
 
 #endif
