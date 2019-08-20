@@ -242,7 +242,7 @@ void RD::do_rd( Simulation *theSimulation )
 			double Dtot = D1+D2;
 			double Rmax = binding_radius + 3 * sqrt( Dtot * dt ); 
 			double rn = gsl_rng_uniform(rng_x);
-		
+			printf("rn: %le\n", rn );
 			// TO DO: retrieve stored reaction information from tracked_info.			
 			prob = get_2D_2D_rxn_prob(tracked[t]->tracked_info[n].curr_sep, k_on, binding_radius, Dtot, dt, Rmax);
 	
@@ -289,7 +289,7 @@ void RD::do_rd( Simulation *theSimulation )
 				// HACK: now only working for single-site attachment.
 				int s = 0;
 	
-				printf("Dissociated! p: %le\n", prob );
+				printf("Dissociated! p: %le\n", pr );
 				// binding reaction between these two complexes... 
 				// possible outcomes are to add to a previous complex (likely case with Actin polymerization) or create a new one.	
 				// for now: create new complex.

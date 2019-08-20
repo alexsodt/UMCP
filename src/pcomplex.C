@@ -1944,6 +1944,8 @@ void pcomplex::saveComplex( FILE *theFile )
 // the surface energy of attachments.
 double pcomplex::AttachV( Simulation *theSimulation )
 {	
+	if( disabled ) return 0;
+
 	double pot = 0;
 
 #ifndef DISABLE_ATTACH
@@ -1962,6 +1964,8 @@ double pcomplex::AttachV( Simulation *theSimulation )
 
 double pcomplex::AttachG( Simulation *theSimulation,  double *pg )
 {
+	if( disabled ) return 0;
+
 	double pot = 0;
 
 #ifndef DISABLE_ATTACH
