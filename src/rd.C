@@ -194,6 +194,8 @@ void RD::get_tracked( Simulation *theSimulation  )
 				tracked[t]->tracked_new[count].prev_norm = tracked[t]->tracked_info[n].prev_norm;
 				tracked[t]->tracked_new[count].curr_sep = tracked[t]->tracked_info[n].curr_sep;
 				tracked[t]->tracked_new[count].prev_norm = tracked[t]->tracked_info[n].curr_norm;
+				tracked[t]->tracked_new[count].sid1 = tracked[t]->tracked_info[n].sid1;
+				tracked[t]->tracked_new[count].sid2 = tracked[t]->tracked_info[n].sid2;
 				tracked[t]->tracked_new[count].info = 0;	
 				count++;
 			}
@@ -250,7 +252,7 @@ void RD::do_rd( Simulation *theSimulation )
 	
 			if(prob > rn)
 			{
-				printf("Reacted! p: %le\n", prob );
+//				printf("Reacted! p: %le\n", prob );
 				// binding reaction between these two complexes... 
 				// possible outcomes are to add to a previous complex (likely case with Actin polymerization) or create a new one.	
 				// for now: create new complex.
@@ -297,7 +299,7 @@ void RD::do_rd( Simulation *theSimulation )
 				{
 					printf("debug here.\n");
 				}
-				printf("Dissociated! p: %le\n", pr );
+//				printf("Dissociated! p: %le\n", pr );
 				// binding reaction between these two complexes... 
 				// possible outcomes are to add to a previous complex (likely case with Actin polymerization) or create a new one.	
 				// for now: create new complex.
