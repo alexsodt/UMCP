@@ -58,6 +58,8 @@ typedef struct
 
 struct RD
 {
+	parameterBlock *params;
+
 	int nsites_tracked;
 	int nsites_tracked_space;
 	RD_tracked **tracked;	

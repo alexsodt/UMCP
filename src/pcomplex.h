@@ -12,34 +12,34 @@
 
 struct pcomplex
 {
-	int disabled;
-	int nwatchers;
+	int disabled; //check
+	int nwatchers; //check
 
-	int is_inside;
-	int nsites;
-	int nattach;
-	int bound;
-	int debug;
-	int do_bd;
+	int is_inside; // copyparent
+	int nsites; //check
+	int nattach; //check
+	int bound; //check
+	int debug; //check
+	int do_bd; //check
 
-	char *complex_name;
+	char *complex_name; //check
 	
 	// diffusion constants.
-	double *DC;
+	double *DC; //check
 
 	// all masses.
-	double *mass;
+	double *mass; //check
 
 	// all WCA/LJ radii
-	double *sigma;
-	double *att_eps;
-	double *att_sigma;
+	double *sigma; //check
+	double *att_eps; //check
+	double *att_sigma; //check
 
-	// all coordinates in 3D
-	double *rall;
+	// all coordinates in 3D 
+	double *rall; //check
 	// attach coordinates in f/uv; can exceed face bounds
-	int *sid; // id of surface we are on.
-	int *stype; // if doing rxn/diff
+	int *sid; //check // id of surface we are on.
+	int *stype; //check // if doing rxn/diff
 	int *fs;	
 	double *puv;
 
@@ -47,7 +47,6 @@ struct pcomplex
 	int *grad_fs;	
 	double *grad_puv;
 	
-	double *last_p; // Hamiltonian conjugate momenta
 	double *p; // Hamiltonian conjugate momenta
 	double *qdot; // time derivatives of generalized coordinates.
 	double *save_grad;
@@ -157,6 +156,7 @@ struct simpleLipid : pcomplex
 struct simpleDimer : simpleLipid
 {
 	double c0_val;
+	virtual void init( surface *theSurface, double *, int f, double u, double v ); 
 };
 
 struct NBAR : pcomplex

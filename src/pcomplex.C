@@ -37,11 +37,13 @@ void pcomplex::base_init( void )
 	debug = DEBUG_OFF;
 	nwatchers = 0;
 	disabled = 0;
+	alive = 1;
 }
 
 void pcomplex::copyParentParameters( pcomplex *parent )
 {
 	do_bd = parent->do_bd;
+	is_inside = parent->is_inside;
 }
 
 /* general routines */
@@ -1673,6 +1675,13 @@ void simpleLipid::loadParams( parameterBlock *block )
 void simpleLipid::init( surface *theSurface, double *rsurf, int f, double u, double v )
 {
 	pcomplex::init( theSurface, rsurf, f, u, v );
+
+	p_c0[0] = c0_val;
+}
+
+void simpleDimer::init( surface *theSurface, double *rsurf, int f, double u, double v )
+{
+	simpleLipid::init( theSurface, rsurf, f, u, v );
 
 	p_c0[0] = c0_val;
 }

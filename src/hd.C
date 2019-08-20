@@ -32,6 +32,8 @@
 #define BOXED
 
 
+int global_delete_this = 0;
+
 #define OLD_LANGEVIN
 
 //#define MONTE_CARLO_HACK
@@ -1527,6 +1529,8 @@ int temp_main( int argc, char **argv )
 			if( t == 0 )
 			{
 				printf("t: %le ns o: %d T: %.8le V: %.12le T+V: %.14le TEMP: %le MEM_TEMP: %le AV_TEMP %le VR: %.3le VMEM: %le VP: %le", (cur_t * 1e9), o, T, V, T+V, TEMP, mem_T, sum_average_temp / n_temp,VR, VMEM, VP );
+
+				global_delete_this = o;
 				if( step_rate > 0 )
 					printf(" steps/s: %le", step_rate );
 				printf("\n");

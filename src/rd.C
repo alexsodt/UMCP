@@ -12,10 +12,13 @@
 #include "random_global.h"
 #include "util.h"
 
+extern int global_delete_this;
 static global_boxing *boxing = NULL;
 
 void RD::init( Simulation * theSimulation, double time_step_in, parameterBlock *block )
 {
+	params = block;
+
 	nreactants = 0;
 	nreactantsSpace = 10;
 	reactants = (ReactantType *)malloc( sizeof(ReactantType) * nreactantsSpace );
@@ -242,7 +245,6 @@ void RD::do_rd( Simulation *theSimulation )
 			double Dtot = D1+D2;
 			double Rmax = binding_radius + 3 * sqrt( Dtot * dt ); 
 			double rn = gsl_rng_uniform(rng_x);
-			printf("rn: %le\n", rn );
 			// TO DO: retrieve stored reaction information from tracked_info.			
 			prob = get_2D_2D_rxn_prob(tracked[t]->tracked_info[n].curr_sep, k_on, binding_radius, Dtot, dt, Rmax);
 	
@@ -254,13 +256,15 @@ void RD::do_rd( Simulation *theSimulation )
 				// for now: create new complex.
 	
 				pcomplex *product = loadComplex( allReactions[rxn].productName );
-	
+				product->loadParams(params);			
 				struct surface_record *sRec = theSimulation->fetch( theSimulation->allComplexes[p]->sid[s] );
 				product->init( sRec->theSurface, sRec->r, theSimulation->allComplexes[p]->fs[s], theSimulation->allComplexes[p]->puv[2*s+0], theSimulation->allComplexes[p]->puv[2*s+1] );
 				product->copyParentParameters( theSimulation->allComplexes[p] );
 				for( int s = 0; s < product->nattach; s++ )
 					product->sid[s] = sRec->id;
-				theSimulation->AddComplex( product );
+				int padd = theSimulation->AddComplex( product );
+				for( int s = 0; s < theSimulation->allComplexes[padd]->nsites; s++ )
+					registerSite( theSimulation->allComplexes[padd], padd, s );
 	 
 				// this stops the complex from being propagated, simulated, etc. leaves it for garbage collection later.
 				theSimulation->RemoveComplexDelayed(p);
@@ -289,13 +293,19 @@ void RD::do_rd( Simulation *theSimulation )
 				// HACK: now only working for single-site attachment.
 				int s = 0;
 	
+				if( global_delete_this == 531)
+				{
+					printf("debug here.\n");
+				}
 				printf("Dissociated! p: %le\n", pr );
 				// binding reaction between these two complexes... 
 				// possible outcomes are to add to a previous complex (likely case with Actin polymerization) or create a new one.	
 				// for now: create new complex.
 	
 				pcomplex *reactant1 = loadComplex( allReactions[r].pcomplex_name1 );
+				reactant1->loadParams(params);			
 				pcomplex *reactant2 = loadComplex( allReactions[r].pcomplex_name2 );
+				reactant2->loadParams(params);			
 	
 				struct surface_record *sRec = theSimulation->fetch( theSimulation->allComplexes[p]->sid[s] );
 
@@ -305,18 +315,17 @@ void RD::do_rd( Simulation *theSimulation )
 
 				int rd_blocked = 0;
 
-
-
 				reactant1->init( sRec->theSurface, sRec->r, theSimulation->allComplexes[p]->fs[s], theSimulation->allComplexes[p]->puv[2*s+0], theSimulation->allComplexes[p]->puv[2*s+1] );
-				// reactant placement.
-
 				reactant2->init( sRec->theSurface, sRec->r, theSimulation->allComplexes[p]->fs[s], theSimulation->allComplexes[p]->puv[2*s+0], theSimulation->allComplexes[p]->puv[2*s+1] );
+
 				reactant1->copyParentParameters( theSimulation->allComplexes[p] );
 				reactant2->copyParentParameters( theSimulation->allComplexes[p] );
 
 				for( int s = 0; s < reactant1->nattach; s++ )
 					reactant1->sid[s] = sRec->id;
 				int padd1 = theSimulation->AddComplex( reactant1 );
+				for( int s = 0; s < theSimulation->allComplexes[padd1]->nsites; s++ )
+					registerSite( theSimulation->allComplexes[padd1], padd1, s );
 				
 				// this stops the complex from being propagated, simulated, etc. leaves it for garbage collection later.
 				theSimulation->RemoveComplexDelayed(p);
@@ -324,8 +333,9 @@ void RD::do_rd( Simulation *theSimulation )
 				// Eventually we will place the reactants based on Boltzmann probabilities.
 				// for now, just don't block RD.
 
+				theSimulation->allComplexes[padd1]->refresh(theSimulation);
 				do {
-					int rd_blocked = check_RD_blocked( theSimulation, padd1, 0 ); 	
+					rd_blocked = check_RD_blocked( theSimulation, padd1, 0 ); 	
 
 					if( rd_blocked )
 						theSimulation->allComplexes[padd1]->propagate_surface_q( theSimulation, dt );
@@ -335,25 +345,27 @@ void RD::do_rd( Simulation *theSimulation )
 				for( int s = 0; s < reactant2->nattach; s++ )
 					reactant2->sid[s] = sRec->id;
 				int padd2 = theSimulation->AddComplex( reactant2 );
+				for( int s = 0; s < theSimulation->allComplexes[padd2]->nsites; s++ )
+					registerSite( theSimulation->allComplexes[padd2], padd2, s );
 				
+				theSimulation->allComplexes[padd2]->refresh(theSimulation);
 				do {
-					int rd_blocked = check_RD_blocked( theSimulation, padd2, 0 ); 	
-
-					if( rd_blocked )
-						theSimulation->allComplexes[padd2]->propagate_surface_q( theSimulation, dt );
+					rd_blocked = check_RD_blocked( theSimulation, padd2, 0 ); 	
 
 					double dr[3] = { 
 							theSimulation->allComplexes[padd2]->rall[0] - theSimulation->allComplexes[padd1]->rall[0],
 							theSimulation->allComplexes[padd2]->rall[1] - theSimulation->allComplexes[padd1]->rall[1],
 							theSimulation->allComplexes[padd2]->rall[2] - theSimulation->allComplexes[padd1]->rall[2] };
+
 					double lr =normalize(dr);
 
 					if( lr < allReactions[r].binding_radius )
 						rd_blocked = 1;
+					
+					if( rd_blocked )
+						theSimulation->allComplexes[padd2]->propagate_surface_q( theSimulation, dt );
 
 				} while( rd_blocked );
-				
-	 
 			}
 		}   
 	}   
