@@ -1,6 +1,6 @@
-time_step 		1e-12
+time_step 		1e-11
 jobname			rd
-add simplelipid nbound 100 outside
+add simplelipid nbound 300 outside
 c0			-0.03
 mesh 			sphere.mesh
 sphere 			yes
@@ -8,10 +8,10 @@ do_bd_particles 			yes
 do_ld			yes
 do_rd			yes
 rxn_diffusion		rxn_info.inp
-o_lim 			10
+o_lim 			100
 nequil			1000
 nsteps			5000
 movie			yes	
 gamma_langevin 		100	
 KA			0.2
-seed			354651
+seed			315553

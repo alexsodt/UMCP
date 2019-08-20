@@ -1009,6 +1009,13 @@ int temp_main( int argc, char **argv )
 				int c = par_info.complexes[cx];
 				VP += theSimulation->allComplexes[c]->V(theSimulation);	
 				VP += theSimulation->allComplexes[c]->AttachV(theSimulation);	
+
+				if( VP > 1e4 )
+				{
+					VP += theSimulation->allComplexes[c]->V(theSimulation);	
+					VP += theSimulation->allComplexes[c]->AttachV(theSimulation);	
+					exit(1);
+				}
 			}
 
 

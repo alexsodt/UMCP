@@ -155,7 +155,6 @@ struct simpleLipid : pcomplex
 
 struct simpleDimer : simpleLipid
 {
-	double c0_val;
 	virtual void init( surface *theSurface, double *, int f, double u, double v ); 
 };
 
