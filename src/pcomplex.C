@@ -1123,7 +1123,7 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 		
 			refresh(theSimulation);
 			
-			if( stype && stype[s] >= 0 && check_iter < 100 )
+			if( theSimulation->rd && stype && stype[s] >= 0 && check_iter < 100 )
 			{
 				// this particle is configured for reaction/diffusion.
 				// we must block it from entering the reaction zone for all reactions for which it can participate.
