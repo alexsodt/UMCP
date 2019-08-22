@@ -34,7 +34,6 @@ class parameterBlock
 	int timestep_analysis;
 	int mass_scaling;
 	int disable_mesh;
-	int fix_membrane;
 	int mode_x;
 	int mode_y;
 	int mode_min;

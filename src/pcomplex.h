@@ -21,6 +21,7 @@ struct pcomplex
 	int bound; //check
 	int debug; //check
 	int do_bd; //check
+	int my_id;
 
 	char *complex_name; //check
 	
@@ -155,6 +156,7 @@ struct simpleLipid : pcomplex
 
 struct simpleDimer : simpleLipid
 {
+	void loadParams( parameterBlock *block );
 	virtual void init( surface *theSurface, double *, int f, double u, double v ); 
 };
 

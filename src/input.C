@@ -55,7 +55,6 @@ void setDefaults( parameterBlock *block )
 	block->kg = 0;
 	block->mode_min = -1;
 	block->mode_max = -1;
-	block->fix_membrane = 0;
 	block->T = 298;
 	block->mab_k_theta = 1;
 	block->mab_bond_length = 60;
@@ -90,7 +89,6 @@ void setDefaults( parameterBlock *block )
 	block->aqueous_diffc = 1e10; // angstroms^2/s
 	block->kinetic_corr_period = 10; 
 
-	block->fix_membrane = 0;
 	block->disable_mesh = 0;
 
 	block->tachyon_collision_draw_type = 0;
@@ -659,12 +657,12 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}	
 		}
-		else if( !strcasecmp( word1, "fix_membrane" ) )
+		else if( !strcasecmp( word1, "disable_mesh" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
-				block->fix_membrane = 1;
+				block->disable_mesh = 1;
 			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
-				block->fix_membrane = 0;
+				block->disable_mesh = 0;
 			else
 			{
 				printf("Could not interpret input line '%s'.\n", tbuf );
@@ -681,13 +679,13 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->mode_y = atoi( word2 );
 		else if( !strcasecmp( word1, "mode_KA" ) )
 			block->mode_KA = atof( word2 );
-		else if( !strcasecmp( word1, "nsteps" ) )
+		else if( !strcasecmp( word1, "nsteps" ) || !strcasecmp( word1, "nouter")  )
 			block->nsteps = atoi( word2 );
 		else if( !strcasecmp( word1, "nequil" ) )
 			block->nequil = atoi( word2 );
 		else if( !strcasecmp( word1, "nmin" ) )
 			block->nmin = atoi( word2 );
-		else if( !strcasecmp( word1, "o_lim" ) )
+		else if( !strcasecmp( word1, "o_lim" ) ||  !strcasecmp( word1, "ninner") )
 			block->o_lim = atoi( word2 );
 		else if( !strcasecmp( word1, "seed" ) )
 			block->random_seed = atoi( word2 );

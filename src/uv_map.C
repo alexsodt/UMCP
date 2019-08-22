@@ -2537,7 +2537,7 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 			double c = Sop[2];
 			double d = Sop[3];
 	
-			double c0 = theFormulas[frm].c0;
+			double c0 = theIrregularFormulas[frm].c0;
 			double fac = sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d);
 			c1 = -0.5*(a+d-fac);
 			c2 = -0.5*(a+d+fac);

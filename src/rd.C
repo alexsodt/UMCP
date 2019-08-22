@@ -12,7 +12,6 @@
 #include "random_global.h"
 #include "util.h"
 
-extern int global_delete_this;
 static global_boxing *boxing = NULL;
 
 void RD::init( Simulation * theSimulation, double time_step_in, parameterBlock *block )
@@ -220,7 +219,6 @@ void RD::do_rd( Simulation *theSimulation )
 	int ncomplex = theSimulation->ncomplex;
 
 	// box_reactants MUST be called before get_tracked, sets up boxing across function calls.
-	box_reactants(theSimulation);
 	get_tracked( theSimulation  );
 
 	for( int t = 0; t < nsites_tracked; t++ )
@@ -295,10 +293,6 @@ void RD::do_rd( Simulation *theSimulation )
 				// HACK: now only working for single-site attachment.
 				int s = 0;
 	
-				if( global_delete_this == 531)
-				{
-					printf("debug here.\n");
-				}
 //				printf("Dissociated! p: %le\n", pr );
 				// binding reaction between these two complexes... 
 				// possible outcomes are to add to a previous complex (likely case with Actin polymerization) or create a new one.	
@@ -371,9 +365,26 @@ void RD::do_rd( Simulation *theSimulation )
 			}
 		}   
 	}   
-	
-	unbox_reactants();
 
+#define RD_GM1_HACK // REMOVE THIS CODE FOR DISTRIBUTION
+
+#ifdef RD_GM1_HACK
+	int nMonomer = 0;
+	int nDimer = 0;
+
+	for( int c = 0; c < theSimulation->ncomplex; c++ )
+	{
+		if( theSimulation->allComplexes[c]->disabled ) continue;
+
+		if( !strcasecmp( theSimulation->allComplexes[c]->complex_name, "simpleLipid" ) )
+			nMonomer++;	
+		if( !strcasecmp( theSimulation->allComplexes[c]->complex_name, "simpleDimer" ) )
+			nDimer++;	
+	}	
+	
+	printf("%le %d %d\n", theSimulation->current_time, nMonomer, nDimer );
+#endif
+	
 }
 
 void RD::parseRDFile( const char *fileName )

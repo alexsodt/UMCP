@@ -5,6 +5,10 @@
 struct surface;
 #endif
 
+#ifndef __rdh__
+struct RD;
+#endif
+
 #ifndef __sparsematrixh__
 struct SparseMatrix;
 #endif
@@ -73,12 +77,14 @@ typedef struct surface_record
 typedef struct Simulation
 {
 	surface_record *allSurfaces;
-
+	RD *rd;
 	pcomplex **allComplexes;	
 	int ncomplex;	
 	int ncomplexSpace;	
 	double alpha[3];
 	double PBC_vec[3][3];
+	double current_time;
+
 
 	// visualize_cache keeps an extra cache of single particles for visualization purposes.
 	int nsites_at_psfwrite;

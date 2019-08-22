@@ -1,5 +1,5 @@
 %\documentclass[11pt,notitlepage]{revtex4}
-\documentclass[11pt]{article}
+\documentclass[11pt,twoside]{article}
 \usepackage{geometry}
 \usepackage[bottom]{footmisc}
 \usepackage{amsmath}
@@ -13,14 +13,20 @@
 \usepackage{setspace}
 \usepackage{wrapfig}
 \usepackage{newfloat}
+\usepackage{newfile}
 \usepackage{mdframed}
 \usepackage{cleveref}
 \usepackage{calc}
 \usepackage{regexpatch}
 \usepackage{ifxetex,ifluatex}
+\usepackage{multicol}
 %\usepackage[resetlabels]{multibib}
 \usepackage{filecontents}
-
+\usepackage{tocloft}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{nameref}
+\usepackage{pdftexcmds}
 \geometry{margin=0.75in}
 
   \newenvironment{bcomment}[1]{%
@@ -32,6 +38,27 @@
 %      \setlist[itemize]{label=$\Box$,leftmargin=*}
   }{\end{mdframed}}
 
+
+\makeatletter
+\newcommand\compareStringsDo[4]{%
+  \lowercase{\ifcase\pdf@strcmp{#1}{#2}}%
+    #4\or
+    #4\else
+    #3\fi
+}
+%\def\compareStrings#1#2{%
+% \pdf@strcmp{#1}{#2}%
+%}
+\newcommand*{\currentname}{\@currentlabelname}
+\makeatother
+
+\newcommand{\sectiontitle}{}
+\newcommand{\newsection}[1]{\section{#1}\renewcommand{\sectiontitle}{#1}}
+
+\newcommand{\subsectiontitle}{}
+\newcommand{\newsubsection}[1]{\subsection{#1}\renewcommand{\subsectiontitle}{#1}}
+
+%\newcommand*{\currentname}{\@currentlabelname}
 \newcommand{\vek}[1]{\boldsymbol{#1}}          % vector symbol
 \newcommand{\code}[1]{\texttt{#1}}
 \newcommand{\diff}{\textrm{d}}
@@ -80,6 +107,41 @@
 }
 \newcommand{\icommandfmt}{(\theicommand)}
 
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+%\fancyhead[RE,LO]{\subsectionmark}
+%\fancyhead[LE,RO]{\sectionmark}
+%\fancyfoot[R]{\thepage}
+%\cfoot{}
+\definecolor{veryLightGray}{HTML}{EEEEEE}
+
+%\renewcommand{\sectionmark}[1]{\markright{\thesection~~~#1}}
+%\renewcommand{\subsectionmark}[1]{\markright{\thesubsection~~~#1}}
+
+\chead{%
+\setlength{\fboxsep}{3pt}
+\colorbox{veryLightGray}{
+\begin{minipage}{\headwidth}
+\centering
+\color{black}
+\compareStringsDo{\thesection.0}{\thesubsection}
+{{\bf \sectiontitle} \hfill {\it \subsectiontitle} }
+{{\it \subsectiontitle} \hfill {\bf \sectiontitle} }
+\end{minipage}}%
+%\colorbox{LiveCoMSMediumGrey}{\currentname}%
+}
+
+%\fancyhead[RE]{\leftmark}
+%\fancyhead[LO]{\rightmark}
+%\fancyfoot[RO,LE]{\thepage}
+%\fancypagestyle{plain}{%  the preset of fancyhdr 
+%    \fancyhf{} % clear all header and footer fields
+%    \fancyfoot[C]{\textbf{\thepage}} % except the center
+%    \renewcommand{\headrulewidth}{0pt}
+%    \renewcommand{\footrulewidth}{0pt}}
+%\cfoot{}
+\rfoot{\small\thepage\space of\space\pageref{LastPage}}
 
 %\usepackage[hmargin=0.75in,vmargin=0.75in,paperheight=11in,paperwidth=8.5in]{geometry}
 %
@@ -110,7 +172,7 @@
 \begin{document}
 \bibliographystyle{unsrt}
 
-\pagenumbering{roman}
+%\pagenumbering{off}
 
 
 \title{ Documentation for UMCP continuum modeling software}
@@ -126,7 +188,7 @@
 \input{preamble.tex}
 
 \input{introduction.tex}
-~\cite{Feng2006}
+
 \input{running.tex}
 
 \input{lipid_composition.tex}
@@ -144,7 +206,41 @@
 % Ensembles, thermostatting and hydrodynamics.
 
 \input{npt.tex}
+
 \input{srd.tex}
+
+\input{options.tex}
+
+\newpage
+
+%\newcommand{\listSetupOptionName}{Options: System setup}
+%\newlistof{optionSummarysetup}{setupopts}{\listSetupOptionName}
+%\newcommand{\listDynamicsOptionName}{Options: Dynamics}
+%\newlistof{optionSummarydynamics}{dynamicsopts}{\listDynamicsOptionName}
+%\newcommand{\listRxnOptionName}{Options: Reaction diffusion}
+%\newlistof{optionSummaryrxn}{rxnopts}{\listRxnOptionName}
+%\newcommand{\listMiscOptionName}{Options: Miscellaneous}
+%\newlistof{optionSummarymisc}{miscopts}{\listMiscOptionName}
+
+% setup, dynamics, misc, rxn
+
+
+
+
+% \renewcommand{\cftoptionSummarysetupfont}{\bf}
+% \renewcommand{\cftoptionSummarysetupaftersnum}{}
+% \renewcommand{\cftoptionSummarysetupaftersnumb}{}
+% \renewcommand{\cftoptionSummarysetupleader}{\cftdotfill{\cftoptionSummarysetupdotsep}}
+% \renewcommand{\cftoptionSummarysetupdotsep}{\cftdotsep}
+% \renewcommand{\cftoptionSummarysetuppagefont}{}
+% \renewcommand{\cftoptionSummarysetupafterpnum}{}
+% \renewcommand{\cftoptionSummarysetuppresnum}{SOMETHING }
+%
+%\renewcommand{\cftsetupoptstitlefont}{\Large\bf}
+%\renewcommand{\cftdynamicsoptstitlefont}{\Large\bf}
+%\renewcommand{\cftrxnoptstitlefont}{\Large\bf}
+%\renewcommand{\cftmiscoptstitlefont}{\Large\bf}
+
 
 \section{Bibliography}
 \bibliography{docs}

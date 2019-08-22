@@ -1,5 +1,5 @@
 
-\section{ Running dynamics: \code{\MakeLowercase{hd}} }
+\newsection{ Running dynamics: \code{\MakeLowercase{hd}} }
 
 Dynamics are computed using the program \code{hd}, short for Hamiltonian dynamics. 
 
@@ -16,16 +16,16 @@ hd run.inp nsteps=10
 \end{command}
 
 
-\subsection{Dynamics options and parameters }
+\newsubsection{Dynamics options and parameters }
 
 The choice of timestep is critical for computing proper ensembles. 
 If the timestep is too large, the system will be unstable and program execution will halt.
 The option \code{timestep\_analysis=yes} provides a rough estimate of a proper timescale for dynamics.
 
-\subsubsection{Loading a simulation state}
+\newsubsection{Loading a simulation state}
 
 Dynamics and minimization can be restarted by loading a save file.
-The input syntax is \code{load}:
+The input syntax is \code{load <name.save>}:
 \begin{command}
 hd run.inp load=min.save
 \end{command}

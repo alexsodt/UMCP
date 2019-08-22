@@ -32,7 +32,6 @@
 #define BOXED
 
 
-int global_delete_this = 0;
 
 #define OLD_LANGEVIN
 
@@ -150,7 +149,7 @@ int temp_main( int argc, char **argv )
 
 	Simulation *theSimulation = (Simulation *)malloc( sizeof(Simulation) );
 	theSimulation->visualization_cache = 0;
-
+	theSimulation->current_time = 0;
 	srd_integrator *srd_i = NULL;
 	theSimulation->allSurfaces = NULL;	
 
@@ -289,12 +288,11 @@ int temp_main( int argc, char **argv )
 
 	// for now only collect kc info from first surface.
 	// INITIALIZE REACTION DIFFUSION
-	RD *rd = NULL;
 
 	if(do_rd)
 	{
-		rd = (RD *)malloc( sizeof(RD) );
-		rd->init(theSimulation, dt, &block );
+		theSimulation->rd = (RD *)malloc( sizeof(RD) );
+		theSimulation->rd->init(theSimulation, dt, &block );
 		if(debug)
 			printf("debug RD 1st ncomplexes: %d\n", theSimulation->ncomplex);
 
@@ -304,8 +302,10 @@ int temp_main( int argc, char **argv )
 
 		theSimulation->nsites_at_psfwrite = nsites_total;
 		theSimulation->visualization_cache = 3 * nsites_total;
+		theSimulation->rd->box_reactants(theSimulation);
 	}
-
+	else
+		theSimulation->rd = NULL;
 	int nmodes = 8;
 	int nspacehk = 10;
 	int nhk = 0;
@@ -972,7 +972,7 @@ int temp_main( int argc, char **argv )
 		double last_wait_time = 0;
 		double last_complex_time = 0;
 		
-		for( int t = 0; t < block.o_lim; t++, cur_t += time_step, global_cntr++ )
+		for( int t = 0; t < block.o_lim; t++, cur_t += time_step, global_cntr++, theSimulation->current_time += time_step)
 		{
 #ifdef SAVE_RESTARTS
 			int save_seed = rand();
@@ -1226,6 +1226,11 @@ int temp_main( int argc, char **argv )
 			// has special routines for handling elastic collisions.
 			propagateSolutionParticles( theSimulation, time_step );
 
+			if( do_rd )
+			{
+				theSimulation->rd->unbox_reactants();
+				theSimulation->rd->box_reactants(theSimulation);
+			}
 			gettimeofday(&tnow, NULL);
 			double complex_time_stop = tnow.tv_sec + (1e-6) * tnow.tv_usec;
 
@@ -1235,7 +1240,7 @@ int temp_main( int argc, char **argv )
 
 			/* BEGIN SRD */
 			
-			if( do_srd && ! block.fix_membrane )
+			if( do_srd && ! block.disable_mesh)
 			{
 				for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 				sRec->theSurface->rebox_system();
@@ -1479,13 +1484,13 @@ int temp_main( int argc, char **argv )
 				if(debug)
 					printf("debug RD 2nd ncomplexes: %d\n", theSimulation->ncomplex);
 
-				rd->do_rd(theSimulation); 
+				theSimulation->rd->do_rd(theSimulation); 
 
 				if(debug)
 				{
 					for(int p = 0; p < theSimulation->ncomplex; p++)
 					{
-						printf("debug RD 3rd id: %d ntracked: %d\n", p, rd->tracked[p]->ntracked);
+						printf("debug RD 3rd id: %d ntracked: %d\n", p, theSimulation->rd->tracked[p]->ntracked);
 					}
 				}
 				//run RD
@@ -1537,7 +1542,6 @@ int temp_main( int argc, char **argv )
 			{
 				printf("t: %le ns o: %d T: %.8le V: %.12le T+V: %.14le TEMP: %le MEM_TEMP: %le AV_TEMP %le VR: %.3le VMEM: %le VP: %le", (cur_t * 1e9), o, T, V, T+V, TEMP, mem_T, sum_average_temp / n_temp,VR, VMEM, VP );
 
-				global_delete_this = o;
 				if( step_rate > 0 )
 					printf(" steps/s: %le", step_rate );
 				printf("\n");

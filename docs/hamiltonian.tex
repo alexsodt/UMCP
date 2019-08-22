@@ -1,7 +1,7 @@
 
-\section{ Hamiltonian and Lagrangian dynamics } \label{sec:hamilton}
+\newsection{ Hamiltonian and Lagrangian dynamics } \label{sec:hamilton}
 
-\subsection{Lagrangian mechanics}
+\newsubsection{Lagrangian mechanics}
 
 
 The Lagrangian $L$ is defined as:
@@ -40,7 +40,7 @@ This matrix is inverted to put the equations in form suitable for integration:
 \ddot{q}_j = M^{-1}_{ij} \frac{\partial V}{\partial q_i}
 \end{equation}
 
-\subsection{Hamiltonian dynamics}
+\newsubsection{Hamiltonian dynamics}
 
 In Hamiltonian dynamics a new variable is introduced, the momentum $p$:
 \begin{equation}
@@ -64,7 +64,7 @@ The equations of motion are then:
 \dot{q} &= + \frac{\partial H }{\partial p}
 \end{align} 
 
-\subsection{Particle on the membrane surface}
+\newsubsection{Particle on the membrane surface}
 
 The coordinates of a particle on the membrane's surface are determined by their internal coordinates $u$ and $v$ as well as the control points of the surrounding mesh:
 \begin{equation}
@@ -187,7 +187,7 @@ because
 
 The kinetic energy $T$ now has position-dependent cross-terms between the particle and membrane that contribute to the time derivative of the momenta.
 
-\subsection{Propagating particle momenta $p$ }
+\newsubsection{Propagating particle momenta $p$ }
 
 Particle momenta $p$ are propagated using the force, e.g., $\frac{\partial{H}}{\partial{u}}$.
 The kinetic energy now depends on $u$ through $\frac{\partial T}{\partial u}$ and $\frac{\partial T}{\partial v}$.
@@ -197,12 +197,12 @@ The kinetic energy now depends on $u$ through $\frac{\partial T}{\partial u}$ an
 %\end{equation}
 %where the superscript $T$ indicates transposition.
 
-\subsection{The effective mass matrix is banded; its inverse is short-ranged }
+\newsubsection{The effective mass matrix is banded; its inverse is short-ranged }
 
 \input{normal_modes.tex}
 
 
-\subsection{Langevin dynamics}
+\newsubsection{Langevin dynamics}
 
 The generic Langevin equation\footnote{The form of this equation was adapted from the English language Wikipedia page for the Langevin Equation on March 27th, 2019.}
 is
@@ -224,7 +224,7 @@ However, for a more complicated kinetic energy the quantity $\dot{q}$ is a conve
 
 % normally computed as nv by nv matrix.
 
-%\section{Bibliography}
+%\newsection{Bibliography}
 %\bibliography{hamiltonian}
 %
 %\end{document}

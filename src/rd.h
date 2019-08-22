@@ -1,5 +1,5 @@
-#ifndef __rd_kaylah__
-#define __rd_kaylah__
+#ifndef __rdh__
+#define __rdh__
 
 #define SITE_TYPE_ANY -1
 
