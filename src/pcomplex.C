@@ -294,7 +294,7 @@ double pcomplex::update_dH_dq( Simulation *theSimulation, double time_step, doub
 	// frac mult is used for distributing the mesh gradients throughout propagation..	
 	double frac_mult=1.0;
 
-	if( is_irreg && time_step > 0 )
+	if( is_irreg && time_step > 0 && ! do_bd )
 	{
 		double fraction = 1.0;
 
@@ -1168,12 +1168,14 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 	
 	if( bound )	
 	{
+		setrall(theSimulation);
 		// 
 	}
 	else
 	{
 
 	} 
+
 }
 
 void pcomplex::propagate_p( Simulation *theSimulation, double dt )
