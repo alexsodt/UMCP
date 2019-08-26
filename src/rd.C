@@ -11,6 +11,7 @@
 #include "fpr_subroutines/2D.h"
 #include "random_global.h"
 #include "util.h"
+#include "uv_map.h"
 
 static global_boxing *boxing = NULL;
 
@@ -75,6 +76,7 @@ void RD::get_tracked( Simulation *theSimulation  )
 	pcomplex **allComplexes = theSimulation->allComplexes;
 	int ncomplex = theSimulation->ncomplex;
 
+
 	// set up the system boxing
 	double *alphas = theSimulation->alpha;
         int id = 0;
@@ -126,6 +128,7 @@ void RD::get_tracked( Simulation *theSimulation  )
 
 			theSimulation->wrapPBC( dr, alphas );
 			double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+
 			if( r < Rmax )
 			{
 				npairs++;
@@ -148,10 +151,10 @@ void RD::get_tracked( Simulation *theSimulation  )
 				if(old)
 				{
 					tracked[t]->tracked_info[old_id].info = 1;
-					tracked[t]->tracked_info[old_id].prev_sep = tracked[t]->tracked_info[old_id].curr_sep;
-					tracked[t]->tracked_info[old_id].prev_norm = tracked[t]->tracked_info[old_id].curr_norm;
+					tracked[t]->tracked_info[old_id].prevsep = tracked[t]->tracked_info[old_id].curr_sep;
+					tracked[t]->tracked_info[old_id].prevnorm = tracked[t]->tracked_info[old_id].currnorm;
 					tracked[t]->tracked_info[old_id].curr_sep = r;
-					tracked[t]->tracked_info[old_id].curr_norm = 1.0;
+					tracked[t]->tracked_info[old_id].currnorm = 1.0;
 				}
 				// If newly tracked need to add to list
 				else
@@ -168,7 +171,11 @@ void RD::get_tracked( Simulation *theSimulation  )
 					tracked[t]->tracked_new[nnew].sid1 = s;
 					tracked[t]->tracked_new[nnew].sid2 = s2;
 					tracked[t]->tracked_new[nnew].curr_sep = r;
-					tracked[t]->tracked_new[nnew].curr_norm = 1.0;
+					tracked[t]->tracked_new[nnew].currnorm = 1.0;
+					tracked[t]->tracked_new[nnew].prevnorm = 1.0;
+					tracked[t]->tracked_new[nnew].prevsep= -1;
+					tracked[t]->tracked_new[nnew].ps_prev = 1.0;
+			
 					
 					nnew++;
 				}
@@ -189,10 +196,10 @@ void RD::get_tracked( Simulation *theSimulation  )
 			if(tracked[t]->tracked_info[n].info)
 			{
 				tracked[t]->tracked_new[count].id = tracked[t]->tracked_info[n].id;
-				tracked[t]->tracked_new[count].prev_sep = tracked[t]->tracked_info[n].prev_sep;
-				tracked[t]->tracked_new[count].prev_norm = tracked[t]->tracked_info[n].prev_norm;
+				tracked[t]->tracked_new[count].prevsep = tracked[t]->tracked_info[n].prevsep;
+				tracked[t]->tracked_new[count].prevnorm = tracked[t]->tracked_info[n].prevnorm;
 				tracked[t]->tracked_new[count].curr_sep = tracked[t]->tracked_info[n].curr_sep;
-				tracked[t]->tracked_new[count].prev_norm = tracked[t]->tracked_info[n].curr_norm;
+				tracked[t]->tracked_new[count].prevnorm = tracked[t]->tracked_info[n].currnorm;
 				tracked[t]->tracked_new[count].sid1 = tracked[t]->tracked_info[n].sid1;
 				tracked[t]->tracked_new[count].sid2 = tracked[t]->tracked_info[n].sid2;
 				tracked[t]->tracked_new[count].info = 0;	
@@ -217,6 +224,27 @@ void RD::do_rd( Simulation *theSimulation )
 	*/
 	double prob;
 	int ncomplex = theSimulation->ncomplex;
+	
+	static int *bin_counts = NULL;
+	static double *p_sampled = NULL;
+	static int nbins = 100;
+	static int ncount=0;
+	static int delay = 0;
+	static int delay_start = -1;
+	static double use_binding_radius = 5.0;
+	static double use_Rmax = 18;
+	static int nreact = 0, ndissoc = 0;
+
+	static double p_no_reaction = 1.0;
+	static double sum_prob = 0;
+
+	if( !bin_counts )
+	{
+		bin_counts = (int *)malloc( sizeof(int) * nbins );
+		memset( bin_counts, 0, sizeof(int) * nbins );
+		p_sampled = (double *)malloc( sizeof(double) * nbins );
+		memset( p_sampled, 0, sizeof(double) * nbins );
+	}
 
 	// box_reactants MUST be called before get_tracked, sets up boxing across function calls.
 	get_tracked( theSimulation  );
@@ -237,6 +265,10 @@ void RD::do_rd( Simulation *theSimulation )
 			int rxn = rxnLookup( theSimulation->allComplexes[p]->stype[s], theSimulation->allComplexes[p2]->stype[s2] );
 			if( rxn == -1 ) continue; // should never be -1..
 	
+			double prevnorm = tracked[t]->tracked_info[n].prevnorm;
+			double prevsep  = tracked[t]->tracked_info[n].prevsep;
+			double ps_prev  = tracked[t]->tracked_info[n].ps_prev;
+
 			double k_on = allReactions[rxn].k_on;
 			double k_off = allReactions[rxn].k_off;
 			double binding_radius = allReactions[rxn].binding_radius;
@@ -244,12 +276,42 @@ void RD::do_rd( Simulation *theSimulation )
 			double D2 = theSimulation->allComplexes[p2]->DC[s2];	
 			double Dtot = D1+D2;
 			double Rmax = binding_radius + 3 * sqrt( Dtot * dt ); 
-			double rn = gsl_rng_uniform(rng_x);
+//			double rn = gsl_rng_uniform(rng_x);
+			double rn = rand() / (double)RAND_MAX;
 			// TO DO: retrieve stored reaction information from tracked_info.			
-			prob = get_2D_2D_rxn_prob(tracked[t]->tracked_info[n].curr_sep, k_on, binding_radius, Dtot, dt, Rmax);
+
+			double p0_ratio = 1.0;
+
+			double pre_prob = get_2D_2D_rxn_prob(tracked[t]->tracked_info[n].curr_sep, k_on, binding_radius, Dtot, dt, Rmax,
+				prevsep, ps_prev, &p0_ratio);
 	
+
+
+
+			double currnorm = tracked[t]->tracked_info[n].prevnorm * p0_ratio;
+			double prob = pre_prob * currnorm;
+
+			tracked[t]->tracked_info[n].ps_prev = 1.0 - pre_prob * currnorm;
+			tracked[t]->tracked_info[n].prevnorm = currnorm;
+
+			use_Rmax = Rmax;
+			use_binding_radius = binding_radius;
+
+			if( delay > delay_start )
+			{
+				int rb = nbins*(tracked[t]->tracked_info[n].curr_sep-binding_radius)/(Rmax-binding_radius);	
+				if( rb >= nbins ) rb = nbins-1;
+				if( rb < 0 )
+				{	
+					 rb = 0;
+				}
+				bin_counts[rb] += 1;
+				p_sampled[rb] += prob;
+			}
 			if(prob > rn)
 			{
+				sum_prob = 0;
+				p_no_reaction = 1.0;
 //				printf("Reacted! p: %le\n", prob );
 				// binding reaction between these two complexes... 
 				// possible outcomes are to add to a previous complex (likely case with Actin polymerization) or create a new one.	
@@ -269,11 +331,29 @@ void RD::do_rd( Simulation *theSimulation )
 				// this stops the complex from being propagated, simulated, etc. leaves it for garbage collection later.
 				theSimulation->RemoveComplexDelayed(p);
 				theSimulation->RemoveComplexDelayed(p2);			
+
+				product->refresh(theSimulation);
+
+				nreact+=1;
 			}
-				
+			else
+			{
+				p_no_reaction *= (1.0-prob); 
+				sum_prob += prob;
+			}
 		}
 	}
 
+#ifdef DEBUG_RD
+	printf("p_no_reaction: %le sum_prob: %le\n", p_no_reaction, sum_prob );
+
+	if( delay > delay_start )
+		ncount++;
+	delay++;
+	for( int b = 0; b < nbins; b++ )
+		printf("%le %le %le\n",
+			use_binding_radius+(b+0.5)*(use_Rmax-use_binding_radius)/nbins, bin_counts[b]/(double)ncount, p_sampled[b]/ncount);
+#endif
 //	printf("After rd, ncomplex: %d\n", theSimulation->ncomplex );
 
 	// dissociation.
@@ -289,6 +369,8 @@ void RD::do_rd( Simulation *theSimulation )
 			if( rn < pr ) 
 			{
 				// creates the reactants.
+
+				double binding_radius = allReactions[r].binding_radius;
 
 				// HACK: now only working for single-site attachment.
 				int s = 0;
@@ -343,7 +425,22 @@ void RD::do_rd( Simulation *theSimulation )
 				int padd2 = theSimulation->AddComplex( reactant2 );
 				for( int s = 0; s < theSimulation->allComplexes[padd2]->nsites; s++ )
 					registerSite( theSimulation->allComplexes[padd2], padd2, s );
-				
+
+				double duv[2];
+				randomDirection( sRec->theSurface, sRec->r, reactant1->fs[0], reactant1->puv[0], reactant1->puv[1], binding_radius*1.03, duv );
+
+				int f_1 = reactant1->fs[0];
+				int nf = f_1;
+				double uv1[2] = { reactant1->puv[0], reactant1->puv[1] };
+				do {
+					f_1 = nf;
+					nf = sRec->theSurface->nextFace( f_1, uv1+0, uv1+1, duv+0, duv+1, sRec->r ); 
+				} while( nf != f_1 );
+
+
+				theSimulation->allComplexes[padd2]->fs[0] = f_1;
+				theSimulation->allComplexes[padd2]->puv[0] = uv1[0];
+				theSimulation->allComplexes[padd2]->puv[1] = uv1[1];
 				theSimulation->allComplexes[padd2]->refresh(theSimulation);
 				do {
 					rd_blocked = check_RD_blocked( theSimulation, padd2, 0 ); 	
@@ -362,6 +459,8 @@ void RD::do_rd( Simulation *theSimulation )
 						theSimulation->allComplexes[padd2]->propagate_surface_q( theSimulation, dt );
 
 				} while( rd_blocked );
+				
+				ndissoc+=1;
 			}
 		}   
 	}   
@@ -382,7 +481,7 @@ void RD::do_rd( Simulation *theSimulation )
 			nDimer++;	
 	}	
 	
-	printf("%le %d %d\n", theSimulation->current_time, nMonomer, nDimer );
+	printf("RDOUT %le %d %d nreact: %d ndissoc: %d\n", theSimulation->current_time, nMonomer, nDimer, nreact, ndissoc );
 #endif
 	
 }
@@ -691,8 +790,8 @@ int RD::check_RD_blocked( Simulation *theSimulation, int p, int s)
 
 		if( p == p2 )
 			continue;
-		if( p2 < p )
-			continue;
+//		if( p2 < p )
+//			continue;
 
 		int rxn = rxnLookup( theSimulation->allComplexes[p]->stype[s], theSimulation->allComplexes[p2]->stype[s2] );
 	

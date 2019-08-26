@@ -953,6 +953,7 @@ int temp_main( int argc, char **argv )
 	struct timeval tnow;
 
 
+
 	while( !done )
 	{
 
@@ -1222,6 +1223,22 @@ int temp_main( int argc, char **argv )
 					time_remaining -= dt;
 				}
 			}
+	
+#define VERIFY_BLOCKED_CHECK
+#ifdef VERIFY_BLOCKED_CHECK
+			int nblocked = 0;
+			for( int c = 0; c < theSimulation->ncomplex; c++ )
+			{
+				for( int s = 0; s < theSimulation->allComplexes[c]->nsites; s++ )
+				{
+					if( theSimulation->rd && theSimulation->allComplexes[c]->stype[s] >= 0 )
+					{
+						if( theSimulation->rd->check_RD_blocked( theSimulation, c, s ) ) nblocked++;
+					}
+				}
+			}
+			printf("NBLOCKED: %d\n", nblocked );
+#endif		
 
 			// has special routines for handling elastic collisions.
 			propagateSolutionParticles( theSimulation, time_step );

@@ -1010,136 +1010,160 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 	{
 		int okay = 1;
 		int check_iter = 0;
-		do {
-			okay = 1;
  
-			surface_record *sRec = NULL;
-			surface *theSurface =NULL;
-			for( surface_record *tRec = theSimulation->allSurfaces; tRec; tRec = tRec->next )
+		surface_record *sRec = NULL;
+		surface *theSurface =NULL;
+		for( surface_record *tRec = theSimulation->allSurfaces; tRec; tRec = tRec->next )
+		{
+			if( tRec->id == sid[s] )
 			{
-				if( tRec->id == sid[s] )
+				sRec = tRec;	
+				theSurface = sRec->theSurface;
+				break;
+			}
+		}
+
+		double *rsurf = sRec->r;
+		double *mesh_grad = sRec->g;
+		double *mesh_qdot = sRec->qdot;
+		double *mesh_qdot0 = sRec->qdot0;
+		int last_f = fs[s];
+		double last_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
+		double duv[2];
+
+		if( do_bd )
+		{
+			double gmat[4];
+			double g_u; // derivative of |g|, not root wrt u
+			double g_v; //                             wrt v
+			
+	
+			// gval is the sqrt metric
+			double root_g = theSurface->metric( fs[s], puv[2*s+0], puv[2*s+1], rsurf, gmat, &g_u, &g_v );
+
+#ifdef TRACK_UNUSUAL
+			if( n_av_root_g > 10 )
+			{
+				double var = av_root_g2/n_av_root_g - pow(av_root_g/n_av_root_g,2);
+				double stdd = sqrt(var);
+
+				if( fabs( (root_g - av_root_g/n_av_root_g)/stdd ) > 3 )
 				{
-					sRec = tRec;	
-					theSurface = sRec->theSurface;
-					break;
+					printf("Unusual root g %le av %le stdd %le\n",
+						root_g, av_root_g/n_av_root_g, stdd );
 				}
 			}
+
+			av_root_g2 += root_g*root_g;
+			av_root_g += root_g;
+			n_av_root_g += 1;
+#endif
+			double val = sqrt(gmat[0]*gmat[0]+4*gmat[1]*gmat[1]-2*gmat[0]*gmat[3]+gmat[3]*gmat[3]);
+
+			double gamma_neg_half[4] = { 
+				(1.0/val) * ((-gmat[0]+gmat[3]+val)/sqrt(2*(gmat[0]+gmat[3]-val))-(-gmat[0]+gmat[3]-val)/sqrt(2*(gmat[0]+gmat[3]+val))),   	
+				(1.0/val) * ( -sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]-val) + sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]+val) ),
+				(1.0/val) * ( -sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]-val) + sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]+val) ),
+				(1.0/val) * (( gmat[0]-gmat[3]+val)/sqrt(2*(gmat[0]+gmat[3]-val))+(-gmat[0]+gmat[3]+val)/sqrt(2*(gmat[0]+gmat[3]+val))),   
+				};
+
+			double gamma_inv[4] = {
+				gmat[0]/(root_g*root_g), -gmat[1]/(root_g*root_g), -gmat[1]/(root_g*root_g), gmat[3]/(root_g*root_g)
+			};
+
+			// g_u + means metric increases in u direction, move particle there.
+			double pre_drift[2] = { 
+					save_grad[2*s+0]/kT + (-g_u/(2*root_g*root_g)), // 1/g done with sqrt
+					save_grad[2*s+1]/kT + (-g_v/(2*root_g*root_g))
+						};
+
+			double tu = puv[2*s+0]; 
+			double tv = puv[2*s+1]; 
 	
-			double *rsurf = sRec->r;
-			double *mesh_grad = sRec->g;
-			double *mesh_qdot = sRec->qdot;
-			double *mesh_qdot0 = sRec->qdot0;
-			int last_f = fs[s];
-			double last_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
-			double duv[2];
-	
-			if( do_bd )
-			{
-				double gmat[4];
-				double g_u; // derivative of |g|, not root wrt u
-				double g_v; //                             wrt v
-				
+			do {
+				puv[2*s+0] = tu;
+				puv[2*s+1] = tv;
+
+				okay = 1;
+
 				double noise[2] = { 
 					gsl_ran_gaussian(r_gen_global, 1 ),
 					gsl_ran_gaussian(r_gen_global, 1 )
 					};
-		
-				// gval is the sqrt metric
-				double root_g = theSurface->metric( fs[s], puv[2*s+0], puv[2*s+1], rsurf, gmat, &g_u, &g_v );
-	
-	#ifdef TRACK_UNUSUAL
-				if( n_av_root_g > 10 )
-				{
-					double var = av_root_g2/n_av_root_g - pow(av_root_g/n_av_root_g,2);
-					double stdd = sqrt(var);
-	
-					if( fabs( (root_g - av_root_g/n_av_root_g)/stdd ) > 3 )
-					{
-						printf("Unusual root g %le av %le stdd %le\n",
-							root_g, av_root_g/n_av_root_g, stdd );
-					}
-				}
-	
-				av_root_g2 += root_g*root_g;
-				av_root_g += root_g;
-				n_av_root_g += 1;
-	#endif
-				double val = sqrt(gmat[0]*gmat[0]+4*gmat[1]*gmat[1]-2*gmat[0]*gmat[3]+gmat[3]*gmat[3]);
-	
-				double gamma_neg_half[4] = { 
-					(1.0/val) * ((-gmat[0]+gmat[3]+val)/sqrt(2*(gmat[0]+gmat[3]-val))-(-gmat[0]+gmat[3]-val)/sqrt(2*(gmat[0]+gmat[3]+val))),   	
-					(1.0/val) * ( -sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]-val) + sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]+val) ),
-					(1.0/val) * ( -sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]-val) + sqrt(2)*gmat[1]/sqrt(gmat[0]+gmat[3]+val) ),
-					(1.0/val) * (( gmat[0]-gmat[3]+val)/sqrt(2*(gmat[0]+gmat[3]-val))+(-gmat[0]+gmat[3]+val)/sqrt(2*(gmat[0]+gmat[3]+val))),   
-					};
-	
-				double gamma_inv[4] = {
-					gmat[0]/(root_g*root_g), -gmat[1]/(root_g*root_g), -gmat[1]/(root_g*root_g), gmat[3]/(root_g*root_g)
-				};
-	
-				// g_u + means metric increases in u direction, move particle there.
-				double pre_drift[2] = { 
-						save_grad[2*s+0]/kT + (-g_u/(2*root_g*root_g)), // 1/g done with sqrt
-						save_grad[2*s+1]/kT + (-g_v/(2*root_g*root_g))
-							};
-	
 	
 				double corr_noise[2] = { gamma_neg_half[0] * noise[0] + gamma_neg_half[1] * noise[1],
 							 gamma_neg_half[2] * noise[0] + gamma_neg_half[3] * noise[1] }; 
-	
-	#ifdef TRACK_UNUSUAL
-				double dstep[2] = { (gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt,
-						  (gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt };
-				
-				double dstep_mag = sqrt(dstep[0]*dstep[0]+dstep[1]*dstep[1]);
-				
-				av_dstep += dstep_mag;
-				av_dstep2 += dstep_mag*dstep_mag;
-				n_dstep += 1;
-	
-				double av = av_dstep/n_dstep;
-				double av2 = av_dstep2/n_dstep;
-				double var = av2-av*av;
-				double stdd = sqrt(var);
-				double del = (dstep_mag-av)/stdd;
-	
-				if( del > 3 )
-				{
-					printf("unusual step %le av %le std %le grad: %le %le gg: %le %le\n", dstep_mag, av, stdd, save_grad[2*s+0]/kT, save_grad[2*s+1]/kT, -g_u/(2*root_g*root_g), -g_v/(2*root_g*root_g)  );
-				}
-	#endif
+			
 				// negative sign means move in the direction of force not grad.
 				duv[0] = -(gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[0];
 				duv[1] = -(gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[1];	
-			}
-			else
-			{
-				duv[0] = qdot[2*s+0] * dt * AKMA_TIME;
-				duv[1] = qdot[2*s+1] * dt * AKMA_TIME;
-			}
-	
+				
+				puv[2*s+0] += duv[0];
+				puv[2*s+1] += duv[1];				
+
+				
+				if( theSimulation->rd && stype && stype[s] >= 0 && check_iter < 100 )
+				{
+					refresh(theSimulation);
+					// this particle is configured for reaction/diffusion.
+					// we must block it from entering the reaction zone for all reactions for which it can participate.
+		
+					if( theSimulation->rd->check_RD_blocked( theSimulation, my_id, s ) )
+					{
+	//						printf("BLOCKED RD MOVE.\n");
+						okay = 0; 
+					}
+					check_iter++;
+
+					if( check_iter > 50 )
+					{
+						printf("hm.\n");
+					}
+				}
+			} while ( !okay );
+		}
+		else
+		{
+			duv[0] = qdot[2*s+0] * dt * AKMA_TIME;
+			duv[1] = qdot[2*s+1] * dt * AKMA_TIME;
+		
 			puv[2*s+0] += duv[0];
 			puv[2*s+1] += duv[1];
-		
-			refresh(theSimulation);
-			
-			if( theSimulation->rd && stype && stype[s] >= 0 && check_iter < 100 )
-			{
-				// this particle is configured for reaction/diffusion.
-				// we must block it from entering the reaction zone for all reactions for which it can participate.
+		}
 
-				if( theSimulation->rd->check_RD_blocked( theSimulation, my_id, s ) )
-				{
-//					printf("BLOCKED RD MOVE.\n");
-					okay = 0; 
-				}
-				check_iter++;
-			}
-			
 
-			//double new_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
-			//double fr = fabs(1-new_metric/last_metric);
-		} while ( !okay );
+//#define DEBUG_DIFFUSION		
+#ifdef DEBUG_DIFFUSION
+		if( fabs(dt-1e-9) < 1e-11)
+		{
+			double curp[3], curn[3];
+			double newp[3], newn[3];
+
+			double cur_u = puv[2*s+0]-duv[0], cur_v = puv[2*s+1]-duv[1];
+			theSurface->evaluateRNRM( fs[s], cur_u, cur_v, curp, curn, rsurf );
+
+			int nf = fs[s], f_1 = fs[s];
+			double new_u = cur_u, new_v = cur_v;
+			double tduv[2] = { duv[0], duv[1] };
+
+			do {
+				f_1 = nf;
+				nf = theSurface->nextFace( f_1, &new_u, &new_v, tduv+0, tduv+1, rsurf ); 
+			} while( nf != f_1 );
+	
+			theSurface->evaluateRNRM( nf, new_u, new_v, newp, newn, rsurf );
+
+			double dr[3] = {newp[0]-curp[0],newp[1]-curp[1],newp[2]-curp[2] };
+			printf("DEL %le\n", dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+		}
+#endif		
+
+	
+		if( check_iter >= 100 )
+			printf("totally blocked.\n");	
+
+		//double new_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
+		//double fr = fabs(1-new_metric/last_metric);
 	}
 	
 	if( bound )	
@@ -1432,6 +1456,11 @@ void pcomplex::refresh( Simulation *theSimulation )
 		rall[3*s+2] += theSimulation->PBC_vec[0][2] * PBC_ext[3*s+0] * alphas[2] + theSimulation->PBC_vec[1][2] * PBC_ext[3*s+1] * alphas[2] + theSimulation->PBC_vec[2][2] * PBC_ext[3*s+2] * alphas[2];
 
 
+	}
+
+	if( puv[0] < 0 || puv[1] < 0 || puv[0]+puv[1] > 1.0 )
+	{
+		printf("ERROR.\n");
 	}
 
 	memcpy( last_pos, rall, sizeof(double) * nsites*3);

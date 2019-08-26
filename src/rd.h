@@ -32,10 +32,11 @@ typedef struct
 	int id;
 	int sid1; // sub id 1 (of mine)
 	int sid2; // sub id 2 (of the complex with int id; above)
-	double prev_norm;
-	double prev_sep;
+	double prevnorm;
+	double prevsep;
 	double curr_sep;
-	double curr_norm;
+	double currnorm;
+	double ps_prev;
 	int info;
 } RD_tracked_info;
 

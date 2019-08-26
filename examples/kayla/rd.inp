@@ -3,13 +3,13 @@ jobname			rd
 c0			0.015
 dimer_c0		0.030
 mesh 			sphere.mesh # radius is 20 nm
-add simplelipid nbound 773 outside # makes for 10\% surface coverage, 65 AA/lipid
+add simplelipid nbound 874 outside # makes for 10\% surface coverage, 65 AA/lipid
 sphere 			yes
 do_bd_particles 			yes
 do_ld			yes
 do_rd			yes
 rxn_diffusion		rxn_info.inp
-o_lim 			100
+o_lim 			1
 nequil			1000
 nsteps			5000
 movie			yes	
