@@ -82,6 +82,12 @@ void pcomplex::alloc( void )
 	save_grad = (double *)malloc( sizeof(double) * 3 * nsites );
 	memset( save_grad, 0, sizeof(double) * 3 * nsites );
 
+	/* caches */	
+	cache_grad = (double *)malloc( sizeof(double) * 3 * nsites );
+	cache_rall = (double *)malloc( sizeof(double) * 3 * nsites );
+	cache_f = (int *)malloc( sizeof(int) * nsites );
+	cache_puv = (double *)malloc( sizeof(double) * 2 * nsites);
+
 	sigma = (double *)malloc( sizeof(double) * nsites );
 	memset( sigma, 0, sizeof(double) * nsites );
 
@@ -1079,8 +1085,19 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 
 			double tu = puv[2*s+0]; 
 			double tv = puv[2*s+1]; 
-	
+			int fu = fs[s];
+
+#ifndef PRINT_PTS
+			int ntests = 0;
+#else
+			int ntests = 500;
+			printf("%d\n", ntests+1);
+			printf("test\n");
+			printf("O %le %le %le\n", rall[0], rall[1], rall[2] );	
+#endif
+			check_iter=0;
 			do {
+				fs[s] = fu;
 				puv[2*s+0] = tu;
 				puv[2*s+1] = tv;
 
@@ -1101,7 +1118,7 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 				puv[2*s+0] += duv[0];
 				puv[2*s+1] += duv[1];				
 
-				
+				/*
 				if( theSimulation->rd && stype && stype[s] >= 0 && check_iter < 100 )
 				{
 					refresh(theSimulation);
@@ -1118,8 +1135,13 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 					if( check_iter > 50 )
 					{
 					}
-				}
-			} while ( !okay );
+				}*/
+				refresh(theSimulation);
+#ifdef PRINT_PTS
+				printf("C %le %le %le\n", rall[0], rall[1], rall[2] );
+#endif
+				check_iter++;
+			} while ( !okay || check_iter < ntests);
 		}
 		else
 		{
@@ -1177,7 +1199,34 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 	{
 
 	} 
-
+#if 0
+#define VERIFY_BLOCKED_CHECK
+#ifdef VERIFY_BLOCKED_CHECK
+	int nblocked = 0;
+	int I_was_blocked = 0;
+	for( int c = 0; c < theSimulation->ncomplex; c++ )
+	{
+		for( int s = 0; s < theSimulation->allComplexes[c]->nsites; s++ )
+		{
+			if( theSimulation->rd && theSimulation->allComplexes[c]->stype[s] >= 0 )
+			{
+				if( theSimulation->rd->check_RD_blocked( theSimulation, c, s ) ) {
+					nblocked++;
+	
+					if( c == my_id )
+						I_was_blocked=1;
+				}
+			}
+		}
+	}
+	if( nblocked > 0 )
+	{
+		printf("after propagate NBLOCKED: %d", nblocked );
+		if( I_was_blocked) printf(" including me.");
+		printf("\n");
+	}
+#endif	
+#endif	
 }
 
 void pcomplex::propagate_p( Simulation *theSimulation, double dt )
@@ -2513,5 +2562,20 @@ void pcomplex::forget( void )
 	nwatchers--;
 }
 
+void pcomplex::cache(void)
+{
+	memcpy( cache_grad, save_grad, sizeof(double) * 3 * nsites );
+	memcpy( cache_f, fs, sizeof(int) * nattach );
+	memcpy( cache_puv, puv, sizeof(double) * 2*nattach );
+	memcpy( cache_rall, rall, sizeof(double) * 3 * nsites );
+}
+
+void pcomplex::uncache(void)
+{
+	memcpy( save_grad, cache_grad, sizeof(double) * 3 * nsites );
+	memcpy(        fs, cache_f,    sizeof(int) * nattach );
+	memcpy(       puv, cache_puv,  sizeof(double) * 2*nattach );
+	memcpy(      rall, cache_rall, sizeof(double) * 3 * nsites );
+}
 
 

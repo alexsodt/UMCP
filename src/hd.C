@@ -1176,78 +1176,153 @@ int temp_main( int argc, char **argv )
 			
 			double PT = 0;
 
+			// propagating particles with RD on means prohibiting overlaps.
+			// we keep track of which particles need to be re-propagated.
+	
+			int rd_consistent = 0;
+ 			int rd_niter = 0;
+			int prop_done[par_info.nc];
+			memset( prop_done, 0, sizeof(int) * par_info.nc );	
+
 			for( int cx = 0; cx < par_info.nc; cx++ )
 			{
 				int c = par_info.complexes[cx];
-				// currently has the PP gradient.
+				theSimulation->allComplexes[c]->cache();
+			}
 
-				int nsites = theSimulation->allComplexes[c]->nsites;
-				double save_grad[3*nsites];
-				memcpy( save_grad, theSimulation->allComplexes[c]->save_grad, sizeof(double)*3*nsites );		
+			while( ! rd_consistent && rd_niter < 100)
+			{
+				rd_consistent = 1;
+
+				for( int cx = 0; cx < par_info.nc; cx++ )
+				{
+					if( !prop_done[cx] )
+					{
+						int c = par_info.complexes[cx];
+						theSimulation->allComplexes[c]->uncache();
+					}
+				}
+
+				for( int cx = 0; cx < par_info.nc; cx++ )
+				{
+					int c = par_info.complexes[cx];
+					// currently has the PP gradient.
+
+					if( cx == 2 )
+					{		
+//						printf("debug this\n");
+					}
+	
+					if( prop_done[cx] ) continue;
+					if( theSimulation->allComplexes[c]->disabled ) continue;
+
+					int nsites = theSimulation->allComplexes[c]->nsites;
+					double save_grad[3*nsites];
+					memcpy( save_grad, theSimulation->allComplexes[c]->save_grad, sizeof(double)*3*nsites );		
+			
+	
+					/*
+						Propagation of the particle depends on the details of the surface metric.
+						Near irregular vertices the move must be done in tiny pieces.
+	
+					*/
+	
+					double time_remaining = time_step;
+	
+					while( time_remaining > 0 )
+					{
+						memcpy( theSimulation->allComplexes[c]->save_grad, save_grad, sizeof(double)*3*nsites );
+	
+						double dt = theSimulation->allComplexes[c]->update_dH_dq( theSimulation, time_remaining, time_step );
+				
+						if(  do_ld || o < nequil )
+						{					
+							theSimulation->allComplexes[c]->applyLangevinFriction( theSimulation, dt, gamma_langevin );
+							theSimulation->allComplexes[c]->applyLangevinNoise( theSimulation, dt,  gamma_langevin, temperature );
+						}
+	
+						if( !theSimulation->allComplexes[c]->do_bd )
+						{
+							theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
+							theSimulation->allComplexes[c]->compute_qdot( theSimulation, dt/time_step );			
+				
+							// close enough.
+							PT += theSimulation->allComplexes[c]->T(theSimulation)  * (dt/time_step);
 		
-
-				/*
-					Propagation of the particle depends on the details of the surface metric.
-					Near irregular vertices the move must be done in tiny pieces.
-
-				*/
-
-				double time_remaining = time_step;
-
-				while( time_remaining > 0 )
-				{
-					memcpy( theSimulation->allComplexes[c]->save_grad, save_grad, sizeof(double)*3*nsites );
-
-					double dt = theSimulation->allComplexes[c]->update_dH_dq( theSimulation, time_remaining, time_step );
-			
-					if(  do_ld || o < nequil )
-					{					
-						theSimulation->allComplexes[c]->applyLangevinFriction( theSimulation, dt, gamma_langevin );
-						theSimulation->allComplexes[c]->applyLangevinNoise( theSimulation, dt,  gamma_langevin, temperature );
-					}
-
-					if( !theSimulation->allComplexes[c]->do_bd )
-					{
-						theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
-						theSimulation->allComplexes[c]->compute_qdot( theSimulation, dt/time_step );			
-			
-						// close enough.
-						PT += theSimulation->allComplexes[c]->T(theSimulation)  * (dt/time_step);
+							theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
+							theSimulation->allComplexes[c]->compute_qdot( theSimulation,  dt/time_step );			
+						}
+							
+						theSimulation->allComplexes[c]->propagate_surface_q( theSimulation, dt );
 	
-						theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
-						theSimulation->allComplexes[c]->compute_qdot( theSimulation,  dt/time_step );			
+						time_remaining -= dt;
 					}
-						
-					theSimulation->allComplexes[c]->propagate_surface_q( theSimulation, dt );
 
-					time_remaining -= dt;
 				}
-			}
+
+				rd_niter++;
 	
-#define VERIFY_BLOCKED_CHECK
-#ifdef VERIFY_BLOCKED_CHECK
-			int nblocked = 0;
-			for( int c = 0; c < theSimulation->ncomplex; c++ )
-			{
-				for( int s = 0; s < theSimulation->allComplexes[c]->nsites; s++ )
+				// has special routines for handling elastic collisions.
+				propagateSolutionParticles( theSimulation, time_step );
+
+#ifndef DISABLE_RD	
+				if( do_rd )
 				{
-					if( theSimulation->rd && theSimulation->allComplexes[c]->stype[s] >= 0 )
+					theSimulation->rd->unbox_reactants();
+					theSimulation->rd->box_reactants(theSimulation);
+
+					for( int cx = 0; cx < par_info.nc; cx++ )
 					{
-						if( theSimulation->rd->check_RD_blocked( theSimulation, c, s ) ) nblocked++;
+						int c = par_info.complexes[cx];
+						if( theSimulation->allComplexes[c]->disabled ) continue;
+						if( prop_done[cx] ) continue;
+
+						int blocked = 0;
+
+						for( int s = 0; s < theSimulation->allComplexes[c]->nsites; s++ )
+						{
+							if( theSimulation->rd && theSimulation->allComplexes[c]->stype[s] >= 0 )
+							{
+								if( theSimulation->rd->check_RD_blocked( theSimulation, c, s ) ) {blocked=1;}
+							}
+						}
+
+						if( blocked )
+						{
+							prop_done[cx] = 0;
+							rd_consistent=0;
+						}
+						else
+							prop_done[cx] = 1;
 					}
 				}
+#endif
 			}
-			printf("NBLOCKED: %d\n", nblocked );
-#endif		
 
-			// has special routines for handling elastic collisions.
-			propagateSolutionParticles( theSimulation, time_step );
+			printf("rd_consistent: %d rd_niter: %d\n", rd_consistent, rd_niter );
+			
+			// ************* DO REACTION DIFFUSION
 
-			if( do_rd )
-			{
-				theSimulation->rd->unbox_reactants();
-				theSimulation->rd->box_reactants(theSimulation);
+			if(do_rd)
+			{	
+				// get_tracked
+				if(debug)
+					printf("debug RD 2nd ncomplexes: %d\n", theSimulation->ncomplex);
+
+				theSimulation->rd->do_rd(theSimulation); 
+
+				if(debug)
+				{
+					for(int p = 0; p < theSimulation->ncomplex; p++)
+					{
+						printf("debug RD 3rd id: %d ntracked: %d\n", p, theSimulation->rd->tracked[p]->ntracked);
+					}
+				}
+				//run RD
 			}
+
+			// ************* END REACTION DIFFUSION
+
 			gettimeofday(&tnow, NULL);
 			double complex_time_stop = tnow.tv_sec + (1e-6) * tnow.tv_usec;
 
@@ -1493,27 +1568,6 @@ int temp_main( int argc, char **argv )
 					PartialSyncVertices(sRec->pp, sRec->id);
 #endif
 			}
-			// ************* DO REACTION DIFFUSION
-
-			if(do_rd)
-			{	
-				// get_tracked
-				if(debug)
-					printf("debug RD 2nd ncomplexes: %d\n", theSimulation->ncomplex);
-
-				theSimulation->rd->do_rd(theSimulation); 
-
-				if(debug)
-				{
-					for(int p = 0; p < theSimulation->ncomplex; p++)
-					{
-						printf("debug RD 3rd id: %d ntracked: %d\n", p, theSimulation->rd->tracked[p]->ntracked);
-					}
-				}
-				//run RD
-			}
-
-			// ************* END REACTION DIFFUSION
 #ifdef PARALLEL
 			ParallelSum( &PT, 1 );
 #endif

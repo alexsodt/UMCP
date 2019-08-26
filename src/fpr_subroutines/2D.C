@@ -99,6 +99,10 @@ double get_2D_2D_rxn_prob( double R1, double kr, double bindrad, double Dtot, do
 		*p0_ratio = DDpirr_pfree_ratio_ps(
 				rxnTable->contpir[uniquetableindex], rxnTable->contsur[uniquetableindex], rxnTable->contnorm[uniquetableindex], 
 				R1, Dtot, deltat, prev_sep, ps_prev, rtol, bindrad);
+		if( *p0_ratio < 0 )		
+		{
+			printf("funny p0_ratio.\n");
+		}
 	}
 	else
 		*p0_ratio = 1.0;

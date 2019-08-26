@@ -88,6 +88,8 @@ void RD::get_tracked( Simulation *theSimulation  )
 			tracked[t]->tracked_info[n].info = 0;
 	}
 
+	double n_to_track = 0;
+
 	for( int t = 0; t < nsites_tracked; t++ )
 	{
 		int p = tracked[t]->pid;
@@ -98,6 +100,7 @@ void RD::get_tracked( Simulation *theSimulation  )
 		int npairs = 0;
 		int nnew = 0;
 		/////////// TO-DO: use max Rmax from this site's reactions.
+
 		int near = boxing->getNearPts(allComplexes[p]->rall+3*s, nearlist, max_Rmax);
 	
 		for(int np = 0; np < near; np++)
@@ -106,7 +109,6 @@ void RD::get_tracked( Simulation *theSimulation  )
 			
 			int s2 = subp_for_id[id];
 			int p2 = complex_for_id[id];
-
 			if( allComplexes[p2]->disabled ) continue;
 
 			if( p == p2 )
@@ -131,6 +133,7 @@ void RD::get_tracked( Simulation *theSimulation  )
 
 			if( r < Rmax )
 			{
+				n_to_track++;
 				npairs++;
 				int old = 0;
 				int old_id;
@@ -214,6 +217,8 @@ void RD::get_tracked( Simulation *theSimulation  )
 		tracked[t]->tracked_info = tracked[t]->tracked_new;
 		tracked[t]->tracked_new = temp;
 	}
+
+	printf("n_to_track: %le Rmax: %lf\n", n_to_track, max_Rmax );
 }
 
 void RD::do_rd( Simulation *theSimulation )
@@ -230,7 +235,7 @@ void RD::do_rd( Simulation *theSimulation )
 	static int nbins = 100;
 	static int ncount=0;
 	static int delay = 0;
-	static int delay_start = -1;
+	static int delay_start = 200;
 	static double use_binding_radius = 5.0;
 	static double use_Rmax = 18;
 	static int nreact = 0, ndissoc = 0;
@@ -248,6 +253,8 @@ void RD::do_rd( Simulation *theSimulation )
 
 	// box_reactants MUST be called before get_tracked, sets up boxing across function calls.
 	get_tracked( theSimulation  );
+
+	double nfound = 0;
 
 	for( int t = 0; t < nsites_tracked; t++ )
 	{
@@ -282,14 +289,18 @@ void RD::do_rd( Simulation *theSimulation )
 
 			double p0_ratio = 1.0;
 
-			double pre_prob = get_2D_2D_rxn_prob(tracked[t]->tracked_info[n].curr_sep, k_on, binding_radius, Dtot, dt, Rmax,
+			double pre_prob = get_2D_2D_rxn_prob(tracked[t]->tracked_info[n].curr_sep, k_on*2*binding_radius, binding_radius, Dtot, dt, Rmax,
 				prevsep, ps_prev, &p0_ratio);
 	
 
 
-
 			double currnorm = tracked[t]->tracked_info[n].prevnorm * p0_ratio;
 			double prob = pre_prob * currnorm;
+
+			if( prob < 0 )
+			{
+				printf("prob: %le\n", prob );
+			}
 
 			tracked[t]->tracked_info[n].ps_prev = 1.0 - pre_prob * currnorm;
 			tracked[t]->tracked_info[n].prevnorm = currnorm;
@@ -297,6 +308,8 @@ void RD::do_rd( Simulation *theSimulation )
 			use_Rmax = Rmax;
 			use_binding_radius = binding_radius;
 
+
+			nfound++;
 			if( delay > delay_start )
 			{
 				int rb = nbins*(tracked[t]->tracked_info[n].curr_sep-binding_radius)/(Rmax-binding_radius);	
@@ -308,7 +321,8 @@ void RD::do_rd( Simulation *theSimulation )
 				bin_counts[rb] += 1;
 				p_sampled[rb] += prob;
 			}
-			if(prob > rn)
+#ifndef DISABLE_RD
+			if(prob > rn )
 			{
 				sum_prob = 0;
 				p_no_reaction = 1.0;
@@ -341,8 +355,13 @@ void RD::do_rd( Simulation *theSimulation )
 				p_no_reaction *= (1.0-prob); 
 				sum_prob += prob;
 			}
+#endif
 		}
 	}
+
+	printf("nfound: %le\n", nfound);
+
+#define DEBUG_RD
 
 #ifdef DEBUG_RD
 	printf("p_no_reaction: %le sum_prob: %le\n", p_no_reaction, sum_prob );
@@ -366,6 +385,7 @@ void RD::do_rd( Simulation *theSimulation )
 			double pr = allReactions[r].k_off * dt; 
 			double rn = gsl_rng_uniform(rng_x);
 
+#ifndef DISABLE_RD
 			if( rn < pr ) 
 			{
 				// creates the reactants.
@@ -462,6 +482,7 @@ void RD::do_rd( Simulation *theSimulation )
 				
 				ndissoc+=1;
 			}
+#endif
 		}   
 	}   
 
@@ -779,6 +800,7 @@ int RD::check_RD_blocked( Simulation *theSimulation, int p, int s)
 	double *alphas = theSimulation->alpha;
 	int near = boxing->getNearPts(theSimulation->allComplexes[p]->rall+3*s, nearlist, max_binding_radius );
 
+
 	for(int np = 0; np < near; np++)
 	{
 		int id = nearlist[np];
@@ -809,7 +831,10 @@ int RD::check_RD_blocked( Simulation *theSimulation, int p, int s)
 		double r = sqrt(dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
 
 		if( r < binding_radius )
+		{
+//			printf("%d and %d blocked, r: %.12le\n", p, p2, r ); 
 			return 1;	
+		}
 	}	
 
 	return 0;

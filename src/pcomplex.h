@@ -51,6 +51,10 @@ struct pcomplex
 	double *p; // Hamiltonian conjugate momenta
 	double *qdot; // time derivatives of generalized coordinates.
 	double *save_grad;
+	double *cache_grad; // if a particle move is rejected we may need to save the gradient
+	double *cache_rall; // if a particle move is rejected we may need to save the gradient
+	double *cache_puv; // if a particle move is rejected we may need to save the gradient
+	int *cache_f; // if a particle move is rejected we may need to save the gradient
 	
 	double *PBC_ext; // the current PBC vector of each site.
 	double *last_pos;
@@ -133,6 +137,9 @@ struct pcomplex
 	void destroy( void);
 	void watch( void );
 	void forget( void );
+
+	void cache( void);
+	void uncache(void);
 };
 
 struct actin : pcomplex
