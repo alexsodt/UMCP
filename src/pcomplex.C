@@ -1168,7 +1168,11 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 	
 	if( bound )	
 	{
+		refresh(theSimulation);
 		// 
+
+		if( puv[0] < 0 || puv[1] < 0 || puv[0]+puv[1] > 1 )
+			printf("after propagate and setrall, uv: %le %le\n",puv[0], puv[1] );
 	}
 	else
 	{
@@ -1460,7 +1464,7 @@ void pcomplex::refresh( Simulation *theSimulation )
 
 	if( puv[0] < 0 || puv[1] < 0 || puv[0]+puv[1] > 1.0 )
 	{
-		printf("ERROR.\n");
+		printf("DOMAIN ERROR.\n");
 	}
 
 	memcpy( last_pos, rall, sizeof(double) * nsites*3);
