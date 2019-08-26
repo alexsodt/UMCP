@@ -1117,7 +1117,6 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 
 					if( check_iter > 50 )
 					{
-						printf("hm.\n");
 					}
 				}
 			} while ( !okay );
