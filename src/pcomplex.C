@@ -17,7 +17,7 @@
 
 extern double kc;
 static double default_particle_area = 65;
-double lipid_DC = 1e9; //Angstrom^2/s
+double lipid_DC = 1e10; //Angstrom^2/s
 double solution_DC = 1e10; //Angstrom^2/s
 
 // For doing Newtonian/Langevin dynamics:
@@ -1917,7 +1917,6 @@ void pcomplex::applyLangevinFriction( Simulation *theSimulation, double dt, doub
 
 void pcomplex::applyLangevinNoise( Simulation *theSimulation,  double dt, double gamma, double temperature )
 {
-	check_random_init();
 
 	for( int s = 0; s < nattach; s++ )
 	{

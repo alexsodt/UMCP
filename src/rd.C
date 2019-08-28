@@ -525,7 +525,7 @@ void RD::do_rd( Simulation *theSimulation )
 #ifdef RD_GM1_HACK
 	int nMonomer = 0;
 	int nDimer = 0;
-
+	static int counter = 0;
 	for( int c = 0; c < theSimulation->ncomplex; c++ )
 	{
 		if( theSimulation->allComplexes[c]->disabled ) continue;
@@ -535,8 +535,10 @@ void RD::do_rd( Simulation *theSimulation )
 		if( !strcasecmp( theSimulation->allComplexes[c]->complex_name, "simpleDimer" ) )
 			nDimer++;	
 	}	
-	
-	printf("RDOUT %le %d %d nreact: %d ndissoc: %d\n", theSimulation->current_time, nMonomer, nDimer, nreact, ndissoc );
+		
+	if( counter % 100 == 0 )
+		printf("RDOUT %le %d %d nreact: %d ndissoc: %d\n", theSimulation->current_time, nMonomer, nDimer, nreact, ndissoc );
+	counter++;
 #endif
 	
 }

@@ -1282,7 +1282,7 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 		{
 			if( val < 5 || val > 7 )
 			{
-				printf("The valence of any point must currently must be between 5 and 7.\n");
+				printf("The valence of any point currently must be between 5 and 7.\n");
 				exit(1);
 			}
 			if( val > MAX_VALENCE )

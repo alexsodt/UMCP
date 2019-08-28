@@ -21,6 +21,7 @@
 #include "random_global.h"
 #include "sans.h"
 #include "globals.h"
+#include "init.h"
 #ifdef USE_CUDA
 #include "local_cuda.h"
 #endif
@@ -79,15 +80,8 @@ double b;
 #define N_BINS 100
 #define MAX_R  8.0
 double ppdist[N_BINS];
-int temp_main( int argc, char **argv );
 
 int main( int argc, char **argv )
-{
-	return temp_main( argc, argv );
-}
-
-
-int temp_main( int argc, char **argv )
 {
 #ifdef PARALLEL
 	int ierr;
@@ -100,7 +94,7 @@ int temp_main( int argc, char **argv )
 #ifdef USE_CUDA
 	showCUDAStats();
 #endif
-
+	global_initialize();
 
 	int nprocs = 1;
 	int taskid = 0;
@@ -1187,8 +1181,11 @@ int temp_main( int argc, char **argv )
 			for( int cx = 0; cx < par_info.nc; cx++ )
 			{
 				int c = par_info.complexes[cx];
+				theSimulation->allComplexes[c]->update_dH_dq( theSimulation, time_step, time_step );
 				theSimulation->allComplexes[c]->cache();
 			}
+
+			////// FIRST: propagate BD particles. their timesteps are never divided, and they never undergo reactions.
 
 			while( ! rd_consistent && rd_niter < 100)
 			{
@@ -1207,19 +1204,11 @@ int temp_main( int argc, char **argv )
 				{
 					int c = par_info.complexes[cx];
 					// currently has the PP gradient.
-
-					if( cx == 2 )
-					{		
-//						printf("debug this\n");
-					}
-	
+					if( !theSimulation->allComplexes[c]->do_bd ) continue;	
 					if( prop_done[cx] ) continue;
 					if( theSimulation->allComplexes[c]->disabled ) continue;
 
 					int nsites = theSimulation->allComplexes[c]->nsites;
-					double save_grad[3*nsites];
-					memcpy( save_grad, theSimulation->allComplexes[c]->save_grad, sizeof(double)*3*nsites );		
-			
 	
 					/*
 						Propagation of the particle depends on the details of the surface metric.
@@ -1227,37 +1216,7 @@ int temp_main( int argc, char **argv )
 	
 					*/
 	
-					double time_remaining = time_step;
-	
-					while( time_remaining > 0 )
-					{
-						memcpy( theSimulation->allComplexes[c]->save_grad, save_grad, sizeof(double)*3*nsites );
-	
-						double dt = theSimulation->allComplexes[c]->update_dH_dq( theSimulation, time_remaining, time_step );
-				
-						if(  do_ld || o < nequil )
-						{					
-							theSimulation->allComplexes[c]->applyLangevinFriction( theSimulation, dt, gamma_langevin );
-							theSimulation->allComplexes[c]->applyLangevinNoise( theSimulation, dt,  gamma_langevin, temperature );
-						}
-	
-						if( !theSimulation->allComplexes[c]->do_bd )
-						{
-							theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
-							theSimulation->allComplexes[c]->compute_qdot( theSimulation, dt/time_step );			
-				
-							// close enough.
-							PT += theSimulation->allComplexes[c]->T(theSimulation)  * (dt/time_step);
-		
-							theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
-							theSimulation->allComplexes[c]->compute_qdot( theSimulation,  dt/time_step );			
-						}
-							
-						theSimulation->allComplexes[c]->propagate_surface_q( theSimulation, dt );
-	
-						time_remaining -= dt;
-					}
-
+					theSimulation->allComplexes[c]->propagate_surface_q( theSimulation, time_step );
 				}
 
 				rd_niter++;
@@ -1298,11 +1257,62 @@ int temp_main( int argc, char **argv )
 #endif
 				}
 			}
+			
+			// propagate momentum-based particles (not BD).			
+			for( int cx = 0; cx < par_info.nc; cx++ )
+			{
+				int c = par_info.complexes[cx];
+				// currently has the PP gradient.
+				if( theSimulation->allComplexes[c]->do_bd ) continue;	
+				if( theSimulation->allComplexes[c]->disabled ) continue;
+
+				int nsites = theSimulation->allComplexes[c]->nsites;
+				double save_grad[3*nsites];
+				memcpy( save_grad, theSimulation->allComplexes[c]->save_grad, sizeof(double)*3*nsites );		
+			
+	
+				/*
+					Propagation of the particle depends on the details of the surface metric.
+					Near irregular vertices the move must be done in tiny pieces.
+	
+				*/
+	
+				double time_remaining = time_step;
+	
+				while( time_remaining > 0 )
+				{
+					memcpy( theSimulation->allComplexes[c]->save_grad, save_grad, sizeof(double)*3*nsites );
+					double dt = theSimulation->allComplexes[c]->update_dH_dq( theSimulation, time_remaining, time_step );
+			
+					if(  do_ld || o < nequil )
+					{					
+						theSimulation->allComplexes[c]->applyLangevinFriction( theSimulation, dt, gamma_langevin );
+						theSimulation->allComplexes[c]->applyLangevinNoise( theSimulation, dt,  gamma_langevin, temperature );
+					}
+	
+					theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
+					theSimulation->allComplexes[c]->compute_qdot( theSimulation, dt/time_step );			
+			
+					// close enough.
+					PT += theSimulation->allComplexes[c]->T(theSimulation)  * (dt/time_step);
+		
+					theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
+					theSimulation->allComplexes[c]->compute_qdot( theSimulation,  dt/time_step );			
+						
+					theSimulation->allComplexes[c]->propagate_surface_q( theSimulation, dt );
+	
+					time_remaining -= dt;
+				}
+
+			}
 
 			if( do_rd && rd_consistent && !rd_triggered ) {
 				rd_triggered = 1;
 				printf("Triggering RD.\n");
 			}
+			if( do_rd && !rd_consistent && rd_triggered )
+				printf("RD inconsistent %d.\n", rd_niter);
+
 	//		printf("rd_consistent: %d rd_niter: %d\n", rd_consistent, rd_niter );
 			
 			// ************* DO REACTION DIFFUSION
