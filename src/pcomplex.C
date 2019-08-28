@@ -17,7 +17,7 @@
 
 extern double kc;
 static double default_particle_area = 65;
-double lipid_DC = 1e10; //Angstrom^2/s
+double lipid_DC = 1e9; //Angstrom^2/s
 double solution_DC = 1e10; //Angstrom^2/s
 
 // For doing Newtonian/Langevin dynamics:
@@ -61,6 +61,8 @@ void pcomplex::alloc( void )
 	for( int s = 0; s < nsites; s++ )
 		sid[s] = -1;
 
+	rd_timestep_disabled = (int *)malloc( sizeof(int) * nsites );
+	memset( rd_timestep_disabled, 0, sizeof(int) * nsites );
 	stype = (int*)malloc( sizeof(int) * nsites );
 
 	fs = (int *)malloc( sizeof(int) * nsites );
@@ -1037,8 +1039,10 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 		double last_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
 		double duv[2];
 
-		if( do_bd )
+		if( do_bd && !rd_timestep_disabled[s] )
 		{
+			int was_irreg = fs[s] >= theSurface->nf_faces;
+			double curp[3] = { rall[0], rall[1], rall[2] };
 			double gmat[4];
 			double g_u; // derivative of |g|, not root wrt u
 			double g_v; //                             wrt v
@@ -1137,6 +1141,18 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 					}
 				}*/
 				refresh(theSimulation);
+
+//#define DEBUG_DIFFUSION		
+#ifdef DEBUG_DIFFUSION
+		if( fabs(dt-1e-9) < 1e-11)
+		{
+			double newp[3] = { rall[0], rall[1], rall[2] };
+			double dr[3] = {newp[0]-curp[0],newp[1]-curp[1],newp[2]-curp[2] };
+			printf("%d DEL %le\n", was_irreg, dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+		}
+#endif		
+
+			
 #ifdef PRINT_PTS
 				printf("C %le %le %le\n", rall[0], rall[1], rall[2] );
 #endif
@@ -1153,31 +1169,6 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 		}
 
 
-//#define DEBUG_DIFFUSION		
-#ifdef DEBUG_DIFFUSION
-		if( fabs(dt-1e-9) < 1e-11)
-		{
-			double curp[3], curn[3];
-			double newp[3], newn[3];
-
-			double cur_u = puv[2*s+0]-duv[0], cur_v = puv[2*s+1]-duv[1];
-			theSurface->evaluateRNRM( fs[s], cur_u, cur_v, curp, curn, rsurf );
-
-			int nf = fs[s], f_1 = fs[s];
-			double new_u = cur_u, new_v = cur_v;
-			double tduv[2] = { duv[0], duv[1] };
-
-			do {
-				f_1 = nf;
-				nf = theSurface->nextFace( f_1, &new_u, &new_v, tduv+0, tduv+1, rsurf ); 
-			} while( nf != f_1 );
-	
-			theSurface->evaluateRNRM( nf, new_u, new_v, newp, newn, rsurf );
-
-			double dr[3] = {newp[0]-curp[0],newp[1]-curp[1],newp[2]-curp[2] };
-			printf("DEL %le\n", dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
-		}
-#endif		
 
 	
 		if( check_iter >= 100 )

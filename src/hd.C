@@ -952,8 +952,8 @@ int temp_main( int argc, char **argv )
 	int global_cntr = 0;
 	struct timeval tnow;
 
-
-
+	int rd_triggered = 0;
+	
 	while( !done )
 	{
 
@@ -1265,11 +1265,11 @@ int temp_main( int argc, char **argv )
 				// has special routines for handling elastic collisions.
 				propagateSolutionParticles( theSimulation, time_step );
 
-#ifndef DISABLE_RD	
 				if( do_rd )
 				{
 					theSimulation->rd->unbox_reactants();
 					theSimulation->rd->box_reactants(theSimulation);
+#ifndef DISABLE_RD	
 
 					for( int cx = 0; cx < par_info.nc; cx++ )
 					{
@@ -1295,15 +1295,19 @@ int temp_main( int argc, char **argv )
 						else
 							prop_done[cx] = 1;
 					}
-				}
 #endif
+				}
 			}
 
-			printf("rd_consistent: %d rd_niter: %d\n", rd_consistent, rd_niter );
+			if( do_rd && rd_consistent && !rd_triggered ) {
+				rd_triggered = 1;
+				printf("Triggering RD.\n");
+			}
+	//		printf("rd_consistent: %d rd_niter: %d\n", rd_consistent, rd_niter );
 			
 			// ************* DO REACTION DIFFUSION
 
-			if(do_rd)
+			if(do_rd && rd_triggered )
 			{	
 				// get_tracked
 				if(debug)

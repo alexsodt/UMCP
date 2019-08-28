@@ -23,6 +23,8 @@ struct pcomplex
 	int do_bd; //check
 	int my_id;
 
+	int *rd_timestep_disabled; // set to true if we disable its diffusion this timestep.
+
 	char *complex_name; //check
 	
 	// diffusion constants.

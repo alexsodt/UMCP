@@ -42,6 +42,7 @@ typedef struct
 
 typedef struct
 {
+	int reacted;
 	int pid; // index of pcomplex
 	int sid; // index of site.
         int ntracked; // number of site-site distances tracked at the moment by this site.
