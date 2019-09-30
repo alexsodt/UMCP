@@ -21,15 +21,17 @@
 #include "random_global.h"
 #include "sans.h"
 #include "globals.h"
+#include "init.h"
 #ifdef USE_CUDA
 #include "local_cuda.h"
 #endif
 #include "simulation.h"
 #include "meshCollisionLib.h"
-#include "rd_kayla.h"
+#include "rd.h"
 
 #define MM_METHOD_1
 #define BOXED
+
 
 
 #define OLD_LANGEVIN
@@ -78,15 +80,8 @@ double b;
 #define N_BINS 100
 #define MAX_R  8.0
 double ppdist[N_BINS];
-int temp_main( int argc, char **argv );
 
 int main( int argc, char **argv )
-{
-	return temp_main( argc, argv );
-}
-
-
-int temp_main( int argc, char **argv )
 {
 #ifdef PARALLEL
 	int ierr;
@@ -99,7 +94,7 @@ int temp_main( int argc, char **argv )
 #ifdef USE_CUDA
 	showCUDAStats();
 #endif
-
+	global_initialize();
 
 	int nprocs = 1;
 	int taskid = 0;
@@ -148,13 +143,20 @@ int temp_main( int argc, char **argv )
 
 	Simulation *theSimulation = (Simulation *)malloc( sizeof(Simulation) );
 	theSimulation->visualization_cache = 0;
-
+	theSimulation->current_time = 0;
 	srd_integrator *srd_i = NULL;
 	theSimulation->allSurfaces = NULL;	
 
 	surface *theSurface1 =(surface *)malloc( sizeof(surface) );
 	double *r1 = NULL;
 	theSurface1->loadLattice( block.meshName , 0. );
+
+	for( int t = 0; t < theSurface1->nv; t++ )
+	{
+		theSurface1->theVertices[t].r[0] += block.shift[0];
+		theSurface1->theVertices[t].r[1] += block.shift[1];
+		theSurface1->theVertices[t].r[2] += block.shift[2];
+	}
 
 
 
@@ -188,6 +190,13 @@ int temp_main( int argc, char **argv )
 	
 		surface *addSurface = (surface *)malloc( sizeof(surface) );
 		addSurface->loadLattice( block.meshName2, 0. );
+	
+		for( int t = 0; t < addSurface->nv; t++ )
+		{
+			addSurface->theVertices[t].r[0] += block.shift[0];
+			addSurface->theVertices[t].r[1] += block.shift[1];
+			addSurface->theVertices[t].r[2] += block.shift[2];
+		}
 	
 		surface_record *newSurface = (struct surface_record*)malloc( sizeof(surface_record) );
 		newSurface->theSurface = addSurface;
@@ -273,12 +282,11 @@ int temp_main( int argc, char **argv )
 
 	// for now only collect kc info from first surface.
 	// INITIALIZE REACTION DIFFUSION
-	RD *rd = NULL;
 
 	if(do_rd)
 	{
-		rd = (RD *)malloc( sizeof(RD) );
-		rd->init(theSimulation, dt, &block );
+		theSimulation->rd = (RD *)malloc( sizeof(RD) );
+		theSimulation->rd->init(theSimulation, dt, &block );
 		if(debug)
 			printf("debug RD 1st ncomplexes: %d\n", theSimulation->ncomplex);
 
@@ -288,8 +296,10 @@ int temp_main( int argc, char **argv )
 
 		theSimulation->nsites_at_psfwrite = nsites_total;
 		theSimulation->visualization_cache = 3 * nsites_total;
+		theSimulation->rd->box_reactants(theSimulation);
 	}
-
+	else
+		theSimulation->rd = NULL;
 	int nmodes = 8;
 	int nspacehk = 10;
 	int nhk = 0;
@@ -686,33 +696,35 @@ int temp_main( int argc, char **argv )
 
 	
 	setupParallel( theSimulation ); 
+
+	if( nsteps > 0 )
+	{	
+		for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+		{
+			surface *useSurface = sRec->theSurface;
+			int nv = useSurface->nv;
+			int NQ = sRec->NQ;
 	
-	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
-	{
-		surface *useSurface = sRec->theSurface;
-		int nv = useSurface->nv;
-		int NQ = sRec->NQ;
-
-		sRec->EFFM = NULL;
-		sRec->MMat = NULL;
-
-		int max_mat = nv;
-
-		if( NQ > nv )
-			max_mat = NQ;
-		int *sparse_use = (int *)malloc( sizeof(int) * (NQ > nv ? NQ : nv) );
-		int n_vuse = 0;
-		double *mass_scaling = NULL;
+			sRec->EFFM = NULL;
+			sRec->MMat = NULL;
 	
-		useSurface->getSparseEffectiveMass( sRec->theForceSet, sparse_use, &n_vuse, &sRec->EFFM, sRec->gen_transform, NQ, mass_scaling );	
-		if( do_bd_membrane )
-			useSurface->getSparseRoot( sRec->theForceSet, &sRec->MMat ); 
-
-		free(sparse_use);
-	}
+			int max_mat = nv;
+	
+			if( NQ > nv )
+				max_mat = NQ;
+			int *sparse_use = (int *)malloc( sizeof(int) * (NQ > nv ? NQ : nv) );
+			int n_vuse = 0;
+			double *mass_scaling = NULL;
 		
-	setupSparseVertexPassing( theSimulation );
-
+			useSurface->getSparseEffectiveMass( sRec->theForceSet, sparse_use, &n_vuse, &sRec->EFFM, sRec->gen_transform, NQ, mass_scaling );	
+			if( do_bd_membrane )
+				useSurface->getSparseRoot( sRec->theForceSet, &sRec->MMat ); 
+	
+			free(sparse_use);
+		}
+			
+		setupSparseVertexPassing( theSimulation );
+	}
 
 	double V = 0;
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
@@ -787,7 +799,7 @@ int temp_main( int argc, char **argv )
 		memset( avc, 0, sizeof(double) * theSimulation->ncomplex );
 	}
 
-	if( block.nsteps == 0 )
+	if( nsteps == 0 )
 	{
 
 #ifdef MULTISURFACE_TACHYON
@@ -934,7 +946,8 @@ int temp_main( int argc, char **argv )
 	int global_cntr = 0;
 	struct timeval tnow;
 
-
+	int rd_triggered = 0;
+	
 	while( !done )
 	{
 
@@ -954,7 +967,7 @@ int temp_main( int argc, char **argv )
 		double last_wait_time = 0;
 		double last_complex_time = 0;
 		
-		for( int t = 0; t < block.o_lim; t++, cur_t += time_step, global_cntr++ )
+		for( int t = 0; t < block.o_lim; t++, cur_t += time_step, global_cntr++, theSimulation->current_time += time_step)
 		{
 #ifdef SAVE_RESTARTS
 			int save_seed = rand();
@@ -991,6 +1004,13 @@ int temp_main( int argc, char **argv )
 				int c = par_info.complexes[cx];
 				VP += theSimulation->allComplexes[c]->V(theSimulation);	
 				VP += theSimulation->allComplexes[c]->AttachV(theSimulation);	
+
+				if( VP > 1e4 )
+				{
+					VP += theSimulation->allComplexes[c]->V(theSimulation);	
+					VP += theSimulation->allComplexes[c]->AttachV(theSimulation);	
+					exit(1);
+				}
 			}
 
 
@@ -1150,28 +1170,118 @@ int temp_main( int argc, char **argv )
 			
 			double PT = 0;
 
+			// propagating particles with RD on means prohibiting overlaps.
+			// we keep track of which particles need to be re-propagated.
+	
+			int rd_consistent = 0;
+ 			int rd_niter = 0;
+			int prop_done[par_info.nc];
+			memset( prop_done, 0, sizeof(int) * par_info.nc );	
+
+			for( int cx = 0; cx < par_info.nc; cx++ )
+			{
+				int c = par_info.complexes[cx];
+				theSimulation->allComplexes[c]->update_dH_dq( theSimulation, time_step, time_step );
+				theSimulation->allComplexes[c]->cache();
+			}
+
+			////// FIRST: propagate BD particles. their timesteps are never divided, and they never undergo reactions.
+
+			while( ! rd_consistent && rd_niter < 100)
+			{
+				rd_consistent = 1;
+
+				for( int cx = 0; cx < par_info.nc; cx++ )
+				{
+					if( !prop_done[cx] )
+					{
+						int c = par_info.complexes[cx];
+						theSimulation->allComplexes[c]->uncache();
+					}
+				}
+
+				for( int cx = 0; cx < par_info.nc; cx++ )
+				{
+					int c = par_info.complexes[cx];
+					// currently has the PP gradient.
+					if( !theSimulation->allComplexes[c]->do_bd ) continue;	
+					if( prop_done[cx] ) continue;
+					if( theSimulation->allComplexes[c]->disabled ) continue;
+
+					int nsites = theSimulation->allComplexes[c]->nsites;
+	
+					/*
+						Propagation of the particle depends on the details of the surface metric.
+						Near irregular vertices the move must be done in tiny pieces.
+	
+					*/
+	
+					theSimulation->allComplexes[c]->propagate_surface_q( theSimulation, time_step );
+				}
+
+				rd_niter++;
+	
+				// has special routines for handling elastic collisions.
+				propagateSolutionParticles( theSimulation, time_step );
+
+				if( do_rd )
+				{
+					theSimulation->rd->unbox_reactants();
+					theSimulation->rd->box_reactants(theSimulation);
+#ifndef DISABLE_RD	
+
+					for( int cx = 0; cx < par_info.nc; cx++ )
+					{
+						int c = par_info.complexes[cx];
+						if( theSimulation->allComplexes[c]->disabled ) continue;
+						if( prop_done[cx] ) continue;
+
+						int blocked = 0;
+
+						for( int s = 0; s < theSimulation->allComplexes[c]->nsites; s++ )
+						{
+							if( theSimulation->rd && theSimulation->allComplexes[c]->stype[s] >= 0 )
+							{
+								if( theSimulation->rd->check_RD_blocked( theSimulation, c, s ) ) {blocked=1;}
+							}
+						}
+
+						if( blocked )
+						{
+							prop_done[cx] = 0;
+							rd_consistent=0;
+						}
+						else
+							prop_done[cx] = 1;
+					}
+#endif
+				}
+			}
+			
+			// propagate momentum-based particles (not BD).			
 			for( int cx = 0; cx < par_info.nc; cx++ )
 			{
 				int c = par_info.complexes[cx];
 				// currently has the PP gradient.
+				if( theSimulation->allComplexes[c]->do_bd ) continue;	
+				if( theSimulation->allComplexes[c]->disabled ) continue;
 
 				int nsites = theSimulation->allComplexes[c]->nsites;
 				double save_grad[3*nsites];
 				memcpy( save_grad, theSimulation->allComplexes[c]->save_grad, sizeof(double)*3*nsites );		
-		
-
+			
+	
 				/*
 					Propagation of the particle depends on the details of the surface metric.
 					Near irregular vertices the move must be done in tiny pieces.
-
+	
 				*/
-
+	
 				double time_remaining = time_step;
-
+	
 				while( time_remaining > 0 )
 				{
 					memcpy( theSimulation->allComplexes[c]->save_grad, save_grad, sizeof(double)*3*nsites );
-
 					double dt = theSimulation->allComplexes[c]->update_dH_dq( theSimulation, time_remaining, time_step );
 			
 					if(  do_ld || o < nequil )
@@ -1179,27 +1289,53 @@ int temp_main( int argc, char **argv )
 						theSimulation->allComplexes[c]->applyLangevinFriction( theSimulation, dt, gamma_langevin );
 						theSimulation->allComplexes[c]->applyLangevinNoise( theSimulation, dt,  gamma_langevin, temperature );
 					}
-
-					if( !theSimulation->allComplexes[c]->do_bd )
-					{
-						theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
-						theSimulation->allComplexes[c]->compute_qdot( theSimulation, dt/time_step );			
-			
-						// close enough.
-						PT += theSimulation->allComplexes[c]->T(theSimulation)  * (dt/time_step);
 	
-						theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
-						theSimulation->allComplexes[c]->compute_qdot( theSimulation,  dt/time_step );			
-					}
+					theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
+					theSimulation->allComplexes[c]->compute_qdot( theSimulation, dt/time_step );			
+			
+					// close enough.
+					PT += theSimulation->allComplexes[c]->T(theSimulation)  * (dt/time_step);
+		
+					theSimulation->allComplexes[c]->propagate_p( theSimulation, dt/2 );
+					theSimulation->allComplexes[c]->compute_qdot( theSimulation,  dt/time_step );			
 						
 					theSimulation->allComplexes[c]->propagate_surface_q( theSimulation, dt );
-
+	
 					time_remaining -= dt;
 				}
+
 			}
 
-			// has special routines for handling elastic collisions.
-			propagateSolutionParticles( theSimulation, time_step );
+			if( do_rd && rd_consistent && !rd_triggered ) {
+				rd_triggered = 1;
+				printf("Triggering RD.\n");
+			}
+			if( do_rd && !rd_consistent && rd_triggered )
+				printf("RD inconsistent %d.\n", rd_niter);
+
+	//		printf("rd_consistent: %d rd_niter: %d\n", rd_consistent, rd_niter );
+			
+			// ************* DO REACTION DIFFUSION
+
+			if(do_rd && rd_triggered )
+			{	
+				// get_tracked
+				if(debug)
+					printf("debug RD 2nd ncomplexes: %d\n", theSimulation->ncomplex);
+
+				theSimulation->rd->do_rd(theSimulation); 
+
+				if(debug)
+				{
+					for(int p = 0; p < theSimulation->ncomplex; p++)
+					{
+						printf("debug RD 3rd id: %d ntracked: %d\n", p, theSimulation->rd->tracked[p]->ntracked);
+					}
+				}
+				//run RD
+			}
+
+			// ************* END REACTION DIFFUSION
 
 			gettimeofday(&tnow, NULL);
 			double complex_time_stop = tnow.tv_sec + (1e-6) * tnow.tv_usec;
@@ -1210,7 +1346,7 @@ int temp_main( int argc, char **argv )
 
 			/* BEGIN SRD */
 			
-			if( do_srd && ! block.fix_membrane )
+			if( do_srd && ! block.disable_mesh)
 			{
 				for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 				sRec->theSurface->rebox_system();
@@ -1446,27 +1582,6 @@ int temp_main( int argc, char **argv )
 					PartialSyncVertices(sRec->pp, sRec->id);
 #endif
 			}
-			// ************* DO REACTION DIFFUSION
-
-			if(do_rd)
-			{	
-				// get_tracked
-				if(debug)
-					printf("debug RD 2nd ncomplexes: %d\n", theSimulation->ncomplex);
-
-				rd->do_rd(theSimulation); 
-
-				if(debug)
-				{
-					for(int p = 0; p < theSimulation->ncomplex; p++)
-					{
-						printf("debug RD 3rd id: %d ntracked: %d\n", p, rd->tracked[p]->ntracked);
-					}
-				}
-				//run RD
-			}
-
-			// ************* END REACTION DIFFUSION
 #ifdef PARALLEL
 			ParallelSum( &PT, 1 );
 #endif
@@ -1511,6 +1626,7 @@ int temp_main( int argc, char **argv )
 			if( t == 0 )
 			{
 				printf("t: %le ns o: %d T: %.8le V: %.12le T+V: %.14le TEMP: %le MEM_TEMP: %le AV_TEMP %le VR: %.3le VMEM: %le VP: %le", (cur_t * 1e9), o, T, V, T+V, TEMP, mem_T, sum_average_temp / n_temp,VR, VMEM, VP );
+
 				if( step_rate > 0 )
 					printf(" steps/s: %le", step_rate );
 				printf("\n");

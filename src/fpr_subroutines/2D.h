@@ -16,6 +16,6 @@ typedef struct
 }  twoDReactionPTable;
 
 twoDReactionPTable *newTable( void );
-double get_2D_2D_rxn_prob( double R1, double kr, double bindrad, double Dtot, double deltat, double Rmax );
+double get_2D_2D_rxn_prob( double R1, double kr, double bindrad, double Dtot, double deltat, double Rmax,double,double,double*p0_ratio );
 
 #endif

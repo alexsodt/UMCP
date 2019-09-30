@@ -11,6 +11,7 @@
 #include <typeinfo>
 #include <ctype.h>
 #include "globals.h"
+#include "rd.h"
 
 //#define DISABLE_POINT_GRADIENT_DEBUG
 
@@ -37,6 +38,13 @@ void pcomplex::base_init( void )
 	debug = DEBUG_OFF;
 	nwatchers = 0;
 	disabled = 0;
+	alive = 1;
+}
+
+void pcomplex::copyParentParameters( pcomplex *parent )
+{
+	do_bd = parent->do_bd;
+	is_inside = parent->is_inside;
 }
 
 /* general routines */
@@ -53,6 +61,8 @@ void pcomplex::alloc( void )
 	for( int s = 0; s < nsites; s++ )
 		sid[s] = -1;
 
+	rd_timestep_disabled = (int *)malloc( sizeof(int) * nsites );
+	memset( rd_timestep_disabled, 0, sizeof(int) * nsites );
 	stype = (int*)malloc( sizeof(int) * nsites );
 
 	fs = (int *)malloc( sizeof(int) * nsites );
@@ -73,6 +83,12 @@ void pcomplex::alloc( void )
 	grad_puv = (double *)malloc( sizeof(double) * 2 * nsites );
 	save_grad = (double *)malloc( sizeof(double) * 3 * nsites );
 	memset( save_grad, 0, sizeof(double) * 3 * nsites );
+
+	/* caches */	
+	cache_grad = (double *)malloc( sizeof(double) * 3 * nsites );
+	cache_rall = (double *)malloc( sizeof(double) * 3 * nsites );
+	cache_f = (int *)malloc( sizeof(int) * nsites );
+	cache_puv = (double *)malloc( sizeof(double) * 2 * nsites);
 
 	sigma = (double *)malloc( sizeof(double) * nsites );
 	memset( sigma, 0, sizeof(double) * nsites );
@@ -286,7 +302,7 @@ double pcomplex::update_dH_dq( Simulation *theSimulation, double time_step, doub
 	// frac mult is used for distributing the mesh gradients throughout propagation..	
 	double frac_mult=1.0;
 
-	if( is_irreg && time_step > 0 )
+	if( is_irreg && time_step > 0 && ! do_bd )
 	{
 		double fraction = 1.0;
 
@@ -1000,6 +1016,9 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 
 	for( int s = 0; s < nattach; s++ )
 	{
+		int okay = 1;
+		int check_iter = 0;
+ 
 		surface_record *sRec = NULL;
 		surface *theSurface =NULL;
 		for( surface_record *tRec = theSimulation->allSurfaces; tRec; tRec = tRec->next )
@@ -1020,16 +1039,14 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 		double last_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
 		double duv[2];
 
-		if( do_bd )
+		if( do_bd && !rd_timestep_disabled[s] )
 		{
+			int was_irreg = fs[s] >= theSurface->nf_faces;
+			double curp[3] = { rall[0], rall[1], rall[2] };
 			double gmat[4];
 			double g_u; // derivative of |g|, not root wrt u
 			double g_v; //                             wrt v
 			
-			double noise[2] = { 
-				gsl_ran_gaussian(r_gen_global, 1 ),
-				gsl_ran_gaussian(r_gen_global, 1 )
-				};
 	
 			// gval is the sqrt metric
 			double root_g = theSurface->metric( fs[s], puv[2*s+0], puv[2*s+1], rsurf, gmat, &g_u, &g_v );
@@ -1070,59 +1087,137 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 					save_grad[2*s+1]/kT + (-g_v/(2*root_g*root_g))
 						};
 
+			double tu = puv[2*s+0]; 
+			double tv = puv[2*s+1]; 
+			int fu = fs[s];
 
-			double corr_noise[2] = { gamma_neg_half[0] * noise[0] + gamma_neg_half[1] * noise[1],
-						 gamma_neg_half[2] * noise[0] + gamma_neg_half[3] * noise[1] }; 
-
-#ifdef TRACK_UNUSUAL
-			double dstep[2] = { (gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt,
-					  (gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt };
-			
-			double dstep_mag = sqrt(dstep[0]*dstep[0]+dstep[1]*dstep[1]);
-			
-			av_dstep += dstep_mag;
-			av_dstep2 += dstep_mag*dstep_mag;
-			n_dstep += 1;
-
-			double av = av_dstep/n_dstep;
-			double av2 = av_dstep2/n_dstep;
-			double var = av2-av*av;
-			double stdd = sqrt(var);
-			double del = (dstep_mag-av)/stdd;
-
-			if( del > 3 )
-			{
-				printf("unusual step %le av %le std %le grad: %le %le gg: %le %le\n", dstep_mag, av, stdd, save_grad[2*s+0]/kT, save_grad[2*s+1]/kT, -g_u/(2*root_g*root_g), -g_v/(2*root_g*root_g)  );
-			}
+#ifndef PRINT_PTS
+			int ntests = 0;
+#else
+			int ntests = 500;
+			printf("%d\n", ntests+1);
+			printf("test\n");
+			printf("O %le %le %le\n", rall[0], rall[1], rall[2] );	
 #endif
-			// negative sign means move in the direction of force not grad.
-			duv[0] = -(gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[0];
-			duv[1] = -(gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[1];	
+			check_iter=0;
+			do {
+				fs[s] = fu;
+				puv[2*s+0] = tu;
+				puv[2*s+1] = tv;
+
+				okay = 1;
+
+				double noise[2] = { 
+					gsl_ran_gaussian(r_gen_global, 1 ),
+					gsl_ran_gaussian(r_gen_global, 1 )
+					};
+	
+				double corr_noise[2] = { gamma_neg_half[0] * noise[0] + gamma_neg_half[1] * noise[1],
+							 gamma_neg_half[2] * noise[0] + gamma_neg_half[3] * noise[1] }; 
+			
+				// negative sign means move in the direction of force not grad.
+				duv[0] = -(gamma_inv[0] * pre_drift[0] + gamma_inv[1] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[0];
+				duv[1] = -(gamma_inv[2] * pre_drift[0] + gamma_inv[3] * pre_drift[1]) * DC[s] * dt + sqrt(2 * DC[s] * dt) * corr_noise[1];	
+				
+				puv[2*s+0] += duv[0];
+				puv[2*s+1] += duv[1];				
+
+				/*
+				if( theSimulation->rd && stype && stype[s] >= 0 && check_iter < 100 )
+				{
+					refresh(theSimulation);
+					// this particle is configured for reaction/diffusion.
+					// we must block it from entering the reaction zone for all reactions for which it can participate.
+		
+					if( theSimulation->rd->check_RD_blocked( theSimulation, my_id, s ) )
+					{
+	//						printf("BLOCKED RD MOVE.\n");
+						okay = 0; 
+					}
+					check_iter++;
+
+					if( check_iter > 50 )
+					{
+					}
+				}*/
+				refresh(theSimulation);
+
+//#define DEBUG_DIFFUSION		
+#ifdef DEBUG_DIFFUSION
+		if( fabs(dt-1e-9) < 1e-11)
+		{
+			double newp[3] = { rall[0], rall[1], rall[2] };
+			double dr[3] = {newp[0]-curp[0],newp[1]-curp[1],newp[2]-curp[2] };
+			printf("%d DEL %le\n", was_irreg, dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+		}
+#endif		
+
+			
+#ifdef PRINT_PTS
+				printf("C %le %le %le\n", rall[0], rall[1], rall[2] );
+#endif
+				check_iter++;
+			} while ( !okay || check_iter < ntests);
 		}
 		else
 		{
 			duv[0] = qdot[2*s+0] * dt * AKMA_TIME;
 			duv[1] = qdot[2*s+1] * dt * AKMA_TIME;
+		
+			puv[2*s+0] += duv[0];
+			puv[2*s+1] += duv[1];
 		}
 
-		puv[2*s+0] += duv[0];
-		puv[2*s+1] += duv[1];
-	
 
-		refresh(theSimulation);
-		
-		double new_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
-		double fr = fabs(1-new_metric/last_metric);
+
+	
+		if( check_iter >= 100 )
+			printf("totally blocked.\n");	
+
+		//double new_metric = theSurface->g( fs[s], puv[2*s+0], puv[2*s+1], rsurf );
+		//double fr = fabs(1-new_metric/last_metric);
 	}
 	
 	if( bound )	
 	{
+		refresh(theSimulation);
 		// 
+
+		if( puv[0] < 0 || puv[1] < 0 || puv[0]+puv[1] > 1 )
+			printf("after propagate and setrall, uv: %le %le\n",puv[0], puv[1] );
 	}
 	else
 	{
 
 	} 
+#if 0
+#define VERIFY_BLOCKED_CHECK
+#ifdef VERIFY_BLOCKED_CHECK
+	int nblocked = 0;
+	int I_was_blocked = 0;
+	for( int c = 0; c < theSimulation->ncomplex; c++ )
+	{
+		for( int s = 0; s < theSimulation->allComplexes[c]->nsites; s++ )
+		{
+			if( theSimulation->rd && theSimulation->allComplexes[c]->stype[s] >= 0 )
+			{
+				if( theSimulation->rd->check_RD_blocked( theSimulation, c, s ) ) {
+					nblocked++;
+	
+					if( c == my_id )
+						I_was_blocked=1;
+				}
+			}
+		}
+	}
+	if( nblocked > 0 )
+	{
+		printf("after propagate NBLOCKED: %d", nblocked );
+		if( I_was_blocked) printf(" including me.");
+		printf("\n");
+	}
+#endif	
+#endif	
 }
 
 void pcomplex::propagate_p( Simulation *theSimulation, double dt )
@@ -1407,6 +1502,11 @@ void pcomplex::refresh( Simulation *theSimulation )
 
 	}
 
+	if( puv[0] < 0 || puv[1] < 0 || puv[0]+puv[1] > 1.0 )
+	{
+		printf("DOMAIN ERROR.\n");
+	}
+
 	memcpy( last_pos, rall, sizeof(double) * nsites*3);
 }
 
@@ -1588,7 +1688,7 @@ void surface::loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterB
 			}	
 		
 			(*allComplexes)[*ncomplex] = prot;
-
+			prot->my_id = *ncomplex;
 			(*ncomplex)++;
 		}
 		
@@ -1621,6 +1721,7 @@ void surface::loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterB
 			}	
 
 			(*allComplexes)[*ncomplex] = prot;
+			prot->my_id = *ncomplex;
 
 			(*ncomplex)++;
 		}
@@ -1664,12 +1765,25 @@ void simpleLipid::loadParams( parameterBlock *block )
 	c0_val = block->c0;
 }
 
+void simpleDimer::loadParams( parameterBlock *block )
+{
+	c0_val = block->dimer_c0;
+}
+
 
 void simpleLipid::init( surface *theSurface, double *rsurf, int f, double u, double v )
 {
 	pcomplex::init( theSurface, rsurf, f, u, v );
 
 	p_c0[0] = c0_val;
+}
+
+void simpleDimer::init( surface *theSurface, double *rsurf, int f, double u, double v )
+{
+	simpleLipid::init( theSurface, rsurf, f, u, v );
+
+	p_c0[0] = c0_val;
+	p_area[0] = 2 * default_particle_area;
 }
 
 
@@ -1803,7 +1917,6 @@ void pcomplex::applyLangevinFriction( Simulation *theSimulation, double dt, doub
 
 void pcomplex::applyLangevinNoise( Simulation *theSimulation,  double dt, double gamma, double temperature )
 {
-	check_random_init();
 
 	for( int s = 0; s < nattach; s++ )
 	{
@@ -1939,6 +2052,8 @@ void pcomplex::saveComplex( FILE *theFile )
 // the surface energy of attachments.
 double pcomplex::AttachV( Simulation *theSimulation )
 {	
+	if( disabled ) return 0;
+
 	double pot = 0;
 
 #ifndef DISABLE_ATTACH
@@ -1957,6 +2072,8 @@ double pcomplex::AttachV( Simulation *theSimulation )
 
 double pcomplex::AttachG( Simulation *theSimulation,  double *pg )
 {
+	if( disabled ) return 0;
+
 	double pot = 0;
 
 #ifndef DISABLE_ATTACH
@@ -2434,4 +2551,21 @@ void pcomplex::forget( void )
 {
 	nwatchers--;
 }
+
+void pcomplex::cache(void)
+{
+	memcpy( cache_grad, save_grad, sizeof(double) * 3 * nsites );
+	memcpy( cache_f, fs, sizeof(int) * nattach );
+	memcpy( cache_puv, puv, sizeof(double) * 2*nattach );
+	memcpy( cache_rall, rall, sizeof(double) * 3 * nsites );
+}
+
+void pcomplex::uncache(void)
+{
+	memcpy( save_grad, cache_grad, sizeof(double) * 3 * nsites );
+	memcpy(        fs, cache_f,    sizeof(int) * nattach );
+	memcpy(       puv, cache_puv,  sizeof(double) * 2*nattach );
+	memcpy(      rall, cache_rall, sizeof(double) * 3 * nsites );
+}
+
 

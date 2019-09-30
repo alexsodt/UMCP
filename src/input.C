@@ -42,6 +42,7 @@ void setDefaults( parameterBlock *block )
 	block->record_curvature = 0;
 	block->create_all_atom = 0;	
 	block->create_flip = 0;
+	block->do_rim = 0;
 
 	block->mode_x = -1;
 	block->mode_y = -1;
@@ -54,13 +55,16 @@ void setDefaults( parameterBlock *block )
 	block->kg = 0;
 	block->mode_min = -1;
 	block->mode_max = -1;
-	block->fix_membrane = 0;
 	block->T = 298;
 	block->mab_k_theta = 1;
 	block->mab_bond_length = 60;
 	block->mab_d_theta = 10; // 10 degrees.
 
-	block->create_all_atom = 0;
+	block->shift[0] = 0;
+	block->shift[1] = 0;
+	block->shift[2] = 0;
+
+
 	block->lipid_lib = NULL;
 
 	block->sub_com_period = 10;
@@ -85,7 +89,6 @@ void setDefaults( parameterBlock *block )
 	block->aqueous_diffc = 1e10; // angstroms^2/s
 	block->kinetic_corr_period = 10; 
 
-	block->fix_membrane = 0;
 	block->disable_mesh = 0;
 
 	block->tachyon_collision_draw_type = 0;
@@ -209,6 +212,9 @@ void setDefaults( parameterBlock *block )
 	
 	block->outerPatchPDB = NULL;
 	block->outerPatchPSF = NULL;
+	
+	block->altPatchPDB = NULL;
+	block->altPatchPSF = NULL;
 
 	block->patchPDB = NULL;
 	block->patchPSF = NULL;
@@ -216,7 +222,6 @@ void setDefaults( parameterBlock *block )
 	block->solvatePDB = NULL;
 	block->solvatePSF = NULL;
 
-	block->create_all_atom = 0;
 
 	// request a timestep analysis
 	block->timestep_analysis = 0;
@@ -377,6 +382,26 @@ int resolveParameters( parameterBlock *block )
 				block->innerPatchPSF = (char *)malloc( sizeof(char) * (1+strlen(block->patchPSF) ) );
 				strcpy( block->innerPatchPSF, block->patchPSF );
 			}
+		}
+	}
+	
+	if( block->do_rim && !block->altPatchPDB )
+	{
+		if( block->patchPDB )
+		{
+			block->altPatchPDB = (char *)malloc( sizeof(char) * (1+strlen(block->patchPDB) ) );
+			strcpy( block->altPatchPDB, block->patchPDB );
+
+			if( block->patchPSF )
+			{
+				block->altPatchPSF = (char *)malloc( sizeof(char) * (1+strlen(block->patchPSF) ) );
+				strcpy( block->altPatchPSF, block->patchPSF );
+			}
+		}
+		else
+		{
+			printf("Adding a rim patch to a membrane structure requires either altPatchPDB or patchPDB to be set.\n");
+			exit(1);
 		}
 	}
 
@@ -632,12 +657,12 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}	
 		}
-		else if( !strcasecmp( word1, "fix_membrane" ) )
+		else if( !strcasecmp( word1, "disable_mesh" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
-				block->fix_membrane = 1;
+				block->disable_mesh = 1;
 			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
-				block->fix_membrane = 0;
+				block->disable_mesh = 0;
 			else
 			{
 				printf("Could not interpret input line '%s'.\n", tbuf );
@@ -654,13 +679,13 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->mode_y = atoi( word2 );
 		else if( !strcasecmp( word1, "mode_KA" ) )
 			block->mode_KA = atof( word2 );
-		else if( !strcasecmp( word1, "nsteps" ) )
+		else if( !strcasecmp( word1, "nsteps" ) || !strcasecmp( word1, "nouter")  )
 			block->nsteps = atoi( word2 );
 		else if( !strcasecmp( word1, "nequil" ) )
 			block->nequil = atoi( word2 );
 		else if( !strcasecmp( word1, "nmin" ) )
 			block->nmin = atoi( word2 );
-		else if( !strcasecmp( word1, "o_lim" ) )
+		else if( !strcasecmp( word1, "o_lim" ) ||  !strcasecmp( word1, "ninner") )
 			block->o_lim = atoi( word2 );
 		else if( !strcasecmp( word1, "seed" ) )
 			block->random_seed = atoi( word2 );
@@ -1246,6 +1271,24 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			ERROR = 1;
 		      }
 		  }
+		else if( !strcasecmp( word1, "shiftx" ) )
+			block->shift[0] = atof(word2);
+		else if( !strcasecmp( word1, "shifty" ) )
+			block->shift[1] = atof(word2);
+		else if( !strcasecmp( word1, "shiftz" ) )
+			block->shift[2] = atof(word2);
+		else if( !strcasecmp( word1, "do_rim" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->do_rim = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->do_rim = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
 		else if( !strcasecmp( word1, "create_all_atom" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
@@ -1283,6 +1326,20 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 		{
 			block->addSalt = 1;
 			block->outerKCL = atof( word2 );
+		}
+		else if( !strcasecmp( word1, "altPatchPDB" ) )
+		{
+			if( block->altPatchPDB )
+				free(block->altPatchPDB);
+			block->altPatchPDB = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->altPatchPDB, word2 );
+		}
+		else if( !strcasecmp( word1, "altPatchPSF" ) )
+		{
+			if( block->altPatchPSF )
+				free(block->altPatchPSF);
+			block->altPatchPSF = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->altPatchPSF, word2 );
 		}
 		else if( !strcasecmp( word1, "outerPatchPDB" ) )
 		{

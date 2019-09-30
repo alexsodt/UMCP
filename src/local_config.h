@@ -17,5 +17,6 @@ void printCompilationTime(void);
 //#define USE_KA4
 //#define M_MIN -1 
 //#define M_MAX 1
+//#define DISABLE_RD
 #define FFTW
 #define DISABLE_ALIGNMENT

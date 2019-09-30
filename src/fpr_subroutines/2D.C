@@ -18,6 +18,7 @@
 
 static double tolKvalue = 1e-3; // correct this. depends on units, machine precision etc.
 static double tolDvalue = 1e-3;
+static double rtol      = 1e-10;
 //
 //  copied and reorganized slightly from Margaret Johnson's code.
 //
@@ -39,7 +40,7 @@ twoDReactionPTable *newTable( void )
 
 static twoDReactionPTable *rxnTable = NULL;
 
-double get_2D_2D_rxn_prob( double R1, double kr, double bindrad, double Dtot, double deltat, double Rmax )
+double get_2D_2D_rxn_prob( double R1, double kr, double bindrad, double Dtot, double deltat, double Rmax, double prev_sep, double ps_prev, double *p0_ratio )
 {
 	if( !rxnTable )
 		rxnTable = newTable();
@@ -92,6 +93,19 @@ double get_2D_2D_rxn_prob( double R1, double kr, double bindrad, double Dtot, do
 		    
 	double probvec1 = DDpsur(rxnTable->contsur[uniquetableindex], Dtot, deltat, R1, bindrad);
 
+
+	if( prev_sep > 0 )
+	{
+		*p0_ratio = DDpirr_pfree_ratio_ps(
+				rxnTable->contpir[uniquetableindex], rxnTable->contsur[uniquetableindex], rxnTable->contnorm[uniquetableindex], 
+				R1, Dtot, deltat, prev_sep, ps_prev, rtol, bindrad);
+		if( *p0_ratio < 0 || *p0_ratio > 1e100 )		
+		{
+			printf("funny p0_ratio.\n");
+		}
+	}
+	else
+		*p0_ratio = 1.0;
 	return probvec1;
 }
 

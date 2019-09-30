@@ -65,6 +65,9 @@ int Simulation::AddComplex( pcomplex *addMe )
 			par_info.nc += 1;
 		}
 	}
+
+	allComplexes[added]->my_id = added;
+
 	return added;
 }
 

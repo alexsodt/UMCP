@@ -1974,6 +1974,57 @@ double surface::trialMove( int *f_in, double *u_in, double *v_in, double duv[2],
 	return l;
 }
 
+void randomDirection( surface *theSurface, double *r, int f, double u, double v, double len, double duv[2] )
+{
+	double drdu[3];
+	double drdv[3];
+
+	theSurface->ru(f, u, v, r, drdu );
+	theSurface->rv(f, u, v, r, drdv );
+
+	double lu = sqrt(drdu[0]*drdu[0]+drdu[1]*drdu[1]+drdu[2]*drdu[2]);
+	double lv = sqrt(drdv[0]*drdv[0]+drdv[1]*drdv[1]+drdv[2]*drdv[2]);
+
+	double U[3] = { drdu[0],drdu[1],drdu[2]};
+	double V[3] = {0,0,0};
+	double proj;
+
+	proj = (drdv[0] * U[0] + drdv[1] * U[1] + drdv[2] * U[2])/(U[0] * U[0] + U[1] * U[1] + U[2] * U[2]);
+
+	V[0] += drdv[0] - proj * U[0];
+	V[1] += drdv[1] - proj * U[1];
+	V[2] += drdv[2] - proj * U[2];
+
+	double nrm_U = normalize(U);
+	double nrm_V = normalize(V);
+	
+	if( ! rng_x )
+		init_random(0);
+
+	double theta = 2 * M_PI * rand() / (double)RAND_MAX;
+	double l = len;
+
+	double cvec[3] = { U[0] * cos(theta) + V[0] * sin(theta),
+			   U[1] * cos(theta) + V[1] * sin(theta),
+			   U[2] * cos(theta) + V[2] * sin(theta) };
+	cvec[0] *= l;
+	cvec[1] *= l;
+	cvec[2] *= l;
+
+	double cvu = cvec[0] * drdu[0] + cvec[1] * drdu[1] + cvec[2] * drdu[2];
+	double cvv = cvec[0] * drdv[0] + cvec[1] * drdv[1] + cvec[2] * drdv[2];
+	
+	double coeff_cross = (cvv - cvu * proj)/nrm_V/nrm_V;
+	
+	double du = cvu/lu/lu - coeff_cross * proj;
+	double dv = coeff_cross;  
+	cvec[0] -= du * drdu[0] + dv * drdv[0];
+	cvec[1] -= du * drdu[1] + dv * drdv[1];
+	cvec[2] -= du * drdu[2] + dv * drdv[2];
+
+	duv[0] = du;
+	duv[1] = dv;
+}
 
 void surface::localMove( int *f_in, double *u_in, double *v_in, double sigma, double *r, double *frc_duv, double dt, double *fstep, int max_correct_iterations)
 {
@@ -2537,7 +2588,7 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 			double c = Sop[2];
 			double d = Sop[3];
 	
-			double c0 = theFormulas[frm].c0;
+			double c0 = theIrregularFormulas[frm].c0;
 			double fac = sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d);
 			c1 = -0.5*(a+d-fac);
 			c2 = -0.5*(a+d+fac);

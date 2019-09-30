@@ -762,7 +762,13 @@ void loadPSF( FILE *theFile )
 	getLine( theFile, buffer );	
 	getLine( theFile, buffer );	
 	int nlines = 0;
-	sscanf( buffer, " %d ", &nlines );
+	int nr = sscanf( buffer, " %d ", &nlines );
+
+	if( nr == 0 )
+	{
+		printf("ERROR. file does not appear to be a valid PSF.\n");
+		exit(1);
+	}
 
 	for( int x = 0; x < nlines; x++ )
 		getLine( theFile, buffer );
@@ -771,7 +777,12 @@ void loadPSF( FILE *theFile )
 	getLine( theFile, buffer );	
 	
 	int local_nat = 0;
-	sscanf( buffer, "%d ", &local_nat );
+	nr = sscanf( buffer, "%d ", &local_nat );
+	if( nr == 0 )
+	{
+		printf("ERROR. file does not appear to be a valid PSF.\n");
+		exit(1);
+	}
 //	printf("Reading %d atoms from the PSF.\n", local_nat );
 
 	res_name = (char **)malloc( sizeof( char *) * local_nat );	

@@ -35,6 +35,23 @@ double fsur(double x, void *p) {
 
 		f = T * P * (1 - exp(-params.D * params.t * x * x));
 		f = f * params.a * params.k;
+
+/*		
+		double j0ur = j0(x*params.r0);
+		double j0us = j0(x*params.a);
+		double y0ur = y0(x*params.r0);
+		double y0us = y0(x*params.a);
+		double y1us = y1(x*params.a);
+		double j1us = j1(x*params.a);
+
+		double ka = params.k;
+		double u =x;	
+		double Cur0 = (j0ur * ( h * u * y1us + ka * y0us) - y0ur * (h * u * j1us+ka*j0us)) / sqrt(tet);
+		
+		
+		double r0 = params.r0;
+		f = 2 * params.k / M_PI * (1.0/x)  * (exp(-params.D * params.t * x * x)-1) * Cur0 / sqrt(tet);
+*/
 	} else { //absorbing boundary conditions... this gives the survival probability
 		alp = j0(x * params.a);
 		bet = y0(x * params.a);

@@ -12,34 +12,37 @@
 
 struct pcomplex
 {
-	int disabled;
-	int nwatchers;
+	int disabled; //check
+	int nwatchers; //check
 
-	int is_inside;
-	int nsites;
-	int nattach;
-	int bound;
-	int debug;
-	int do_bd;
+	int is_inside; // copyparent
+	int nsites; //check
+	int nattach; //check
+	int bound; //check
+	int debug; //check
+	int do_bd; //check
+	int my_id;
 
-	char *complex_name;
+	int *rd_timestep_disabled; // set to true if we disable its diffusion this timestep.
+
+	char *complex_name; //check
 	
 	// diffusion constants.
-	double *DC;
+	double *DC; //check
 
 	// all masses.
-	double *mass;
+	double *mass; //check
 
 	// all WCA/LJ radii
-	double *sigma;
-	double *att_eps;
-	double *att_sigma;
+	double *sigma; //check
+	double *att_eps; //check
+	double *att_sigma; //check
 
-	// all coordinates in 3D
-	double *rall;
+	// all coordinates in 3D 
+	double *rall; //check
 	// attach coordinates in f/uv; can exceed face bounds
-	int *sid; // id of surface we are on.
-	int *stype; // if doing rxn/diff
+	int *sid; //check // id of surface we are on.
+	int *stype; //check // if doing rxn/diff
 	int *fs;	
 	double *puv;
 
@@ -47,10 +50,13 @@ struct pcomplex
 	int *grad_fs;	
 	double *grad_puv;
 	
-	double *last_p; // Hamiltonian conjugate momenta
 	double *p; // Hamiltonian conjugate momenta
 	double *qdot; // time derivatives of generalized coordinates.
 	double *save_grad;
+	double *cache_grad; // if a particle move is rejected we may need to save the gradient
+	double *cache_rall; // if a particle move is rejected we may need to save the gradient
+	double *cache_puv; // if a particle move is rejected we may need to save the gradient
+	int *cache_f; // if a particle move is rejected we may need to save the gradient
 	
 	double *PBC_ext; // the current PBC vector of each site.
 	double *last_pos;
@@ -113,6 +119,7 @@ struct pcomplex
 	//void compute_qdot( surface *theSurface, double *rsurf, double *mesh_qdot0, double *mesh_qdot, double frac_mult=1.0 );
 	void compute_qdot( Simulation *theSimulation,  double frac_mult=1.0 );
 	void propagate_surface_q( Simulation *theSimulation, double dt );
+	void copyParentParameters( pcomplex *parent );
 
 	void debug_dPinv_dq( surface * theSurface, double *rsurf  );
 	void getMeshQxdot( surface *theSurface, double *rsurf, double *Minv, double *mesh_p, double *mesh_qdot, double *mesh_qdot0, double *mesh_der_qdot );
@@ -132,6 +139,9 @@ struct pcomplex
 	void destroy( void);
 	void watch( void );
 	void forget( void );
+
+	void cache( void);
+	void uncache(void);
 };
 
 struct actin : pcomplex
@@ -155,7 +165,8 @@ struct simpleLipid : pcomplex
 
 struct simpleDimer : simpleLipid
 {
-	double c0_val;
+	void loadParams( parameterBlock *block );
+	virtual void init( surface *theSurface, double *, int f, double u, double v ); 
 };
 
 struct NBAR : pcomplex

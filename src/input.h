@@ -34,7 +34,6 @@ class parameterBlock
 	int timestep_analysis;
 	int mass_scaling;
 	int disable_mesh;
-	int fix_membrane;
 	int mode_x;
 	int mode_y;
 	int mode_min;
@@ -218,10 +217,15 @@ class parameterBlock
 	char *innerPatchPSF;
 	char *outerPatchPDB;
 	char *outerPatchPSF;
+	char *altPatchPDB;
+	char *altPatchPSF;
 	char *patchPSF;
 	char *patchPDB;
 	int create_all_atom;
 	int create_flip;
+	int do_rim;
+
+	double shift[3];
 
 	// END section for creating all-atom structures
 

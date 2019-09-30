@@ -1,0 +1,116 @@
+\newenvironment{optionSummary}[3]{
+    \mdfsetup{skipabove=0pt,skipbelow=0pt,frametitleaboveskip=0pt,frametitlebelowskip=5pt,innerbottommargin=0pt,hidealllines=true,frametitlefont=\bfseries\color{darkgray}}
+    \begin{mdframed}
+	[frametitle=\begin{flushleft}Option:~\MakeLowercase{\code{#1}}\\Default:~\code{#2}\end{flushleft},
+	backgroundcolor=white]
+     \addtostream{stream#3}{#1 \par}
+  }{\par\begin{flushleft}\hrulefill\end{flushleft}\end{mdframed}}
+
+\newsection{Input options}
+
+\newcommand{\optionHeader}[1]{{\bf \begin{center}#1\end{center}}}
+
+\newcommand{\optionRuler}{\vspace{-0.2in}\hrulefill}
+
+\optionHeader{System setup options}
+\optionRuler
+\begin{multicols}{3}
+\IfFileExists{setup.options}{\input{setup.options}}{}
+\end{multicols}
+
+\optionHeader{Dynamics options}
+\optionRuler
+\begin{multicols}{3}
+\IfFileExists{dynamics.options}{\input{dynamics.options}}{}
+\end{multicols}
+
+\optionHeader{Reaction-diffusion options}
+\optionRuler
+\begin{multicols}{3}
+\IfFileExists{rxn.options}{\input{rxn.options}}{}
+\end{multicols}
+
+\optionHeader{Miscellaneous options}
+\optionRuler
+\begin{multicols}{3}
+\IfFileExists{misc.options}{\input{misc.options}}{}
+\end{multicols}
+
+\newoutputstream{streamSetup}
+\openoutputfile{setup.options}{streamSetup}
+\newoutputstream{streamDynamics}
+\openoutputfile{dynamics.options}{streamDynamics}
+\newoutputstream{streamRxn}
+\openoutputfile{rxn.options}{streamRxn}
+\newoutputstream{streamMisc}
+\openoutputfile{misc.options}{streamMisc}
+
+% BEGIN options
+
+\newsubsection{System construction options}
+
+\begin{optionSummary}{mesh}{planar.mesh}{Setup}
+Specifies the file name of the mesh to use for the simulation.
+\end{optionSummary}
+
+\begin{optionSummary}{add}{N/A}{Setup}
+Adds particles/complexes to the membrane.
+
+Syntax:
+\code{add <complex\_name> nbound <nbound> <inside/outside>}
+\end{optionSummary}
+
+\newsubsection{Dynamics options}
+
+\begin{optionSummary}{do\_ld}{off}{Dynamics}
+Activates the Langevin dynamical thermostat to propagate both surfaces and particles.
+\end{optionSummary}
+\begin{optionSummary}{gamma\_langevin}{10 AKMA time}{Dynamics}
+Sets the value of $\gamma$, the coupling constant that controls the rate of collisions with the virtual solvent. The units are in AKMA time.
+\end{optionSummary}
+\begin{optionSummary}{do\_bd}{off}{Dynamics}
+Activates Brownian dynamics to propagate membrane and particles.
+\end{optionSummary}
+\begin{optionSummary}{do\_bd\_particles}{off}{Dynamics}
+Activates Brownian dynamics only for particles (rather than the membrane).
+\end{optionSummary}
+\begin{optionSummary}{time\_step}{one nanosecond}{Dynamics}
+Time step used to propagate dynamics.
+Too large a time step in the system will lead to positive feedback of high forces and large motions, crashing the system.
+Appropriate timesteps will conserve energy (when not employing a thermostat).
+Too small timesteps will waste computational resources.
+The default will rarely be appropriate.
+\end{optionSummary}
+\begin{optionSummary}{nouter}{10000}{Dynamics}
+Number of ``outer'' steps of dynamics.
+Trajectory information is written every \code{nouter} steps.
+The total number of time steps is nouter $\times$ ninner.
+\end{optionSummary}
+\begin{optionSummary}{ninner}{10000}{Dynamics}
+Number of ``inner'' steps of dynamics.
+Each outer loop of dynamics loops over this \code{ninner} time steps.
+The total number of time steps is nouter $\times$ ninner.
+\end{optionSummary}
+
+\newsubsection{Reaction diffusion options}
+
+\begin{optionSummary}{do\_rd}{off}{Rxn}
+Activates reaction/diffusion methodology.
+\end{optionSummary}
+\begin{optionSummary}{rxn\_diffusion}{none}{Rxn}
+Input file for reaction diffusion.
+Currently the format is:\par
+\code{reactant\_name1 site\_type1 reactant\_name2 site\_type2 k\_on(vol/s) k\_off(/s) binding\_radius(Angs) productName(or generic instructions)}
+\end{optionSummary}
+
+\newsubsection{Miscellaneous options}
+
+\begin{optionSummary}{disable\_mesh}{off}{Misc}
+Disables all propagation of mesh coordinates.
+\end{optionSummary}
+
+% these must be at the end of the file
+\closeoutputstream{streamSetup}
+\closeoutputstream{streamDynamics}
+\closeoutputstream{streamRxn}
+\closeoutputstream{streamMisc}

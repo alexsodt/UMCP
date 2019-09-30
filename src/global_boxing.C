@@ -151,6 +151,8 @@ int global_boxing::addp( double *r, int id )
 	return box;
 }
 
+
+
 void global_boxing::clearBoxing( int *list, int nclear)
 {
 	if( list )

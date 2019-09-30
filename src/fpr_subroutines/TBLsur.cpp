@@ -50,6 +50,7 @@ void TBLsur(gsl_matrix*& massc, double bindrad, double Dtot, double kr, double d
 			result = integrator(F, params, w, Rindex, bindrad, Dtot, kr, deltat, funcID, fsur);
 			gsl_matrix_set(massc, 1, ctr, 1.0 - result);
 		}
+
 		ctr = ctr + 1;
 	}
 	gsl_integration_workspace_free(w);
