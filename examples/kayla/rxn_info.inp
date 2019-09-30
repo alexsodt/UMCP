@@ -1,3 +1,3 @@
 # RXN/DIFFusion rate info
 # reactant_name1 site_type1 reactant_name2 site_type2 k_on(vol/s) k_off(/s) binding_radius(Angs) productName(or generic instructions)
-simpleLipid ANY simpleLipid ANY 1e10 1e4 10.0 simpleDimer 
+simpleLipid ANY simpleLipid ANY 1e11 1e4 10.0 simpleDimer 
