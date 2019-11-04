@@ -426,7 +426,7 @@ int main( int argc, char **argv )
 		r2[3*theSurface2->nv+1] = scale2;
 		r2[3*theSurface2->nv+2] = scale2;
 		getVertPath( theSurface2, vert2, join_radius, &path2, &pathLen2, r2 );
-	//		printf("scale2 path is %d.\n", pathLen2 );
+			printf("scale2 path is %d.\n", pathLen2 );
 	
 		while( pathLen2 > pathLen1 )
 		{
@@ -437,7 +437,7 @@ int main( int argc, char **argv )
 			r2[3*theSurface2->nv+2] = scale2;
 	
 			getVertPath( theSurface2, vert2, join_radius, &path2, &pathLen2, r2 );
-	//		printf("new scale2 path is %d.\n", pathLen2 );
+			printf("new scale2 path is %d.\n", pathLen2 );
 		}
 		
 		free(path2);
@@ -471,7 +471,20 @@ int main( int argc, char **argv )
 		}	
 	
 		double mesh_scale_2 = trial;
-		
+	
+		for( int i = 0; i < theSurface2->nv; i++ )
+		{
+			r2[3*i+0] *= mesh_scale_2;
+			r2[3*i+1] *= mesh_scale_2;
+			r2[3*i+2] *= mesh_scale_2;
+		}
+		r2[3*theSurface2->nv+0]=1.0;
+		r2[3*theSurface2->nv+1]=1.0;
+		r2[3*theSurface2->nv+2]=1.0;
+
+
+		printf("Final mesh scale %le\n", mesh_scale_2 );
+	
 		if( pathLen1 == pathLen2 )
 			printf("Successfully found two paths of %d edges to chop out.\n", pathLen1 );
 		else
@@ -643,7 +656,7 @@ int main( int argc, char **argv )
 		int reverse_cyl_path2[pathLen2];
 		int back_path2[nv];
 	
-		if( mesh2_has_pbc )
+		if( mesh2_has_pbc || 1 )
 		{
 			for( int p = 0; p < pathLen2; p++ )
 			{
@@ -848,7 +861,6 @@ int main( int argc, char **argv )
 			double scale = 1.0;
 			if( mesh == 1)
 			{
-				scale = mesh_scale_2;
 				nmap = nmap2;
 				cylPath = reverse_cyl_path2;
 				theSurface = theSurface2;
@@ -1008,8 +1020,12 @@ int main( int argc, char **argv )
 	
 		for( int x = 0; x < write_to; x++ )
 			sorter[x] = x;
+		int *rev_sorter = (int *)malloc( sizeof(int) * write_to );
 	
 	
+//#define DO_NOT_SORT
+
+#ifndef DO_NOT_SORT
 		done = 0;
 		while( !done )
 		{
@@ -1036,7 +1052,8 @@ int main( int argc, char **argv )
 				}
 			}
 		}
-		
+
+#endif		
 		double com[3]={0,0,0};
 		for( int v = 0; v < write_to; v++ )
 		{
@@ -1085,6 +1102,8 @@ int main( int argc, char **argv )
 		}
 	
 //		printf("MIN: %le %le %le MAX %le %le %le\n", min[0], min[1], min[2], max[0], max[1], max[2] )
+		for( int v = 0; v < write_to; v++ )
+			rev_sorter[sorter[v]] = v;
 
 	
 		for( int v = 0; v < write_to; v++ )
@@ -1095,7 +1114,7 @@ int main( int argc, char **argv )
 				theMesh[sorter[v]].r[2],
 				theMesh[sorter[v]].valence );
 			for( int e = 0; e < theMesh[sorter[v]].valence; e++ )
-				fprintf(joinFile, " %d", sorter[theMesh[sorter[v]].edges[e]] );	
+				fprintf(joinFile, " %d", rev_sorter[theMesh[sorter[v]].edges[e]] );	
 			fprintf(joinFile,"\n");
 		}
 	

@@ -9,7 +9,7 @@
 #include "util.h"
 #include <sys/time.h>
 
-const char *program_base = "/Users/sodtaj/git_projects/BD_Membrane";
+const char *program_base = "/data/sodtaj/HD/optimized";
 
 int glob_n_outer = 5;
 int glob_n_anneal = 50;
@@ -1312,13 +1312,13 @@ void getSphereMesh( double **r_io, int **edges_io, int **nedges_io, int *nv_io, 
 	// use external calls for this.
 
 	char command[256];
-	sprintf(command, "%s/icosahedron %lf > subdiv.mesh", program_base, R);
+	sprintf(command, "%s/icosahedron.opt %lf > subdiv.mesh", program_base, R);
 	system(command);
 	
 	for( int x = 0; x < ndiv; x++ )
 	{
 		char command[256];
-		sprintf(command, "%s/subdivide subdiv.mesh", program_base );
+		sprintf(command, "%s/subdivide.opt subdiv.mesh", program_base );
 		system(command);
 	}
 

@@ -1397,7 +1397,7 @@ void Simulation::writeLimitingSurface( FILE *theFile )
 		free(r);
 	}
 
-#define RD_HACK_REMOVE_ME
+//#define RD_HACK_REMOVE_ME
 #ifdef RD_HACK_REMOVE_ME
 	// first pass, oxygen
 	
