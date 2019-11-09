@@ -269,7 +269,7 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 			
 							if( rn < p && rat1 > 0.25 && rat2 > 0.25 )
 							{
-	//							printf("Moving %le %s.\n", dL, bilayerComp.names[x] );
+								printf("Moving %le (out of %le %le) %s from %d to %d.\n", dL, comp1[x], comp2[x], bilayerComp.names[x], t1, t2 );
 								nacc++;
 							}
 							else

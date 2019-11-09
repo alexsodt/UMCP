@@ -271,7 +271,11 @@ int main( int argc, char **argv )
 		useSurface->area(r, -1, &cur_area, &area0 );
 		printf("Surface %d area: %le area0: %le\n", sRec->id, cur_area, area0 );
 	}
-	
+
+	if( block.fitRho )
+		theSimulation->setupDensity( block.fitRho );
+
+
 	av_edge_length /= n_edge_length;
 	theSurface1->box_system(av_edge_length);
 	

@@ -1,0 +1,8 @@
+time_step 		1e-12
+mesh 			midplane10.mesh
+fitRho			both10.rho
+sphere 			no
+nsteps 			0
+nequil			0
+nmin			1000
+KA			0.215	

@@ -1,0 +1,16 @@
+time_step 1e-13
+add NBAR nbound 30 outside
+#add dimer nbound 1 outside
+#load start.save
+planar_topology yes
+mesh planar.mesh
+bar_bond_k 1
+bar_theta_k 1 
+bar_phi_k 1
+do_ld yes 
+nmin 20
+o_lim 100
+nsteps 0
+movie		yes
+gamma_langevin 10000
+KA		0.2

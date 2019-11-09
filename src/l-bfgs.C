@@ -3,7 +3,7 @@
 #include <string.h>
 #include <math.h>
 
-//#define DEBUG_PRINT
+#define DEBUG_PRINT
 static int limit_max_coord_move = 0;
 static double max_move = -1;
 

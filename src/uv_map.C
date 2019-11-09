@@ -3341,3 +3341,576 @@ void surface::localMoveReflect( int *f_in, double *u_in, double *v_in, double si
 	}
 
 }
+
+/* gradFetch gets the mesh derivatives of r, n, and c1+c2 */
+double surface::gradFetch( int f, double u, double v, double *r, 
+	double *rGrad, // dim 3 by nCoor
+	double *nGrad, // dim 3 by nCoor
+	double *hGrad, // dim nCoor	
+	int *nCoor,
+	int *vecList )
+{
+	double alpha_x = r[3*nv+0];
+	double alpha_y = r[3*nv+1];
+	double alpha_z = r[3*nv+2];
+		
+
+	int do_irreg = 0;
+	if( f >= nf_faces )
+		do_irreg = 1;
+
+	int frm = 0;
+	
+	if( do_irreg )
+		frm = (f-nf_faces)*nf_irr_pts;
+	else
+		frm = f*nf_g_q_p;
+
+	int i,e,val=6;
+	irr_kernel *theKernel = NULL;
+	
+	if( do_irreg )
+	{
+		i = theIrregularFormulas[frm].vertex;
+		e = theIrregularFormulas[frm].edge;
+		val = theVertices[i].valence;
+		theKernel = kernels[val]; 
+	}
+	else
+	{	
+		i = theFormulas[frm].vertex;
+		e = theFormulas[frm].edge;
+		val = theVertices[i].valence;
+	}
+
+	int ncoords_base = val + 6;
+
+	*nCoor = ncoords_base;
+	double fu = u;
+	double fv = v;					
+	int domain = 0;
+
+	if( do_irreg )
+	{
+		domain = theKernel->domain(fu,fv);
+		if( domain-1 >= theKernel->ndomains )
+		{
+			printf("ERROR trying to evaluate ru outside of irregular domain.\n");
+			exit(1);
+		}
+	}	
+
+	
+	double u_u = 1, u_v=0, v_u=0, v_v = 1;
+	double *theMap=NULL;
+
+	if( do_irreg )
+	{
+		u_u=u;
+		v_v=v;
+		theKernel->get_map_transform( &u_u, &u_v, &v_u, &v_v );
+		theMap = theKernel->get_map( &fu, &fv );
+	}
+
+	u = fu;
+	v = fv;
+	double w = 1 - u - v;
+
+	if( u +v > 1.0+THRESH || u < -THRESH || v < -THRESH )
+	{
+		printf("u: %lf v: %lf\n", u, v );
+		printf("ERROR: outside domain.\n");
+		exit(1);
+	}
+
+	int *cp = NULL;
+	
+
+	if( do_irreg )
+		cp = theIrregularFormulas[frm].cp;
+	else
+		cp = theFormulas[frm].cp;
+	
+	double u2 = u*u;
+	double u3 = u*u*u;
+	double u4 = u*u*u*u;
+	
+	double v2 = v*v;
+	double v3 = v*v*v;
+	double v4 = v*v*v*v;
+	
+	double w2 = w*w;
+	double w3 = w*w*w;
+	double w4 = w*w*w*w;
+		
+	double n1 = (1.0/12.0)*(u4+2*u3*v); 
+	double n2 = (1.0/12.0)*(u4+2*u3*w); 
+	double n3 = (1.0/12.0)*(u4+2*u3*w+6*u3*v+6*u2*v*w+12*u2*v2+6*u*v2*w+6*u*v3+2*v3*w+v4); 
+	double n4 = (1.0/12.0)*(6*u4+24*u3*w+24*u2*w2+8*u*w3+w4+24*u3*v+60*u2*v*w+36*u*v*w2+6*v*w3+24*u2*v2+36*u*v2*w+12*v2*w2+8*u*v3+6*v3*w+v4); 
+	double n5 = (1.0/12.0)*(u4+6*u3*w+12*u2*w2+6*u*w3+w4+2*u3*v+6*u2*v*w+6*u*v*w2+2*v*w3); 
+	double n6 = (1.0/12.0)*(2*u*v3+v4); 
+	double n7 = (1.0/12.0)*(u4+6*u3*w+12*u2*w2+6*u*w3+w4+8*u3*v+36*u2*v*w+36*u*v*w2+8*v*w3+24*u2*v2+60*u*v2*w+24*v2*w2+24*u*v3+24*v3*w+6*v4); 
+	double n8 = (1.0/12.0)*(u4+8*u3*w+24*u2*w2+24*u*w3+6*w4+6*u3*v+36*u2*v*w+60*u*v*w2+24*v*w3+12*u2*v2+36*u*v2*w+24*v2*w2+6*u*v3+8*v3*w+v4); 
+	double n9 = (1.0/12.0)*(2*u*w3+w4); 
+	double n10 = (1.0/12.0)*(2*v3*w+v4); 
+	double n11 = (1.0/12.0)*(2*u*w3+w4+6*u*v*w2+6*v*w3+6*u*v2*w+12*v2*w2+2*u*v3+6*v3*w+v4); 
+	double n12 = (1.0/12.0)*(w4+2*v*w3);
+	
+	double du_1 = Power(u,3)/3. + (Power(u,2)*v)/2.;
+	double du_2 = Power(u,2)/2. - Power(u,3)/3. - (Power(u,2)*v)/2.; 	
+	double du_3 = Power(u,2)/2. - Power(u,3)/3. + u*v - (Power(u,2)*v)/2. + Power(v,2)/2. - Power(v,3)/6.;
+	double du_4 = 0.3333333333333333 + u - Power(u,2) - Power(u,3)/3. + v/2. - u*v - (Power(u,2)*v)/2. - Power(v,2) + Power(v,3)/3.;	
+	double du_5 = 0.16666666666666666 - Power(u,2) + (2*Power(u,3))/3. - v/2. + Power(u,2)*v + Power(v,2)/2. - Power(v,3)/6.;
+	double du_6 = Power(v,3)/6.;	
+	double du_7 = 0.16666666666666666 - Power(u,2) + (2*Power(u,3))/3. + v/2. - 2*u*v + Power(u,2)*v - Power(v,2)/2. - Power(v,3)/6.;	
+	double du_8 = -2*u + 2*Power(u,2) - Power(u,3)/3. - v + 2*u*v - (Power(u,2)*v)/2. + Power(v,2) - Power(v,3)/6.;	
+	double du_9 = -0.16666666666666666 + Power(u,2)/2. - Power(u,3)/3. + v/2. - (Power(u,2)*v)/2. - Power(v,2)/2. + Power(v,3)/6.;	
+	double du_10 = -Power(v,3)/6.;
+	double du_11 = -0.16666666666666666 + Power(u,2)/2. - Power(u,3)/3. - v/2. + u*v - (Power(u,2)*v)/2. + Power(v,3)/3.;	
+	double du_12 = 	-0.3333333333333333 + u - Power(u,2) + Power(u,3)/3. + v/2. - u*v + (Power(u,2)*v)/2. - Power(v,3)/6.;
+	
+	double dv_1 = Power(u,3)/6.;
+	double dv_2 = -Power(u,3)/6.;
+	double dv_3 = Power(u,2)/2. - Power(u,3)/6. + u*v + Power(v,2)/2. - (u*Power(v,2))/2. - Power(v,3)/3.;
+	double dv_4 = 0.16666666666666666 + u/2. - Power(u,2)/2. - Power(u,3)/6. - 2*u*v - Power(v,2) + u*Power(v,2) + (2*Power(v,3))/3.;
+	double dv_5 = -0.16666666666666666 - u/2. + Power(u,3)/3. + u*v + Power(v,2)/2. - (u*Power(v,2))/2. - Power(v,3)/3.;
+	double dv_6 = (u*Power(v,2))/2. + Power(v,3)/3.;
+	double dv_7 = 0.3333333333333333 + u/2. - Power(u,2) + Power(u,3)/3. + v - u*v - Power(v,2) - (u*Power(v,2))/2. - Power(v,3)/3.;
+	double dv_8 = -u + Power(u,2) - Power(u,3)/6. - 2*v + 2*u*v + 2*Power(v,2) - (u*Power(v,2))/2. - Power(v,3)/3.;
+	double dv_9 = -0.3333333333333333 + u/2. - Power(u,3)/6. + v - u*v - Power(v,2) + (u*Power(v,2))/2. + Power(v,3)/3.;
+	double dv_10 = Power(v,2)/2. - (u*Power(v,2))/2. - Power(v,3)/3.;
+	double dv_11 = 0.16666666666666666 - u/2. + Power(u,2)/2. - Power(u,3)/6. - Power(v,2) + u*Power(v,2) + (2*Power(v,3))/3.;
+	double dv_12 = -0.16666666666666666 + u/2. - Power(u,2)/2. + Power(u,3)/6. + Power(v,2)/2. - (u*Power(v,2))/2. - Power(v,3)/3.;
+	
+	double d_uu_1 = Power(u,2) + u*v;
+	double d_uu_2 = u - Power(u,2) - u*v;
+	double d_uu_3 = u - Power(u,2) + v - u*v;
+	double d_uu_4 = 1 - 2*u - Power(u,2) - v - u*v;
+	double d_uu_5 = -2*u + 2*Power(u,2) + 2*u*v;
+	double d_uu_6 = 0;
+	double d_uu_7 = -2*u + 2*Power(u,2) - 2*v + 2*u*v;
+	double d_uu_8 = -2 + 4*u - Power(u,2) + 2*v - u*v;
+	double d_uu_9 = u - Power(u,2) - u*v;
+	double d_uu_10 = 0;
+	double d_uu_11 = u - Power(u,2) + v - u*v;
+	double d_uu_12 = 1 - 2*u + Power(u,2) - v + u*v;
+	
+	double d_uv_1 = Power(u,2)/2.;
+	double d_uv_2 = -Power(u,2)/2.;
+	double d_uv_3 = u - Power(u,2)/2. + v - Power(v,2)/2.;
+	double d_uv_4 = 0.5 - u - Power(u,2)/2. - 2*v + Power(v,2);
+	double d_uv_5 = -0.5 + Power(u,2) + v - Power(v,2)/2.;
+	double d_uv_6 = Power(v,2)/2.;
+	double d_uv_7 = 0.5 - 2*u + Power(u,2) - v - Power(v,2)/2.;
+	double d_uv_8 = -1 + 2*u - Power(u,2)/2. + 2*v - Power(v,2)/2.;
+	double d_uv_9 = 0.5 - Power(u,2)/2. - v + Power(v,2)/2.;
+	double d_uv_10 = -Power(v,2)/2.;
+	double d_uv_11 = -0.5 + u - Power(u,2)/2. + Power(v,2);
+	double d_uv_12 = 0.5 - u + Power(u,2)/2. - Power(v,2)/2.;
+	
+	double d_vv_1 = 0;
+	double d_vv_2 = 0;
+	double d_vv_3 = u + v - u*v - Power(v,2);
+	double d_vv_4 = -2*u - 2*v + 2*u*v + 2*Power(v,2);
+	double d_vv_5 = u + v - u*v - Power(v,2);
+	double d_vv_6 = u*v + Power(v,2);
+	double d_vv_7 = 1 - u - 2*v - u*v - Power(v,2);
+	double d_vv_8 = -2 + 2*u + 4*v - u*v - Power(v,2);
+	double d_vv_9 = 1 - u - 2*v + u*v + Power(v,2);
+	double d_vv_10 = v - u*v - Power(v,2);
+	double d_vv_11 = -2*v + 2*u*v + 2*Power(v,2);
+	double d_vv_12 = v - u*v - Power(v,2);
+	
+	double ceff_map[12] = { n8, n7, n4, n5, n9, n12, n11, n10, n6, n3, n1, n2 };
+	double ceff_map_du[12] = { du_8, du_7, du_4, du_5, du_9, du_12, du_11, du_10, du_6, du_3, du_1, du_2 };
+	double ceff_map_dv[12] = { dv_8, dv_7, dv_4, dv_5, dv_9, dv_12, dv_11, dv_10, dv_6, dv_3, dv_1, dv_2 };
+	
+	double ceff_map_duu[12] = { d_uu_8, d_uu_7, d_uu_4, d_uu_5, d_uu_9, d_uu_12, d_uu_11, d_uu_10, d_uu_6, d_uu_3, d_uu_1, d_uu_2 };
+	double ceff_map_duv[12] = { d_uv_8, d_uv_7, d_uv_4, d_uv_5, d_uv_9, d_uv_12, d_uv_11, d_uv_10, d_uv_6, d_uv_3, d_uv_1, d_uv_2 };
+	double ceff_map_dvv[12] = { d_vv_8, d_vv_7, d_vv_4, d_vv_5, d_vv_9, d_vv_12, d_vv_11, d_vv_10, d_vv_6, d_vv_3, d_vv_1, d_vv_2 };
+	
+	double R[3] = {0,0,0}, Ru[3]={0,0,0}, Rv[3]={0,0,0}, tSuu[3]={0,0,0}, tSuv[3]={0,0,0}, tSvv[3]={0,0,0};
+	double nrm[3]={0,0,0}; 
+	
+	if( do_irreg )
+	{
+		int *cset = theVertices[i].irr_coord_set + e * ncoords_base;
+
+		for( int x = 0; x < ncoords_base; x++ )
+			vecList[x] = cset[x];
+
+		for( int x = 0; x < ncoords_base; x++ )
+		{
+			for( int y = 0; y < 12; y++ )
+			{
+				Ru[0] += (r[3*cset[x]+0] + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * alpha_x * u_u;
+				Ru[1] += (r[3*cset[x]+1] + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * alpha_y * u_u;
+				Ru[2] += (r[3*cset[x]+2] + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_du[y] * alpha_z * u_u;
+				
+				Rv[0] += (r[3*cset[x]+0] + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * alpha_x * v_v;
+				Rv[1] += (r[3*cset[x]+1] + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * alpha_y * v_v;
+				Rv[2] += (r[3*cset[x]+2] + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_dv[y] * alpha_z * v_v;
+				
+				tSuu[0] += (r[3*cset[x]+0]  + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_duu[y] * alpha_x * u_u * u_u;
+				tSuu[1] += (r[3*cset[x]+1]  + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_duu[y] * alpha_y * u_u * u_u;
+				tSuu[2] += (r[3*cset[x]+2]  + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_duu[y] * alpha_z * u_u * u_u;
+				
+				tSuv[0] += (r[3*cset[x]+0]  + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_duv[y] * alpha_x * u_u * v_v;
+				tSuv[1] += (r[3*cset[x]+1]  + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_duv[y] * alpha_y * u_u * v_v;
+				tSuv[2] += (r[3*cset[x]+2]  + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_duv[y] * alpha_z * u_u * v_v;
+				
+				tSvv[0] += (r[3*cset[x]+0]  + theIrregularFormulas[frm].r_pbc[3*x+0]) * theMap[y*ncoords_base+x] * ceff_map_dvv[y] * alpha_x * v_v * v_v;
+				tSvv[1] += (r[3*cset[x]+1]  + theIrregularFormulas[frm].r_pbc[3*x+1]) * theMap[y*ncoords_base+x] * ceff_map_dvv[y] * alpha_y * v_v * v_v;
+				tSvv[2] += (r[3*cset[x]+2]  + theIrregularFormulas[frm].r_pbc[3*x+2]) * theMap[y*ncoords_base+x] * ceff_map_dvv[y] * alpha_z * v_v * v_v;
+			}
+		}
+	}
+	else
+	{
+		for( int p = 0; p < ncoords_base; p++ )
+		{
+			vecList[p] = cp[p];
+			double *lr = r + cp[p]*3;
+				
+			Ru[0] += ceff_map_du[p] * alpha_x*(r[cp[p]*3+0] + theFormulas[frm].r_pbc[3*p+0]); 
+			Ru[1] += ceff_map_du[p] * alpha_y*(r[cp[p]*3+1] + theFormulas[frm].r_pbc[3*p+1]); 
+			Ru[2] += ceff_map_du[p] * alpha_z*(r[cp[p]*3+2] + theFormulas[frm].r_pbc[3*p+2]); 
+			
+			Rv[0] += ceff_map_dv[p] * alpha_x*(r[cp[p]*3+0] + theFormulas[frm].r_pbc[3*p+0]); 
+			Rv[1] += ceff_map_dv[p] * alpha_y*(r[cp[p]*3+1] + theFormulas[frm].r_pbc[3*p+1]); 
+			Rv[2] += ceff_map_dv[p] * alpha_z*(r[cp[p]*3+2] + theFormulas[frm].r_pbc[3*p+2]); 
+			
+			tSuu[0] += ceff_map_duu[p] * alpha_x*(r[cp[p]*3+0] + theFormulas[frm].r_pbc[3*p+0]); 
+			tSuu[1] += ceff_map_duu[p] * alpha_y*(r[cp[p]*3+1] + theFormulas[frm].r_pbc[3*p+1]); 
+			tSuu[2] += ceff_map_duu[p] * alpha_z*(r[cp[p]*3+2] + theFormulas[frm].r_pbc[3*p+2]); 
+			
+			tSuv[0] += ceff_map_duv[p] * alpha_x*(r[cp[p]*3+0] + theFormulas[frm].r_pbc[3*p+0]); 
+			tSuv[1] += ceff_map_duv[p] * alpha_y*(r[cp[p]*3+1] + theFormulas[frm].r_pbc[3*p+1]); 
+			tSuv[2] += ceff_map_duv[p] * alpha_z*(r[cp[p]*3+2] + theFormulas[frm].r_pbc[3*p+2]); 
+			
+			tSvv[0] += ceff_map_dvv[p] * alpha_x*(r[cp[p]*3+0] + theFormulas[frm].r_pbc[3*p+0]); 
+			tSvv[1] += ceff_map_dvv[p] * alpha_y*(r[cp[p]*3+1] + theFormulas[frm].r_pbc[3*p+1]); 
+			tSvv[2] += ceff_map_dvv[p] * alpha_z*(r[cp[p]*3+2] + theFormulas[frm].r_pbc[3*p+2]); 
+		}	
+	}
+	cross( Ru, Rv, nrm );
+	normalize(nrm);
+
+	double RuRu = Ru[0] * Ru[0] + Ru[1] * Ru[1] + Ru[2]*Ru[2];
+	double RuRv = Ru[0] * Rv[0] + Ru[1] * Rv[1] + Ru[2]*Rv[2];
+	double RvRv = Rv[0] * Rv[0] + Rv[1] * Rv[1] + Rv[2]*Rv[2];
+
+	double g = sqrt(RuRu*RvRv-RuRv*RuRv);
+
+	double c1,c2;
+      
+	double nsuu = tSuu[0] * nrm[0] + tSuu[1] * nrm[1] + tSuu[2] * nrm[2];
+	double nsuv = tSuv[0] * nrm[0] + tSuv[1] * nrm[1] + tSuv[2] * nrm[2];
+	double nsvv = tSvv[0] * nrm[0] + tSvv[1] * nrm[1] + tSvv[2] * nrm[2];
+	
+	double Stot = (nsuu * RvRv + nsvv * RuRu -2*nsuv*RuRv)/(g*g);
+	
+	double Sop[4] = { 1.0/(g*g) * (nsuu * RvRv  - nsuv * RuRv), (1.0/(g*g)) * ( nsuv*RvRv-nsvv*RuRv),
+			  1.0/(g*g) * (nsuv * RuRu  - nsuu * RuRv), (1.0/(g*g)) * ( nsvv*RuRu-nsuv*RuRv) };
+	
+	double ctot = -(Sop[0] + Sop[3]);
+
+double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=0,d_nrmz_d_rvz=0,d_nrmy_d_rux=0,d_nrmy_d_ruy=0,d_nrmy_d_ruz=0,d_nrmy_d_rvx=0,d_nrmy_d_rvy=0,d_nrmy_d_rvz=0,d_nrmx_d_rux=0,d_nrmx_d_ruy=0,d_nrmx_d_ruz=0,d_nrmx_d_rvx=0,d_nrmx_d_rvy=0,d_nrmx_d_rvz=0,d_RuRu_d_rux=0,d_RuRu_d_ruy=0,d_RuRu_d_ruz=0,d_nsvv_d_rux=0,d_nsvv_d_ruy=0,d_nsvv_d_ruz=0,d_nsvv_d_rvx=0,d_nsvv_d_rvy=0,d_nsvv_d_rvz=0,d_nsvv_d_svvx=0,d_nsvv_d_svvy=0,d_nsvv_d_svvz=0,d_RuRv_d_rux=0,d_RuRv_d_ruy=0,d_RuRv_d_ruz=0,d_RuRv_d_rvx=0,d_RuRv_d_rvy=0,d_RuRv_d_rvz=0,d_nsuv_d_rux=0,d_nsuv_d_ruy=0,d_nsuv_d_ruz=0,d_nsuv_d_rvx=0,d_nsuv_d_rvy=0,d_nsuv_d_rvz=0,d_nsuv_d_suvx=0,d_nsuv_d_suvy=0,d_nsuv_d_suvz=0,d_RvRv_d_rvx=0,d_RvRv_d_rvy=0,d_RvRv_d_rvz=0,d_nsuu_d_rux=0,d_nsuu_d_ruy=0,d_nsuu_d_ruz=0,d_nsuu_d_rvx=0,d_nsuu_d_rvy=0,d_nsuu_d_rvz=0,d_nsuu_d_suux=0,d_nsuu_d_suuy=0,d_nsuu_d_suuz=0,d_g_d_rux=0,d_g_d_ruy=0,d_g_d_ruz=0,d_g_d_rvx=0,d_g_d_rvy=0,d_g_d_rvz=0,d_e_d_rux=0,d_e_d_ruy=0,d_e_d_ruz=0,d_e_d_rvx=0,d_e_d_rvy=0,d_e_d_rvz=0,d_e_d_suux=0,d_e_d_suuy=0,d_e_d_suuz=0,d_e_d_suvx=0,d_e_d_suvy=0,d_e_d_suvz=0,d_e_d_svvx=0,d_e_d_svvy=0,d_e_d_svvz=0;
+
+
+double d_c2_d_rux=0,d_c2_d_ruy=0,d_c2_d_ruz=0,d_c2_d_rvx=0,d_c2_d_rvy=0,d_c2_d_rvz=0,d_c2_d_suux=0,d_c2_d_suuy=0,d_c2_d_suuz=0,d_c2_d_suvx=0,d_c2_d_suvy=0,d_c2_d_suvz=0,d_c2_d_svvx=0,d_c2_d_svvy=0,d_c2_d_svvz=0,
+d_d_d_rux=0,d_d_d_ruy=0,d_d_d_ruz=0,d_d_d_rvx=0,d_d_d_rvy=0,d_d_d_rvz=0,d_d_d_suvx=0,d_d_d_suvy=0,d_d_d_suvz=0,d_d_d_svvx=0,d_d_d_svvy=0,d_d_d_svvz=0,
+d_a_d_rux=0,d_a_d_ruy=0,d_a_d_ruz=0,d_a_d_rvx=0,d_a_d_rvy=0,d_a_d_rvz=0,d_a_d_suux=0,d_a_d_suuy=0,d_a_d_suuz=0,d_a_d_suvx=0,d_a_d_suvy=0,d_a_d_suvz=0,
+d_g_d_RvRv=0,d_g_d_RuRv=0,d_g_d_RuRu=0,d_nsvv_d_nrmz=0,d_nsvv_d_nrmy=0,d_nsvv_d_nrmx=0,d_nsuv_d_nrmz=0,d_nsuv_d_nrmy=0,d_nsuv_d_nrmx=0,d_nsuu_d_nrmz=0,d_nsuu_d_nrmy=0,d_nsuu_d_nrmx=0,d_d_d_RuRv=0,d_d_d_nsuv=0,d_d_d_RuRu=0,d_d_d_nsvv=0,d_d_d_g=0,
+d_a_d_RuRv=0,d_a_d_nsuv=0,d_a_d_RvRv=0,d_a_d_nsuu=0,d_a_d_g=0;
+	
+	d_g_d_RuRu = RvRv/(2.*sqrt(-Power(RuRv,2) + RuRu*RvRv));  
+	d_g_d_RuRv = -(RuRv/sqrt(-Power(RuRv,2) + RuRu*RvRv));  
+	d_g_d_RvRv = RuRu/(2.*sqrt(-Power(RuRv,2) + RuRu*RvRv));  
+
+	d_RuRu_d_rux = 2*Ru[0];
+	d_RuRu_d_ruy = 2*Ru[1];
+	d_RuRu_d_ruz = 2*Ru[2];
+	
+	d_RuRv_d_rux = Rv[0];
+	d_RuRv_d_ruy = Rv[1];
+	d_RuRv_d_ruz = Rv[2];
+	
+	d_RuRv_d_rvx = Ru[0];
+	d_RuRv_d_rvy = Ru[1];
+	d_RuRv_d_rvz = Ru[2];
+	
+	d_RvRv_d_rvx = 2*Rv[0];
+	d_RvRv_d_rvy = 2*Rv[1];
+	d_RvRv_d_rvz = 2*Rv[2];
+
+	// intermediates.
+	d_a_d_g = (-2*(-(nsuv*RuRv) + nsuu*RvRv))/Power(g,3);
+	d_a_d_nsuu = RvRv/Power(g,2);
+	d_a_d_RvRv = nsuu/Power(g,2);
+	d_a_d_nsuv = -(RuRv/Power(g,2));
+	d_a_d_RuRv = -(nsuv/Power(g,2));
+	
+	d_d_d_g = (-2*(nsvv*RuRu - nsuv*RuRv))/Power(g,3);
+	d_d_d_nsvv = RuRu/Power(g,2);
+	d_d_d_RuRu = nsvv/Power(g,2);
+	d_d_d_nsuv = -(RuRv/Power(g,2));
+	d_d_d_RuRv = -(nsuv/Power(g,2));
+	
+	double fac = Power(Power(Ru[1]*Rv[0] - Ru[0]*Rv[1],2) + Power(Ru[2]*Rv[0] - Ru[0]*Rv[2],2) + Power(Ru[2]*Rv[1] - Ru[1]*Rv[2],2),1.5);
+
+	d_nrmx_d_rux = -((Ru[2]*Rv[1] - Ru[1]*Rv[2])*(Ru[1]*Rv[0]*Rv[1] + Ru[2]*Rv[0]*Rv[2] - Ru[0]*(Power(Rv[1],2) + Power(Rv[2],2))))/fac; 
+	d_nrmx_d_ruy = (Ru[2]*Rv[0] - Ru[0]*Rv[2])*(Ru[1]*Rv[0]*Rv[1] + Ru[2]*Rv[0]*Rv[2] - Ru[0]*(Power(Rv[1],2) + Power(Rv[2],2)))/fac;
+	d_nrmx_d_ruz = -((Ru[1]*Rv[0] - Ru[0]*Rv[1])*(Ru[1]*Rv[0]*Rv[1] + Ru[2]*Rv[0]*Rv[2] - Ru[0]*(Power(Rv[1],2) + Power(Rv[2],2))))/fac;
+	
+	d_nrmy_d_rux = -((Ru[2]*Rv[1] - Ru[1]*Rv[2])*(Rv[1]*(Ru[0]*Rv[0] + Ru[2]*Rv[2]) - Ru[1]*(Power(Rv[0],2) + Power(Rv[2],2))))/fac;
+	d_nrmy_d_ruy = (Ru[2]*Rv[0] - Ru[0]*Rv[2])*(Rv[1]*(Ru[0]*Rv[0] + Ru[2]*Rv[2]) - Ru[1]*(Power(Rv[0],2) + Power(Rv[2],2)))/fac; 
+	d_nrmy_d_ruz = (Ru[1]*Rv[0] - Ru[0]*Rv[1])*(-(Rv[1]*(Ru[0]*Rv[0] + Ru[2]*Rv[2])) + Ru[1]*(Power(Rv[0],2) + Power(Rv[2],2)))/fac;
+
+	d_nrmz_d_rux = (Ru[2]*Rv[1] - Ru[1]*Rv[2])*(Ru[2]*(Power(Rv[0],2) + Power(Rv[1],2)) - (Ru[0]*Rv[0] + Ru[1]*Rv[1])*Rv[2])/fac;
+	d_nrmz_d_ruy = -((Ru[2]*Rv[0] - Ru[0]*Rv[2])*(Ru[2]*(Power(Rv[0],2) + Power(Rv[1],2)) - (Ru[0]*Rv[0] + Ru[1]*Rv[1])*Rv[2]))/fac;
+	d_nrmz_d_ruz = -((Ru[1]*Rv[0] - Ru[0]*Rv[1])*(-(Ru[2]*(Power(Rv[0],2) + Power(Rv[1],2))) + (Ru[0]*Rv[0] + Ru[1]*Rv[1])*Rv[2]))/fac;
+
+	d_nrmx_d_rvx = (Ru[2]*Rv[1] - Ru[1]*Rv[2])*(Power(Ru[1],2)*Rv[0] - Ru[0]*Ru[1]*Rv[1] + Ru[2]*(Ru[2]*Rv[0] - Ru[0]*Rv[2]))/fac; 
+	d_nrmx_d_rvy = -((Ru[2]*Rv[0] - Ru[0]*Rv[2])*(Power(Ru[1],2)*Rv[0] - Ru[0]*Ru[1]*Rv[1] + Ru[2]*(Ru[2]*Rv[0] - Ru[0]*Rv[2])))/fac;
+	d_nrmx_d_rvz = (Ru[1]*Rv[0] - Ru[0]*Rv[1])*(Power(Ru[1],2)*Rv[0] - Ru[0]*Ru[1]*Rv[1] + Ru[2]*(Ru[2]*Rv[0] - Ru[0]*Rv[2]))/fac;
+	
+	d_nrmy_d_rvx = (Ru[2]*Rv[1] - Ru[1]*Rv[2])*(-(Ru[0]*Ru[1]*Rv[0]) + Power(Ru[0],2)*Rv[1] + Ru[2]*(Ru[2]*Rv[1] - Ru[1]*Rv[2]))/fac;
+	d_nrmy_d_rvy = -((Ru[2]*Rv[0] - Ru[0]*Rv[2])*(-(Ru[0]*Ru[1]*Rv[0]) + Power(Ru[0],2)*Rv[1] + Ru[2]*(Ru[2]*Rv[1] - Ru[1]*Rv[2])))/fac;
+	d_nrmy_d_rvz = -((Ru[1]*Rv[0] - Ru[0]*Rv[1])*(Ru[0]*Ru[1]*Rv[0] - Power(Ru[0],2)*Rv[1] + Ru[2]*(-(Ru[2]*Rv[1]) + Ru[1]*Rv[2])))/fac;
+
+	d_nrmz_d_rvx = (Ru[2]*Rv[1] - Ru[1]*Rv[2])*(-(Ru[0]*Ru[2]*Rv[0]) + Power(Ru[0],2)*Rv[2] + Ru[1]*(-(Ru[2]*Rv[1]) + Ru[1]*Rv[2]))/fac;
+	d_nrmz_d_rvy = (Ru[2]*Rv[0] - Ru[0]*Rv[2])*(Ru[0]*Ru[2]*Rv[0] - Power(Ru[0],2)*Rv[2] + Ru[1]*(Ru[2]*Rv[1] - Ru[1]*Rv[2]))/fac;
+	d_nrmz_d_rvz = (Ru[1]*Rv[0] - Ru[0]*Rv[1])*(-(Ru[0]*Ru[2]*Rv[0]) + Power(Ru[0],2)*Rv[2] + Ru[1]*(-(Ru[2]*Rv[1]) + Ru[1]*Rv[2]))/fac;
+
+	
+	d_nsuu_d_nrmx = tSuu[0];
+	d_nsuu_d_nrmy = tSuu[1];
+	d_nsuu_d_nrmz = tSuu[2];
+	
+	d_nsuv_d_nrmx = tSuv[0];
+	d_nsuv_d_nrmy = tSuv[1];
+	d_nsuv_d_nrmz = tSuv[2];
+
+	d_nsvv_d_nrmx = tSvv[0];
+	d_nsvv_d_nrmy = tSvv[1];
+	d_nsvv_d_nrmz = tSvv[2];
+
+	d_nsuu_d_suux = nrm[0];
+	d_nsuu_d_suuy = nrm[1];
+	d_nsuu_d_suuz = nrm[2];
+	
+	d_nsuv_d_suvx = nrm[0];
+	d_nsuv_d_suvy = nrm[1];
+	d_nsuv_d_suvz = nrm[2];
+
+	d_nsvv_d_svvx = nrm[0];
+	d_nsvv_d_svvy = nrm[1];
+	d_nsvv_d_svvz = nrm[2];
+
+
+
+d_nsvv_d_rux += d_nsvv_d_nrmz * d_nrmz_d_rux;
+d_nsvv_d_ruy += d_nsvv_d_nrmz * d_nrmz_d_ruy;
+d_nsvv_d_ruz += d_nsvv_d_nrmz * d_nrmz_d_ruz;
+d_nsvv_d_rvx += d_nsvv_d_nrmz * d_nrmz_d_rvx;
+d_nsvv_d_rvy += d_nsvv_d_nrmz * d_nrmz_d_rvy;
+d_nsvv_d_rvz += d_nsvv_d_nrmz * d_nrmz_d_rvz;
+d_nsvv_d_rux += d_nsvv_d_nrmy * d_nrmy_d_rux;
+d_nsvv_d_ruy += d_nsvv_d_nrmy * d_nrmy_d_ruy;
+d_nsvv_d_ruz += d_nsvv_d_nrmy * d_nrmy_d_ruz;
+d_nsvv_d_rvx += d_nsvv_d_nrmy * d_nrmy_d_rvx;
+d_nsvv_d_rvy += d_nsvv_d_nrmy * d_nrmy_d_rvy;
+d_nsvv_d_rvz += d_nsvv_d_nrmy * d_nrmy_d_rvz;
+d_nsvv_d_rux += d_nsvv_d_nrmx * d_nrmx_d_rux;
+d_nsvv_d_ruy += d_nsvv_d_nrmx * d_nrmx_d_ruy;
+d_nsvv_d_ruz += d_nsvv_d_nrmx * d_nrmx_d_ruz;
+d_nsvv_d_rvx += d_nsvv_d_nrmx * d_nrmx_d_rvx;
+d_nsvv_d_rvy += d_nsvv_d_nrmx * d_nrmx_d_rvy;
+d_nsvv_d_rvz += d_nsvv_d_nrmx * d_nrmx_d_rvz;
+d_nsuv_d_rux += d_nsuv_d_nrmz * d_nrmz_d_rux;
+d_nsuv_d_ruy += d_nsuv_d_nrmz * d_nrmz_d_ruy;
+d_nsuv_d_ruz += d_nsuv_d_nrmz * d_nrmz_d_ruz;
+d_nsuv_d_rvx += d_nsuv_d_nrmz * d_nrmz_d_rvx;
+d_nsuv_d_rvy += d_nsuv_d_nrmz * d_nrmz_d_rvy;
+d_nsuv_d_rvz += d_nsuv_d_nrmz * d_nrmz_d_rvz;
+d_nsuv_d_rux += d_nsuv_d_nrmy * d_nrmy_d_rux;
+d_nsuv_d_ruy += d_nsuv_d_nrmy * d_nrmy_d_ruy;
+d_nsuv_d_ruz += d_nsuv_d_nrmy * d_nrmy_d_ruz;
+d_nsuv_d_rvx += d_nsuv_d_nrmy * d_nrmy_d_rvx;
+d_nsuv_d_rvy += d_nsuv_d_nrmy * d_nrmy_d_rvy;
+d_nsuv_d_rvz += d_nsuv_d_nrmy * d_nrmy_d_rvz;
+d_nsuv_d_rux += d_nsuv_d_nrmx * d_nrmx_d_rux;
+d_nsuv_d_ruy += d_nsuv_d_nrmx * d_nrmx_d_ruy;
+d_nsuv_d_ruz += d_nsuv_d_nrmx * d_nrmx_d_ruz;
+d_nsuv_d_rvx += d_nsuv_d_nrmx * d_nrmx_d_rvx;
+d_nsuv_d_rvy += d_nsuv_d_nrmx * d_nrmx_d_rvy;
+d_nsuv_d_rvz += d_nsuv_d_nrmx * d_nrmx_d_rvz;
+d_nsuu_d_rux += d_nsuu_d_nrmz * d_nrmz_d_rux;
+d_nsuu_d_ruy += d_nsuu_d_nrmz * d_nrmz_d_ruy;
+d_nsuu_d_ruz += d_nsuu_d_nrmz * d_nrmz_d_ruz;
+d_nsuu_d_rvx += d_nsuu_d_nrmz * d_nrmz_d_rvx;
+d_nsuu_d_rvy += d_nsuu_d_nrmz * d_nrmz_d_rvy;
+d_nsuu_d_rvz += d_nsuu_d_nrmz * d_nrmz_d_rvz;
+d_nsuu_d_rux += d_nsuu_d_nrmy * d_nrmy_d_rux;
+d_nsuu_d_ruy += d_nsuu_d_nrmy * d_nrmy_d_ruy;
+d_nsuu_d_ruz += d_nsuu_d_nrmy * d_nrmy_d_ruz;
+d_nsuu_d_rvx += d_nsuu_d_nrmy * d_nrmy_d_rvx;
+d_nsuu_d_rvy += d_nsuu_d_nrmy * d_nrmy_d_rvy;
+d_nsuu_d_rvz += d_nsuu_d_nrmy * d_nrmy_d_rvz;
+d_nsuu_d_rux += d_nsuu_d_nrmx * d_nrmx_d_rux;
+d_nsuu_d_ruy += d_nsuu_d_nrmx * d_nrmx_d_ruy;
+d_nsuu_d_ruz += d_nsuu_d_nrmx * d_nrmx_d_ruz;
+d_nsuu_d_rvx += d_nsuu_d_nrmx * d_nrmx_d_rvx;
+d_nsuu_d_rvy += d_nsuu_d_nrmx * d_nrmx_d_rvy;
+d_nsuu_d_rvz += d_nsuu_d_nrmx * d_nrmx_d_rvz;
+d_g_d_rvx += d_g_d_RvRv * d_RvRv_d_rvx;
+d_g_d_rvy += d_g_d_RvRv * d_RvRv_d_rvy;
+d_g_d_rvz += d_g_d_RvRv * d_RvRv_d_rvz;
+d_g_d_rux += d_g_d_RuRv * d_RuRv_d_rux;
+d_g_d_ruy += d_g_d_RuRv * d_RuRv_d_ruy;
+d_g_d_ruz += d_g_d_RuRv * d_RuRv_d_ruz;
+d_g_d_rvx += d_g_d_RuRv * d_RuRv_d_rvx;
+d_g_d_rvy += d_g_d_RuRv * d_RuRv_d_rvy;
+d_g_d_rvz += d_g_d_RuRv * d_RuRv_d_rvz;
+d_g_d_rux += d_g_d_RuRu * d_RuRu_d_rux;
+d_g_d_ruy += d_g_d_RuRu * d_RuRu_d_ruy;
+d_g_d_ruz += d_g_d_RuRu * d_RuRu_d_ruz;
+d_d_d_rux += d_d_d_RuRv * d_RuRv_d_rux;
+d_d_d_ruy += d_d_d_RuRv * d_RuRv_d_ruy;
+d_d_d_ruz += d_d_d_RuRv * d_RuRv_d_ruz;
+d_d_d_rvx += d_d_d_RuRv * d_RuRv_d_rvx;
+d_d_d_rvy += d_d_d_RuRv * d_RuRv_d_rvy;
+d_d_d_rvz += d_d_d_RuRv * d_RuRv_d_rvz;
+d_d_d_rux += d_d_d_nsuv * d_nsuv_d_rux;
+d_d_d_ruy += d_d_d_nsuv * d_nsuv_d_ruy;
+d_d_d_ruz += d_d_d_nsuv * d_nsuv_d_ruz;
+d_d_d_rvx += d_d_d_nsuv * d_nsuv_d_rvx;
+d_d_d_rvy += d_d_d_nsuv * d_nsuv_d_rvy;
+d_d_d_rvz += d_d_d_nsuv * d_nsuv_d_rvz;
+d_d_d_suvx += d_d_d_nsuv * d_nsuv_d_suvx;
+d_d_d_suvy += d_d_d_nsuv * d_nsuv_d_suvy;
+d_d_d_suvz += d_d_d_nsuv * d_nsuv_d_suvz;
+d_d_d_rux += d_d_d_RuRu * d_RuRu_d_rux;
+d_d_d_ruy += d_d_d_RuRu * d_RuRu_d_ruy;
+d_d_d_ruz += d_d_d_RuRu * d_RuRu_d_ruz;
+d_d_d_rux += d_d_d_nsvv * d_nsvv_d_rux;
+d_d_d_ruy += d_d_d_nsvv * d_nsvv_d_ruy;
+d_d_d_ruz += d_d_d_nsvv * d_nsvv_d_ruz;
+d_d_d_rvx += d_d_d_nsvv * d_nsvv_d_rvx;
+d_d_d_rvy += d_d_d_nsvv * d_nsvv_d_rvy;
+d_d_d_rvz += d_d_d_nsvv * d_nsvv_d_rvz;
+d_d_d_svvx += d_d_d_nsvv * d_nsvv_d_svvx;
+d_d_d_svvy += d_d_d_nsvv * d_nsvv_d_svvy;
+d_d_d_svvz += d_d_d_nsvv * d_nsvv_d_svvz;
+d_d_d_rux += d_d_d_g * d_g_d_rux;
+d_d_d_ruy += d_d_d_g * d_g_d_ruy;
+d_d_d_ruz += d_d_d_g * d_g_d_ruz;
+d_d_d_rvx += d_d_d_g * d_g_d_rvx;
+d_d_d_rvy += d_d_d_g * d_g_d_rvy;
+d_d_d_rvz += d_d_d_g * d_g_d_rvz;
+d_a_d_rux += d_a_d_RuRv * d_RuRv_d_rux;
+d_a_d_ruy += d_a_d_RuRv * d_RuRv_d_ruy;
+d_a_d_ruz += d_a_d_RuRv * d_RuRv_d_ruz;
+d_a_d_rvx += d_a_d_RuRv * d_RuRv_d_rvx;
+d_a_d_rvy += d_a_d_RuRv * d_RuRv_d_rvy;
+d_a_d_rvz += d_a_d_RuRv * d_RuRv_d_rvz;
+d_a_d_rux += d_a_d_nsuv * d_nsuv_d_rux;
+d_a_d_ruy += d_a_d_nsuv * d_nsuv_d_ruy;
+d_a_d_ruz += d_a_d_nsuv * d_nsuv_d_ruz;
+d_a_d_rvx += d_a_d_nsuv * d_nsuv_d_rvx;
+d_a_d_rvy += d_a_d_nsuv * d_nsuv_d_rvy;
+d_a_d_rvz += d_a_d_nsuv * d_nsuv_d_rvz;
+d_a_d_suvx += d_a_d_nsuv * d_nsuv_d_suvx;
+d_a_d_suvy += d_a_d_nsuv * d_nsuv_d_suvy;
+d_a_d_suvz += d_a_d_nsuv * d_nsuv_d_suvz;
+d_a_d_rvx += d_a_d_RvRv * d_RvRv_d_rvx;
+d_a_d_rvy += d_a_d_RvRv * d_RvRv_d_rvy;
+d_a_d_rvz += d_a_d_RvRv * d_RvRv_d_rvz;
+d_a_d_rux += d_a_d_nsuu * d_nsuu_d_rux;
+d_a_d_ruy += d_a_d_nsuu * d_nsuu_d_ruy;
+d_a_d_ruz += d_a_d_nsuu * d_nsuu_d_ruz;
+d_a_d_rvx += d_a_d_nsuu * d_nsuu_d_rvx;
+d_a_d_rvy += d_a_d_nsuu * d_nsuu_d_rvy;
+d_a_d_rvz += d_a_d_nsuu * d_nsuu_d_rvz;
+d_a_d_suux += d_a_d_nsuu * d_nsuu_d_suux;
+d_a_d_suuy += d_a_d_nsuu * d_nsuu_d_suuy;
+d_a_d_suuz += d_a_d_nsuu * d_nsuu_d_suuz;
+d_a_d_rux += d_a_d_g * d_g_d_rux;
+d_a_d_ruy += d_a_d_g * d_g_d_ruy;
+d_a_d_ruz += d_a_d_g * d_g_d_ruz;
+d_a_d_rvx += d_a_d_g * d_g_d_rvx;
+d_a_d_rvy += d_a_d_g * d_g_d_rvy;
+d_a_d_rvz += d_a_d_g * d_g_d_rvz;
+
+	if( do_irreg )
+	{
+		memset( rGrad, 0, 3 * ncoords_base * sizeof(double ));
+		memset( nGrad, 0, 9 * ncoords_base * sizeof(double ));
+		memset( hGrad, 0, 3 * ncoords_base * sizeof(double ));
+
+		for( int x = 0; x < ncoords_base; x++ )
+		for( int y = 0; y < 12; y++ )
+		{
+			rGrad[3*x+0] += ceff_map[y]*theMap[y*ncoords_base+x];
+			rGrad[3*x+1] += ceff_map[y]*theMap[y*ncoords_base+x];
+			rGrad[3*x+2] += ceff_map[y]*theMap[y*ncoords_base+x];
+	
+			// nrmx (outer) rx(inner)
+			nGrad[9*x+0*3+0] += d_nrmx_d_rux * ceff_map_du[y]*theMap[y*ncoords_base+x]*u_u+d_nrmx_d_rvx * ceff_map_dv[y]*theMap[y*ncoords_base+x] * v_v; 
+			nGrad[9*x+1*3+0] += d_nrmy_d_rux * ceff_map_du[y]*theMap[y*ncoords_base+x]*u_u+d_nrmy_d_rvx * ceff_map_dv[y]*theMap[y*ncoords_base+x] * v_v;  
+			nGrad[9*x+2*3+0] += d_nrmz_d_rux * ceff_map_du[y]*theMap[y*ncoords_base+x]*u_u+d_nrmz_d_rvx * ceff_map_dv[y]*theMap[y*ncoords_base+x] * v_v;  
+			                                                                                                                                
+			nGrad[9*x+0*3+1] += d_nrmx_d_ruy * ceff_map_du[y]*theMap[y*ncoords_base+x]*u_u+d_nrmx_d_rvy * ceff_map_dv[y]*theMap[y*ncoords_base+x] * v_v;  
+			nGrad[9*x+1*3+1] += d_nrmy_d_ruy * ceff_map_du[y]*theMap[y*ncoords_base+x]*u_u+d_nrmy_d_rvy * ceff_map_dv[y]*theMap[y*ncoords_base+x] * v_v;  
+			nGrad[9*x+2*3+1] += d_nrmz_d_ruy * ceff_map_du[y]*theMap[y*ncoords_base+x]*u_u+d_nrmz_d_rvy * ceff_map_dv[y]*theMap[y*ncoords_base+x] * v_v;  
+			                                                                                                                                
+			nGrad[9*x+0*3+2] += d_nrmx_d_ruz * ceff_map_du[y]*theMap[y*ncoords_base+x]*u_u+d_nrmx_d_rvz * ceff_map_dv[y]*theMap[y*ncoords_base+x] * v_v;  
+			nGrad[9*x+1*3+2] += d_nrmy_d_ruz * ceff_map_du[y]*theMap[y*ncoords_base+x]*u_u+d_nrmy_d_rvz * ceff_map_dv[y]*theMap[y*ncoords_base+x] * v_v;  
+			nGrad[9*x+2*3+2] += d_nrmz_d_ruz * ceff_map_du[y]*theMap[y*ncoords_base+x]*u_u+d_nrmz_d_rvz * ceff_map_dv[y]*theMap[y*ncoords_base+x] * v_v;  
+	
+			// total curvature
+			
+			hGrad[3*x+0] += (-(d_a_d_rux+d_d_d_rux) * ceff_map_du[y]*u_u-(d_a_d_rvx+d_d_d_rvx) * ceff_map_dv[y]* v_v - d_a_d_suux * ceff_map_duu[y]*u_u*u_u - (d_a_d_suvx + d_d_d_suvx) * ceff_map_duv[y]*u_u* v_v - d_d_d_svvx * ceff_map_dvv[y]* v_v* v_v)*theMap[y*ncoords_base+x];
+			hGrad[3*x+1] += (-(d_a_d_ruy+d_d_d_ruy) * ceff_map_du[y]*u_u-(d_a_d_rvy+d_d_d_rvy) * ceff_map_dv[y]* v_v - d_a_d_suuy * ceff_map_duu[y]*u_u*u_u - (d_a_d_suvy + d_d_d_suvy) * ceff_map_duv[y]*u_u* v_v - d_d_d_svvy * ceff_map_dvv[y]* v_v* v_v)*theMap[y*ncoords_base+x];
+			hGrad[3*x+2] += (-(d_a_d_ruz+d_d_d_ruz) * ceff_map_du[y]*u_u-(d_a_d_rvz+d_d_d_rvz) * ceff_map_dv[y]* v_v - d_a_d_suuz * ceff_map_duu[y]*u_u*u_u - (d_a_d_suvz + d_d_d_suvz) * ceff_map_duv[y]*u_u* v_v - d_d_d_svvz * ceff_map_dvv[y]* v_v* v_v)*theMap[y*ncoords_base+x];
+		}
+	}
+	else
+	{
+		for( int x = 0; x < ncoords_base; x++ )
+		{
+			rGrad[3*x+0] = ceff_map[x];
+			rGrad[3*x+1] = ceff_map[x];
+			rGrad[3*x+2] = ceff_map[x];
+
+			// nrmx (outer) rx(inner)
+			nGrad[9*x+0*3+0] = d_nrmx_d_rux * ceff_map_du[x]+d_nrmx_d_rvx * ceff_map_dv[x];  
+			nGrad[9*x+1*3+0] = d_nrmy_d_rux * ceff_map_du[x]+d_nrmy_d_rvx * ceff_map_dv[x];  
+			nGrad[9*x+2*3+0] = d_nrmz_d_rux * ceff_map_du[x]+d_nrmz_d_rvx * ceff_map_dv[x];  
+			                                                                             
+			nGrad[9*x+0*3+1] = d_nrmx_d_ruy * ceff_map_du[x]+d_nrmx_d_rvy * ceff_map_dv[x];  
+			nGrad[9*x+1*3+1] = d_nrmy_d_ruy * ceff_map_du[x]+d_nrmy_d_rvy * ceff_map_dv[x];  
+			nGrad[9*x+2*3+1] = d_nrmz_d_ruy * ceff_map_du[x]+d_nrmz_d_rvy * ceff_map_dv[x];  
+			                                                                             
+			nGrad[9*x+0*3+2] = d_nrmx_d_ruz * ceff_map_du[x]+d_nrmx_d_rvz * ceff_map_dv[x];  
+			nGrad[9*x+1*3+2] = d_nrmy_d_ruz * ceff_map_du[x]+d_nrmy_d_rvz * ceff_map_dv[x];  
+			nGrad[9*x+2*3+2] = d_nrmz_d_ruz * ceff_map_du[x]+d_nrmz_d_rvz * ceff_map_dv[x];  
+
+			// total curvature
+			
+			hGrad[3*x+0] = -(d_a_d_rux+d_d_d_rux) * ceff_map_du[x]-(d_a_d_rvx+d_d_d_rvx) * ceff_map_dv[x] - d_a_d_suux * ceff_map_duu[x] - (d_a_d_suvx + d_d_d_suvx) * ceff_map_duv[x] - d_d_d_svvx * ceff_map_dvv[x];
+			hGrad[3*x+1] = -(d_a_d_ruy+d_d_d_ruy) * ceff_map_du[x]-(d_a_d_rvy+d_d_d_rvy) * ceff_map_dv[x] - d_a_d_suuy * ceff_map_duu[x] - (d_a_d_suvy + d_d_d_suvy) * ceff_map_duv[x] - d_d_d_svvy * ceff_map_dvv[x];
+			hGrad[3*x+2] = -(d_a_d_ruz+d_d_d_ruz) * ceff_map_du[x]-(d_a_d_rvz+d_d_d_rvz) * ceff_map_dv[x] - d_a_d_suuz * ceff_map_duu[x] - (d_a_d_suvz + d_d_d_suvz) * ceff_map_duv[x] - d_d_d_svvz * ceff_map_dvv[x];
+		}
+	}
+	
+	
+	return ctot;
+}
+
+
+
+
+
+

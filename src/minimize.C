@@ -39,7 +39,10 @@ double surface_f( double *p )
 	VC = 0;
 	double v = 0;
 	for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
+	{
 		v += sRec->theSurface->energy( p+sRec->temp_min_offset, NULL );
+		v += sRec->theSurface->rhoEnergy( p+sRec->temp_min_offset, min_simulation->PBC_vec );
+	}
 	ParallelSum(&VA,1);
 	ParallelSum(&VC,1);
 	int nparams = min_nsurfaceparams;
@@ -80,6 +83,43 @@ double surface_fdf( double *p, double *g)
 	memset( g, 0, sizeof(double) * min_nparams );
 	double v = 0;	
 	int offset = 3; 
+	
+//#define RHO_FDIFF
+#ifdef RHO_FDIFF
+	for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
+	{
+		int nv = sRec->theSurface->nv;
+		p[offset+3*nv+0] = p[0];
+		p[offset+3*nv+1] = p[1];
+		p[offset+3*nv+2] = p[2];
+		sRec->g = g+offset;
+		sRec->r = p+offset;		
+
+		v += sRec->theSurface->rhoGrad( p+offset, g+offset, min_simulation->PBC_vec );
+
+		double eps = 1e-4;
+
+		for( int tx = 0; tx < nv; tx++ )
+		for( int c = 0; c < 3; c++ )
+		{
+			double en[2];
+			for( int pm = 0; pm < 2; pm++ )
+			{
+				p[offset+3*tx+c] += eps * (pm == 0 ? 1 : -1);	
+
+				en[pm] = sRec->theSurface->rhoEnergy( p+offset, min_simulation->PBC_vec );
+
+				p[offset+3*tx+c] -= eps * (pm == 0 ? 1 : -1);	
+			}
+
+			printf("%d %d rho grad: %.14le fd: %.14le\n",
+				tx, c, g[offset+3*tx+c], (en[0]-en[1])/(2*eps) );
+		}
+		
+
+		offset += sRec->theSurface->nv*3+3;
+	}
+#endif
 	for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
 	{
 		int nv = sRec->theSurface->nv;
@@ -91,6 +131,7 @@ double surface_fdf( double *p, double *g)
 //		memcpy( sRec->r, p+offset, sizeof(double) * (3*nv+3) );
 
 		sRec->theSurface->grad( p+offset, g+offset );
+		v += sRec->theSurface->rhoGrad( p+offset, g+offset, min_simulation->PBC_vec );
 		offset += sRec->theSurface->nv*3+3;
 	}
 	int nparams = min_nsurfaceparams;	

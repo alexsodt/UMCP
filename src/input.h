@@ -26,6 +26,7 @@ class parameterBlock
 	char *meshName2;
 	char *jobName;
 	char *qvals;
+	char *fitRho;
 	char *lipid_lib;
 	char *rxnDiffusionInfoName;
 	double rho;
@@ -230,6 +231,8 @@ class parameterBlock
 
 	// END section for creating all-atom structures
 
+	double fitCoupling;
+	double fitThickness;
 
 	parameterBlock(void);
 };
