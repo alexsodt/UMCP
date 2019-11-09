@@ -1185,7 +1185,7 @@ int main( int argc, char **argv )
 				theSimulation->allComplexes[c]->cache();
 			}
 
-			////// FIRST: propagate BD particles. their timesteps are never divided, and they never undergo reactions.
+			////// FIRST: propagate BD particles. their timesteps are never divided.
 
 			while( ! rd_consistent && rd_niter < 100)
 			{

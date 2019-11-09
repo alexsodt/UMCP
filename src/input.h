@@ -196,6 +196,7 @@ class parameterBlock
 	int collect_hk;
 	//reaction diffusion
 	int do_rd;
+	double bound_sigma;
 
 	int on_surface;
 
