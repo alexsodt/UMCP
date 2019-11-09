@@ -2,7 +2,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 
 EMAIL = alexander.sodt@nih.gov
 
-bin_PROGRAMS = hd.dbg makeHexSquare.dbg min.dbg subdivide.dbg scale.dbg icosahedron.dbg makeBud.dbg makeBump.dbg makeHexCylinder.dbg writeBiasPotential.dbg writeCylRTraj.dbg makePore.dbg join.dbg frc_sandbox.dbg
+bin_PROGRAMS = hd.dbg makeHexSquare.dbg min.dbg subdivide.dbg scale.dbg icosahedron.dbg makeBud.dbg makeBump.dbg makeHexCylinder.dbg writeBiasPotential.dbg writeCylRTraj.dbg makePore.dbg join.dbg frc_sandbox.dbg rd_jcp.dbg
 
 AM_CPPFLAGS = -include ../config.h -include ../src/local_config.h $(AM_INCLUDE) 
 AM_CFLAGS = -g
@@ -36,6 +36,7 @@ cuda_SRCS =
 endif
 
 hd_dbg_SOURCES        = hd.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS)
+rd_jcp_dbg_SOURCES        = rd_jcp.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS)
 frc_sandbox_dbg_SOURCES        = frc_sandbox.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS)
 min_dbg_SOURCES       = min.C $(interp_SRCS) $(hull_SRCS) $(complex_SRCS) $(util_SRCS) 
 subdivide_dbg_SOURCES = subdivide.C $(interp_SRCS)  $(hull_SRCS) $(complex_SRCS) $(util_SRCS)
@@ -52,6 +53,7 @@ writeCylRTraj_dbg_SOURCES      = writeCylRTraj.C $(util_SRCS)
 
 
 hd_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
+rd_jcp_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
 frc_sandbox_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
 join_dbg_LDADD              = $(AM_LDADD) $(AM_QHULL) -lstdc++
 min_dbg_LDADD             = $(AM_LDADD) $(AM_QHULL) -lstdc++

@@ -3,7 +3,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 EMAIL = alexander.sodt@nih.gov
 
 
-bin_PROGRAMS = hd.opt makeHexSquare.opt min.opt subdivide.opt scale.opt icosahedron.opt makeBud.opt makeBump.opt makeHexCylinder.opt  writeBiasPotential.opt writeCylRTraj.opt makePore.opt frc_sandbox.opt
+bin_PROGRAMS = hd.opt makeHexSquare.opt min.opt subdivide.opt scale.opt icosahedron.opt makeBud.opt makeBump.opt makeHexCylinder.opt  writeBiasPotential.opt writeCylRTraj.opt makePore.opt frc_sandbox.opt rd_jcp.opt
 
 AM_CPPFLAGS = -include ../config.h -include ../src/local_config.h $(AM_INCLUDE) 
 AM_CFLAGS = -O2
@@ -36,6 +36,7 @@ cuda_SRCS =
 endif
 hull_SRCS = dovoronoi.c clusterv.C
 
+rd_jcp_opt_SOURCES        = hd.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS) $(hull_SRCS) 
 hd_opt_SOURCES        = hd.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS) $(hull_SRCS) 
 frc_sandbox_opt_SOURCES        = frc_sandbox.C $(interp_SRCS) $(complex_SRCS) $(hull_SRCS) $(util_SRCS) $(cuda_SRCS) 
 min_opt_SOURCES       = min.C $(interp_SRCS) $(complex_SRCS) $(util_SRCS) $(cuda_SRCS) $(hull_SRCS)
@@ -50,6 +51,8 @@ makeHexSquare_opt_SOURCES = makeHexSquare.C $(hull_SRCS) $(util_SRCS)
 writeBiasPotential_opt_SOURCES = writeBiasPotential.C $(util_SRCS)
 writeCylRTraj_opt_SOURCES      = writeCylRTraj.C $(util_SRCS) 
 
+rd_jcp_opt_LDFLAGS        = $(AM_LDFLAGS)
+rd_jcp_opt_LDADD	  = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
 hd_opt_LDFLAGS		  = $(AM_LDFLAGS) 
 hd_opt_LDADD              = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
 frc_sandbox_opt_LDADD     = $(AM_LDADD) $(AM_QHULL) $(AM_CUDA) -lstdc++
