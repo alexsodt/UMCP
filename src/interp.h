@@ -388,8 +388,9 @@ struct surface
 	double openCLEnergy( double *r, double *oarr );
 	double fixEdgeGrad( double *r, double *g);
 	double fixEdgePotential( double *r );
-	double rhoEnergy( double * r);
-	double rhoGrad( double *r, double *g);
+	double rhoEnergy( double * r, double PBC_vec[3][3] );
+	double rhoGrad( double *r, double *g, double PBC_vec[3][3] );
+	double rhoWorker( double * r, double *gr, double PBC_vec[3][3], int do_grad);
 	void removeEdge( int e );
 	int createEdge( int i, int j, int k ); // creates a single triangle.
 	int sealEdge( int i, int j, int k ); // creates two triangles
@@ -443,6 +444,14 @@ struct surface
 	double dG( int f, double u, double v, double grad[5], double *r );
 	void get_pt_coeffs( int f, double u, double v, double *coeffs, int *coord_list, int *ncoords );
         void get_pt_dcoeffs( int f, double u, double v, double *coeffs, int *coord_list, int *ncoords );
+
+	/* gradFetch gets the mesh derivatives of r, n, and c1+c2 */
+	double gradFetch( int f, double u, double v, double *r, 
+		double *rGrad, // dim 3 by nCoor
+		double *nGrad, // dim 3 by nCoor
+		double *hGrad, // dim nCoor	
+		int *nCoor,
+		int *vecList );
 
 	void fetchPuv( int f, double u, double v, double *P_uv, double *rsurf );
 	int fetchdP_duv( int f, double u, double v, double **dP_duv, double *rsurf );

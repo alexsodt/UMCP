@@ -30,6 +30,10 @@ void setDefaults( parameterBlock *block )
 	block->betazFile = (char *)malloc( sizeof(char) * ( strlen(defaultBZ)+1) );
 	sprintf(block->betazFile, "%s", defaultBZ );
 
+	block->fitRho = NULL;
+	block->fitCoupling = 1.0;
+	block->fitThickness = 15.0;
+
 	block->rxnDiffusionInfoName = NULL;
 
 	block->qvals = NULL;
@@ -164,6 +168,7 @@ void setDefaults( parameterBlock *block )
 	block->bar_theta_k     = 1000;
 	block->bar_phi_k       = 1000;
 	block->bar_phi_0       = 180;
+
 
 	block->crowder_bond_k       = -1;
 	block->crowder_r       = 25;
@@ -561,6 +566,13 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			free(block->meshName);
 			block->meshName = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
 			strcpy( block->meshName, word2 );
+		}
+		else if( !strcasecmp( word1, "fitRho" ) )
+		{
+			if( block->fitRho )
+				free(block->fitRho);
+			block->fitRho = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->fitRho, word2 );
 		}
 		else if( !strcasecmp( word1, "mesh2" ) )
 		{
@@ -1411,6 +1423,10 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->patchPSF = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
 			strcpy( block->patchPSF, word2 );
 		}
+		else if( !strcasecmp( word1, "fitCoupling") )
+			block->fitCoupling = atof(word2);
+		else if( !strcasecmp( word1, "fitThickness") )
+			block->fitThickness = atof(word2);
 		else if( !strcasecmp( word1, "add") )
 		{
 			// format: add COMPLEX_NAME nbound        %d  [inside|outside]

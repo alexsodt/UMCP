@@ -1081,6 +1081,11 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 				gmat[0]/(root_g*root_g), -gmat[1]/(root_g*root_g), -gmat[1]/(root_g*root_g), gmat[3]/(root_g*root_g)
 			};
 
+			double ru[3],rv[3];
+			theSurface->ru( fs[s], puv[2*s+0], puv[2*s+1], rsurf, ru );
+			theSurface->rv( fs[s], puv[2*s+0], puv[2*s+1], rsurf, rv );
+//			printf("ru: %.14lf %.14lf %.14lf rv: %.14lf %.14lf %.14lf\n", ru[0], ru[1], ru[2], rv[0], rv[1], rv[2] );
+
 			// g_u + means metric increases in u direction, move particle there.
 			double pre_drift[2] = { 
 					save_grad[2*s+0]/kT + (-g_u/(2*root_g*root_g)), // 1/g done with sqrt
@@ -1142,13 +1147,13 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 				}*/
 				refresh(theSimulation);
 
-//#define DEBUG_DIFFUSION		
+#define DEBUG_DIFFUSION		
 #ifdef DEBUG_DIFFUSION
-		if( fabs(dt-1e-9) < 1e-11)
+		if( fabs(dt-1e-12) < 1e-11)
 		{
 			double newp[3] = { rall[0], rall[1], rall[2] };
 			double dr[3] = {newp[0]-curp[0],newp[1]-curp[1],newp[2]-curp[2] };
-			printf("%d DEL %le\n", was_irreg, dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2]);
+			printf("%d DEL %le dx: %le dy: %le\n", was_irreg, dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2], dr[0], dr[1] );
 		}
 #endif		
 
