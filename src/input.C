@@ -54,6 +54,8 @@ void setDefaults( parameterBlock *block )
 	block->nsteps = -1; // these are resolved later.
 	block->nequil = 0;
 	block->nmin = 0;
+	block->minimizeResetG = 0;
+
 	block->KA = -1;
 	block->kc = 14;
 	block->kg = 0;
@@ -68,6 +70,7 @@ void setDefaults( parameterBlock *block )
 	block->shift[1] = 0;
 	block->shift[2] = 0;
 
+	block->outputMesh = 0;
 
 	block->lipid_lib = NULL;
 
@@ -226,6 +229,10 @@ void setDefaults( parameterBlock *block )
 
 	block->solvatePDB = NULL;
 	block->solvatePSF = NULL;
+
+	block->do_gather = 0;
+	block->structureName = NULL;
+	block->dcdName = NULL;
 
 
 	// request a timestep analysis
@@ -409,6 +416,18 @@ int resolveParameters( parameterBlock *block )
 			exit(1);
 		}
 	}
+	
+	if( block->do_gather && (!block->structureName) )
+	{
+		printf("Gathering requires a structure (e.g., PSF) file.\n");
+		exit(1);
+	}
+	
+	if( block->do_gather && (!block->dcdName) )
+	{
+		printf("Gathering requires a coordinate (e.g., dcd) file.\n");
+		exit(1);
+	}
 
 	return warning;
 }
@@ -567,6 +586,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->meshName = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
 			strcpy( block->meshName, word2 );
 		}
+		else if( !strcasecmp( word1, "structure" ) ) // for gathering.
+		{
+			if( block->structureName ) free(block->structureName);
+			block->structureName = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->structureName, word2 );
+		}
+		else if( !strcasecmp( word1, "dcd" ) ) // for gathering.
+		{
+			if( block->dcdName ) free(block->dcdName);
+			block->dcdName = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->dcdName, word2 );
+		}
 		else if( !strcasecmp( word1, "fitRho" ) )
 		{
 			if( block->fitRho )
@@ -645,6 +676,42 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->write_alpha_period = atoi( word2 );
 		else if( !strcasecmp( word1, "nruns" ) )
 			block->nruns = atoi( word2 );
+		else if( !strcasecmp( word1, "minimizeResetG" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->minimizeResetG = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->minimizeResetG = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
+		else if( !strcasecmp( word1, "gather" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->do_gather = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->do_gather = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
+		else if( !strcasecmp( word1, "outputMesh" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->outputMesh = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->outputMesh = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
 		else if( !strcasecmp( word1, "mass_scaling" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )

@@ -6,6 +6,7 @@
 #include "l-bfgs.h"
 #include "p_p.h"
 #include "parallel.h"
+#include "fitRho.h"
 
 extern int enable_elastic_interior;
 static int min_ncomplex = 0;
@@ -15,6 +16,10 @@ static int do_freeze_membrane = 0;
 static pcomplex **min_complexes;
 extern double VA,VC;
 Simulation *min_simulation = NULL;
+static double cur_rho_thickness[2] = { 15.0, 15.0 };
+
+#define FIT_RHO_ONE_THICKNESS
+
 double surface_f( double *p )
 {
 	int offset = 3; 
@@ -41,7 +46,6 @@ double surface_f( double *p )
 	for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
 	{
 		v += sRec->theSurface->energy( p+sRec->temp_min_offset, NULL );
-		v += sRec->theSurface->rhoEnergy( p+sRec->temp_min_offset, min_simulation->PBC_vec );
 	}
 	ParallelSum(&VA,1);
 	ParallelSum(&VC,1);
@@ -53,6 +57,18 @@ double surface_f( double *p )
 		nparams += min_complexes[c]->nparams();
 	}
 		
+	if( fitRho_activated )
+	{
+#ifdef FIT_RHO_ONE_THICKNESS
+		double thick_inner = p[nparams]; nparams++;
+		double thick_outer = thick_inner;
+#else
+		double thick_inner = p[nparams]; nparams++;
+		double thick_outer = p[nparams]; nparams++;
+#endif
+		for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
+			v += sRec->theSurface->rhoEnergy( p+sRec->temp_min_offset, min_simulation->PBC_vec, thick_inner, thick_outer );
+	}	
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
@@ -84,8 +100,6 @@ double surface_fdf( double *p, double *g)
 	double v = 0;	
 	int offset = 3; 
 	
-//#define RHO_FDIFF
-#ifdef RHO_FDIFF
 	for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
 	{
 		int nv = sRec->theSurface->nv;
@@ -94,44 +108,8 @@ double surface_fdf( double *p, double *g)
 		p[offset+3*nv+2] = p[2];
 		sRec->g = g+offset;
 		sRec->r = p+offset;		
-
-		v += sRec->theSurface->rhoGrad( p+offset, g+offset, min_simulation->PBC_vec );
-
-		double eps = 1e-4;
-
-		for( int tx = 0; tx < nv; tx++ )
-		for( int c = 0; c < 3; c++ )
-		{
-			double en[2];
-			for( int pm = 0; pm < 2; pm++ )
-			{
-				p[offset+3*tx+c] += eps * (pm == 0 ? 1 : -1);	
-
-				en[pm] = sRec->theSurface->rhoEnergy( p+offset, min_simulation->PBC_vec );
-
-				p[offset+3*tx+c] -= eps * (pm == 0 ? 1 : -1);	
-			}
-
-			printf("%d %d rho grad: %.14le fd: %.14le\n",
-				tx, c, g[offset+3*tx+c], (en[0]-en[1])/(2*eps) );
-		}
-		
-
-		offset += sRec->theSurface->nv*3+3;
-	}
-#endif
-	for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
-	{
-		int nv = sRec->theSurface->nv;
-		p[offset+3*nv+0] = p[0];
-		p[offset+3*nv+1] = p[1];
-		p[offset+3*nv+2] = p[2];
-		sRec->g = g+offset;
-		sRec->r = p+offset;		
-//		memcpy( sRec->r, p+offset, sizeof(double) * (3*nv+3) );
 
 		sRec->theSurface->grad( p+offset, g+offset );
-		v += sRec->theSurface->rhoGrad( p+offset, g+offset, min_simulation->PBC_vec );
 		offset += sRec->theSurface->nv*3+3;
 	}
 	int nparams = min_nsurfaceparams;	
@@ -141,6 +119,48 @@ double surface_fdf( double *p, double *g)
 		min_complexes[c]->applyParamsToComplex( p + nparams );
 		nparams += np;
 	}
+	
+	if( fitRho_activated )
+	{
+#ifdef FIT_RHO_ONE_THICKNESS
+		double thick_inner = p[nparams];
+		double *rho_g_i = g+nparams;
+		*rho_g_i = 0;
+
+		double thick_outer = p[nparams]; 
+		double *rho_g_o = g+nparams;
+		*rho_g_o = 0;
+
+		nparams++;
+#else
+		double thick_inner = p[nparams];
+		double *rho_g_i = g+nparams;
+		*rho_g_i = 0;
+		nparams++;
+
+		double thick_outer = p[nparams]; 
+		double *rho_g_o = g+nparams;
+		*rho_g_o = 0;
+		nparams++;
+#endif
+		int offset = 3; 
+
+		*rho_g_i = 0;
+		*rho_g_o = 0;
+	
+		for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
+		{
+			int nv = sRec->theSurface->nv;
+			p[offset+3*nv+0] = p[0];
+			p[offset+3*nv+1] = p[1];
+			p[offset+3*nv+2] = p[2];
+			sRec->g = g+offset;
+			sRec->r = p+offset;		
+
+			v += sRec->theSurface->rhoGrad( p+offset, g+offset, min_simulation->PBC_vec, thick_inner, thick_outer, rho_g_i, rho_g_o );
+			offset += sRec->theSurface->nv*3+3;
+		}
+	}	
 	
 	for( int c = 0; c < min_ncomplex; c++ )
 		memset( min_complexes[c]->save_grad, 0, sizeof(double) * 3 * min_complexes[c]->nsites );
@@ -314,11 +334,41 @@ double surface_fdf( double *p, double *g)
 
 void full_fd_test( double *p )
 {
+	double deps = 1e-4;
+
+	double *tp = (double *)malloc( sizeof(double) * min_nparams );
+	memset( tp, 0, sizeof(double) * min_nparams );
+	double *g = (double *)malloc( sizeof(double) * min_nparams );
+	memset( g, 0, sizeof(double) * min_nparams );
+
+	double e0 = surface_fdf( p, g );
+	printf("Finite difference test.\n");
+
+
+	memcpy( tp, p, sizeof(double) * min_nparams );
+	for( int p = 0; p < min_nparams; p++ )
+	{
+		double de_pm[2];
+	
+		for( int im = 0; im < 2; im++ )
+		{
+			tp[p] += deps * (im == 0 ? 1 : -1);	
+		
+			double v = surface_f( tp );
+			
+			de_pm[im] = v;
+
+			tp[p] -= deps * (im == 0 ? 1 : -1);	
+		}
+		
+		printf("parm %d fd_der %.14le g %.14le del %.14le\n", p, (de_pm[0]-de_pm[1])/(2*deps), g[p],  (de_pm[0]-de_pm[1])/(2*deps) - g[p] );
+	}
+	free(tp);
+	free(g);
 }
 
 void fd_test( double *p )
 {
-#if 0 // pre-simulation change me
 	double deps = 1e-10;
 
 	double *tp = (double *)malloc( sizeof(double) * min_nparams );
@@ -338,12 +388,11 @@ void fd_test( double *p )
 		}
 
 		double v = surface_f( tp );
-		printf("%le %.14le %.14le del %.14le\n", eps, v, e0+expec, (v-(e0+expec)) );
+		printf("%le %.14le %.14le del %.14le\n", eps, v-e0, expec, (v-(e0+expec)) );
 	}
 
 	free(tp);
 	free(g);
-#endif
 }
 
 void Simulation::minimize( int freeze_membrane  )
@@ -373,6 +422,14 @@ void Simulation::minimize( int freeze_membrane  )
 	for( int c = 0; c < ncomplex; c++ )
 		num_params += allComplexes[c]->nparams();
 
+	if( fitRho_activated )
+	{
+#ifdef FIT_RHO_ONE_THICKNESS
+		num_params += 1; // same thickness
+#else
+		num_params += 2; // inner and outer thickness.
+#endif
+	}
 	min_nparams = num_params;
 	
 	double *p = (double *)malloc( sizeof(double) * num_params );
@@ -407,6 +464,21 @@ void Simulation::minimize( int freeze_membrane  )
 		allComplexes[c]->getParamsFromComplex( p + tp );
 		tp += allComplexes[c]->nparams();
 	}	
+
+	int thickness_ptr = 0;
+
+	if( fitRho_activated )
+	{
+		printf("Current thickness: %lf %lf\n", cur_rho_thickness[0], cur_rho_thickness[1] );
+		thickness_ptr = tp;
+
+#ifdef FIT_RHO_ONE_THICKNESS
+		p[tp] =cur_rho_thickness[0]; tp++; 
+#else
+		p[tp] =cur_rho_thickness[0]; tp++; 
+		p[tp] =cur_rho_thickness[1]; tp++; 
+#endif
+	}
 	
 	// derivative might be zero (absolutely)
 
@@ -441,7 +513,7 @@ void Simulation::minimize( int freeze_membrane  )
 		printf("Initial gradient zero.\n");
 	}	
 	l_bfgs_clear();
-//	full_fd_test(p);
+	full_fd_test(p);
 
 	double v =surface_fdf(p,g);
 	double e = surface_f(p);
@@ -470,6 +542,17 @@ void Simulation::minimize( int freeze_membrane  )
 	
 	for( int c = 0; c < ncomplex; c++ )
 		allComplexes[c]->refresh(this);
+
+	if( fitRho_activated )
+	{
+#ifdef FIT_RHO_ONE_THICKNESS
+		cur_rho_thickness[0] = p[thickness_ptr];		
+		cur_rho_thickness[1] = p[thickness_ptr];		
+#else
+		cur_rho_thickness[0] = p[thickness_ptr];		
+		cur_rho_thickness[1] = p[thickness_ptr+1];		
+#endif
+	}
 	
 	free(p);
 	free(g);

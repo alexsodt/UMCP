@@ -1704,6 +1704,17 @@ int surface::nextFace( int f, double *u_in, double *v_in, double *du_in, double 
 	else
 		t_cur = theIrregularFormulas[(f-nf_faces)*nf_irr_pts+0].tri;
 
+	// not defined if the user somehow wants to run down the edge of a triangle.
+
+	if( fabs(*u_in+*v_in-1.0) < THRESH || fabs(*v_in) < THRESH || fabs(*u_in) < THRESH )
+	{
+		if( fabs(*du_in+*dv_in) < THRESH )
+		{
+			*du_in += THRESH * 2*(rand()/(double)RAND_MAX-0.5);
+			*dv_in += THRESH * 2*(rand()/(double)RAND_MAX-0.5);
+		}
+	}
+
 	// I am going to return the point on the "next face" where we end up, and the leftover du, dv.
 
 	double u = *u_in;
@@ -2339,7 +2350,7 @@ int surface::map( int face_from, int face_to, double u, double v )
 }
 
 
-double surface::c( int f, double u, double v, double *r, double *c_vec_1, double *c_vec_2, double *c_val_1, double *c_val_2 )
+double surface::c( int f, double u, double v, double *r, double *k, double *c_vec_1, double *c_vec_2, double *c_val_1, double *c_val_2 )
 {
 	double alpha_x = r[3*nv+0];
 	double alpha_y = r[3*nv+1];
@@ -2564,6 +2575,7 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 			c2 = tSuu[2] * dudy * dudy + tSuv[2] * dudy * dvdy + tSuv[2] * dvdy * dudy + tSvv[2] * dvdy * dvdy; 
 
 			csum = c1+c2;
+			*k = c1*c2;
 
 			if( c_vec_1 && c_vec_2 && c_val_1 && c_val_2 )
 			{
@@ -2655,6 +2667,7 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 	
 				}	
 			}
+			*k = c1*c2;
 			csum = c1+c2;
 		}
 	
@@ -2842,6 +2855,7 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 				printf("Monge full c vecs NYI and probably never will be.\n");
 				exit(1);	
 			}
+			*k = c1*c2;
 		}
 		else
 		{
@@ -2929,9 +2943,12 @@ double surface::c( int f, double u, double v, double *r, double *c_vec_1, double
 				}	
 			}
 		}
+			
+		*k = c1*c2;
 		return c1 + c2;
 	}
 	
+	*k=0;
 	return 0;
 }
 
@@ -3339,13 +3356,13 @@ double surface::gradFetch( int f, double u, double v, double *r,
 	double *rGrad, // dim 3 by nCoor
 	double *nGrad, // dim 3 by nCoor
 	double *hGrad, // dim nCoor	
+	double *kGrad, // dim nCoor	
 	int *nCoor,
-	int *vecList )
+	int *vecList, double *k )
 {
 	double alpha_x = r[3*nv+0];
 	double alpha_y = r[3*nv+1];
 	double alpha_z = r[3*nv+2];
-		
 
 	int do_irreg = 0;
 	if( f >= nf_faces )
@@ -3605,7 +3622,13 @@ double surface::gradFetch( int f, double u, double v, double *r,
 	double Sop[4] = { 1.0/(g*g) * (nsuu * RvRv  - nsuv * RuRv), (1.0/(g*g)) * ( nsuv*RvRv-nsvv*RuRv),
 			  1.0/(g*g) * (nsuv * RuRu  - nsuu * RuRv), (1.0/(g*g)) * ( nsvv*RuRu-nsuv*RuRv) };
 	
+	double a = Sop[0];
+	double b = Sop[1];
+	double c = Sop[2];
+	double d = Sop[3];
+
 	double ctot = -(Sop[0] + Sop[3]);
+	*k = a*d-b*c;
 
 double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=0,d_nrmz_d_rvz=0,d_nrmy_d_rux=0,d_nrmy_d_ruy=0,d_nrmy_d_ruz=0,d_nrmy_d_rvx=0,d_nrmy_d_rvy=0,d_nrmy_d_rvz=0,d_nrmx_d_rux=0,d_nrmx_d_ruy=0,d_nrmx_d_ruz=0,d_nrmx_d_rvx=0,d_nrmx_d_rvy=0,d_nrmx_d_rvz=0,d_RuRu_d_rux=0,d_RuRu_d_ruy=0,d_RuRu_d_ruz=0,d_nsvv_d_rux=0,d_nsvv_d_ruy=0,d_nsvv_d_ruz=0,d_nsvv_d_rvx=0,d_nsvv_d_rvy=0,d_nsvv_d_rvz=0,d_nsvv_d_svvx=0,d_nsvv_d_svvy=0,d_nsvv_d_svvz=0,d_RuRv_d_rux=0,d_RuRv_d_ruy=0,d_RuRv_d_ruz=0,d_RuRv_d_rvx=0,d_RuRv_d_rvy=0,d_RuRv_d_rvz=0,d_nsuv_d_rux=0,d_nsuv_d_ruy=0,d_nsuv_d_ruz=0,d_nsuv_d_rvx=0,d_nsuv_d_rvy=0,d_nsuv_d_rvz=0,d_nsuv_d_suvx=0,d_nsuv_d_suvy=0,d_nsuv_d_suvz=0,d_RvRv_d_rvx=0,d_RvRv_d_rvy=0,d_RvRv_d_rvz=0,d_nsuu_d_rux=0,d_nsuu_d_ruy=0,d_nsuu_d_ruz=0,d_nsuu_d_rvx=0,d_nsuu_d_rvy=0,d_nsuu_d_rvz=0,d_nsuu_d_suux=0,d_nsuu_d_suuy=0,d_nsuu_d_suuz=0,d_g_d_rux=0,d_g_d_ruy=0,d_g_d_ruz=0,d_g_d_rvx=0,d_g_d_rvy=0,d_g_d_rvz=0,d_e_d_rux=0,d_e_d_ruy=0,d_e_d_ruz=0,d_e_d_rvx=0,d_e_d_rvy=0,d_e_d_rvz=0,d_e_d_suux=0,d_e_d_suuy=0,d_e_d_suuz=0,d_e_d_suvx=0,d_e_d_suvy=0,d_e_d_suvz=0,d_e_d_svvx=0,d_e_d_svvy=0,d_e_d_svvz=0;
 
@@ -3615,6 +3638,11 @@ d_d_d_rux=0,d_d_d_ruy=0,d_d_d_ruz=0,d_d_d_rvx=0,d_d_d_rvy=0,d_d_d_rvz=0,d_d_d_su
 d_a_d_rux=0,d_a_d_ruy=0,d_a_d_ruz=0,d_a_d_rvx=0,d_a_d_rvy=0,d_a_d_rvz=0,d_a_d_suux=0,d_a_d_suuy=0,d_a_d_suuz=0,d_a_d_suvx=0,d_a_d_suvy=0,d_a_d_suvz=0,
 d_g_d_RvRv=0,d_g_d_RuRv=0,d_g_d_RuRu=0,d_nsvv_d_nrmz=0,d_nsvv_d_nrmy=0,d_nsvv_d_nrmx=0,d_nsuv_d_nrmz=0,d_nsuv_d_nrmy=0,d_nsuv_d_nrmx=0,d_nsuu_d_nrmz=0,d_nsuu_d_nrmy=0,d_nsuu_d_nrmx=0,d_d_d_RuRv=0,d_d_d_nsuv=0,d_d_d_RuRu=0,d_d_d_nsvv=0,d_d_d_g=0,
 d_a_d_RuRv=0,d_a_d_nsuv=0,d_a_d_RvRv=0,d_a_d_nsuu=0,d_a_d_g=0;
+
+double d_b_d_rux=0,d_b_d_ruy=0,d_b_d_ruz=0,d_b_d_rvx=0,d_b_d_rvy=0,d_b_d_rvz=0,d_b_d_suux=0,d_b_d_suuy=0,d_b_d_suuz=0,d_b_d_suvx=0,d_b_d_suvy=0,d_b_d_suvz=0,d_b_d_RuRv=0,d_b_d_nsuv=0,d_b_d_RvRv=0,d_b_d_nsuu=0,d_b_d_g=0;
+double d_c_d_rux=0,d_c_d_ruy=0,d_c_d_ruz=0,d_c_d_rvx=0,d_c_d_rvy=0,d_c_d_rvz=0,d_c_d_suux=0,d_c_d_suuy=0,d_c_d_suuz=0,d_c_d_suvx=0,d_c_d_suvy=0,d_c_d_suvz=0,d_c_d_RuRv=0,d_c_d_nsuv=0,d_c_d_RvRv=0,d_c_d_nsuu=0,d_c_d_g=0;
+
+double d_b_d_nsvv=0,d_c_d_RuRu=0,d_b_d_svvx=0,d_b_d_svvy=0,d_b_d_svvz=0;
 	
 	d_g_d_RuRu = RvRv/(2.*sqrt(-Power(RuRv,2) + RuRu*RvRv));  
 	d_g_d_RuRv = -(RuRv/sqrt(-Power(RuRv,2) + RuRu*RvRv));  
@@ -3642,6 +3670,18 @@ d_a_d_RuRv=0,d_a_d_nsuv=0,d_a_d_RvRv=0,d_a_d_nsuu=0,d_a_d_g=0;
 	d_a_d_RvRv = nsuu/Power(g,2);
 	d_a_d_nsuv = -(RuRv/Power(g,2));
 	d_a_d_RuRv = -(nsuv/Power(g,2));
+			
+	d_b_d_g = (-2*(-(nsvv*RuRv) + nsuv*RvRv))/Power(g,3);
+	d_b_d_nsvv = -(RuRv/Power(g,2));
+	d_b_d_RvRv = nsuv/Power(g,2);
+	d_b_d_nsuv = RvRv/Power(g,2);
+	d_b_d_RuRv = -(nsvv/Power(g,2));
+
+	d_c_d_g = (-2*(nsuv*RuRu - nsuu*RuRv))/Power(g,3);
+	d_c_d_nsuu = -(RuRv/Power(g,2));
+	d_c_d_RuRu = nsuv/Power(g,2);
+	d_c_d_nsuv = RuRu/Power(g,2);
+	d_c_d_RuRv = -(nsuu/Power(g,2));
 	
 	d_d_d_g = (-2*(nsvv*RuRu - nsuv*RuRv))/Power(g,3);
 	d_d_d_nsvv = RuRu/Power(g,2);
@@ -3834,12 +3874,80 @@ d_a_d_ruz += d_a_d_g * d_g_d_ruz;
 d_a_d_rvx += d_a_d_g * d_g_d_rvx;
 d_a_d_rvy += d_a_d_g * d_g_d_rvy;
 d_a_d_rvz += d_a_d_g * d_g_d_rvz;
+	d_c_d_rux += d_c_d_RuRv * d_RuRv_d_rux;
+	d_c_d_ruy += d_c_d_RuRv * d_RuRv_d_ruy;
+	d_c_d_ruz += d_c_d_RuRv * d_RuRv_d_ruz;
+	d_c_d_rvx += d_c_d_RuRv * d_RuRv_d_rvx;
+	d_c_d_rvy += d_c_d_RuRv * d_RuRv_d_rvy;
+	d_c_d_rvz += d_c_d_RuRv * d_RuRv_d_rvz;
+	d_c_d_rux += d_c_d_nsuv * d_nsuv_d_rux;
+	d_c_d_ruy += d_c_d_nsuv * d_nsuv_d_ruy;
+	d_c_d_ruz += d_c_d_nsuv * d_nsuv_d_ruz;
+	d_c_d_rvx += d_c_d_nsuv * d_nsuv_d_rvx;
+	d_c_d_rvy += d_c_d_nsuv * d_nsuv_d_rvy;
+	d_c_d_rvz += d_c_d_nsuv * d_nsuv_d_rvz;
+	d_c_d_suvx += d_c_d_nsuv * d_nsuv_d_suvx;
+	d_c_d_suvy += d_c_d_nsuv * d_nsuv_d_suvy;
+	d_c_d_suvz += d_c_d_nsuv * d_nsuv_d_suvz;
+	d_c_d_rux += d_c_d_RuRu * d_RuRu_d_rux;
+	d_c_d_ruy += d_c_d_RuRu * d_RuRu_d_ruy;
+	d_c_d_ruz += d_c_d_RuRu * d_RuRu_d_ruz;
+	d_c_d_rux += d_c_d_nsuu * d_nsuu_d_rux;
+	d_c_d_ruy += d_c_d_nsuu * d_nsuu_d_ruy;
+	d_c_d_ruz += d_c_d_nsuu * d_nsuu_d_ruz;
+	d_c_d_rvx += d_c_d_nsuu * d_nsuu_d_rvx;
+	d_c_d_rvy += d_c_d_nsuu * d_nsuu_d_rvy;
+	d_c_d_rvz += d_c_d_nsuu * d_nsuu_d_rvz;
+	d_c_d_suux += d_c_d_nsuu * d_nsuu_d_suux;
+	d_c_d_suuy += d_c_d_nsuu * d_nsuu_d_suuy;
+	d_c_d_suuz += d_c_d_nsuu * d_nsuu_d_suuz;
+	d_c_d_rux += d_c_d_g * d_g_d_rux;
+	d_c_d_ruy += d_c_d_g * d_g_d_ruy;
+	d_c_d_ruz += d_c_d_g * d_g_d_ruz;
+	d_c_d_rvx += d_c_d_g * d_g_d_rvx;
+	d_c_d_rvy += d_c_d_g * d_g_d_rvy;
+	d_c_d_rvz += d_c_d_g * d_g_d_rvz;
+	d_b_d_rux += d_b_d_RuRv * d_RuRv_d_rux;
+	d_b_d_ruy += d_b_d_RuRv * d_RuRv_d_ruy;
+	d_b_d_ruz += d_b_d_RuRv * d_RuRv_d_ruz;
+	d_b_d_rvx += d_b_d_RuRv * d_RuRv_d_rvx;
+	d_b_d_rvy += d_b_d_RuRv * d_RuRv_d_rvy;
+	d_b_d_rvz += d_b_d_RuRv * d_RuRv_d_rvz;
+	d_b_d_rux += d_b_d_nsuv * d_nsuv_d_rux;
+	d_b_d_ruy += d_b_d_nsuv * d_nsuv_d_ruy;
+	d_b_d_ruz += d_b_d_nsuv * d_nsuv_d_ruz;
+	d_b_d_rvx += d_b_d_nsuv * d_nsuv_d_rvx;
+	d_b_d_rvy += d_b_d_nsuv * d_nsuv_d_rvy;
+	d_b_d_rvz += d_b_d_nsuv * d_nsuv_d_rvz;
+	d_b_d_suvx += d_b_d_nsuv * d_nsuv_d_suvx;
+	d_b_d_suvy += d_b_d_nsuv * d_nsuv_d_suvy;
+	d_b_d_suvz += d_b_d_nsuv * d_nsuv_d_suvz;
+	d_b_d_rvx += d_b_d_RvRv * d_RvRv_d_rvx;
+	d_b_d_rvy += d_b_d_RvRv * d_RvRv_d_rvy;
+	d_b_d_rvz += d_b_d_RvRv * d_RvRv_d_rvz;
+	d_b_d_rux += d_b_d_nsvv * d_nsvv_d_rux;
+	d_b_d_ruy += d_b_d_nsvv * d_nsvv_d_ruy;
+	d_b_d_ruz += d_b_d_nsvv * d_nsvv_d_ruz;
+	d_b_d_rvx += d_b_d_nsvv * d_nsvv_d_rvx;
+	d_b_d_rvy += d_b_d_nsvv * d_nsvv_d_rvy;
+	d_b_d_rvz += d_b_d_nsvv * d_nsvv_d_rvz;
+	d_b_d_svvx += d_b_d_nsvv * d_nsvv_d_svvx;
+	d_b_d_svvy += d_b_d_nsvv * d_nsvv_d_svvy;
+	d_b_d_svvz += d_b_d_nsvv * d_nsvv_d_svvz;
+	d_b_d_rux += d_b_d_g * d_g_d_rux;
+	d_b_d_ruy += d_b_d_g * d_g_d_ruy;
+	d_b_d_ruz += d_b_d_g * d_g_d_ruz;
+	d_b_d_rvx += d_b_d_g * d_g_d_rvx;
+	d_b_d_rvy += d_b_d_g * d_g_d_rvy;
+	d_b_d_rvz += d_b_d_g * d_g_d_rvz;	
+		
+	memset( rGrad, 0, 3 * ncoords_base * sizeof(double ));
+	memset( nGrad, 0, 9 * ncoords_base * sizeof(double ));
+	memset( hGrad, 0, 3 * ncoords_base * sizeof(double ));
+	memset( kGrad, 0, 3 * ncoords_base * sizeof(double ));
 
 	if( do_irreg )
 	{
-		memset( rGrad, 0, 3 * ncoords_base * sizeof(double ));
-		memset( nGrad, 0, 9 * ncoords_base * sizeof(double ));
-		memset( hGrad, 0, 3 * ncoords_base * sizeof(double ));
 
 		for( int x = 0; x < ncoords_base; x++ )
 		for( int y = 0; y < 12; y++ )
@@ -3866,6 +3974,22 @@ d_a_d_rvz += d_a_d_g * d_g_d_rvz;
 			hGrad[3*x+0] += (-(d_a_d_rux+d_d_d_rux) * ceff_map_du[y]*u_u-(d_a_d_rvx+d_d_d_rvx) * ceff_map_dv[y]* v_v - d_a_d_suux * ceff_map_duu[y]*u_u*u_u - (d_a_d_suvx + d_d_d_suvx) * ceff_map_duv[y]*u_u* v_v - d_d_d_svvx * ceff_map_dvv[y]* v_v* v_v)*theMap[y*ncoords_base+x];
 			hGrad[3*x+1] += (-(d_a_d_ruy+d_d_d_ruy) * ceff_map_du[y]*u_u-(d_a_d_rvy+d_d_d_rvy) * ceff_map_dv[y]* v_v - d_a_d_suuy * ceff_map_duu[y]*u_u*u_u - (d_a_d_suvy + d_d_d_suvy) * ceff_map_duv[y]*u_u* v_v - d_d_d_svvy * ceff_map_dvv[y]* v_v* v_v)*theMap[y*ncoords_base+x];
 			hGrad[3*x+2] += (-(d_a_d_ruz+d_d_d_ruz) * ceff_map_du[y]*u_u-(d_a_d_rvz+d_d_d_rvz) * ceff_map_dv[y]* v_v - d_a_d_suuz * ceff_map_duu[y]*u_u*u_u - (d_a_d_suvz + d_d_d_suvz) * ceff_map_duv[y]*u_u* v_v - d_d_d_svvz * ceff_map_dvv[y]* v_v* v_v)*theMap[y*ncoords_base+x];
+			
+			// ad - bc
+
+			// Gaussian curvature
+		
+			// ad terms:	
+			kGrad[3*x+0] -= (-(d_a_d_rux*d+d_d_d_rux*a) * ceff_map_du[y]*u_u-(d_a_d_rvx*d+d_d_d_rvx*a) * ceff_map_dv[y]* v_v - d_a_d_suux*d * ceff_map_duu[y]*u_u*u_u - (d_a_d_suvx*d + d_d_d_suvx*a) * ceff_map_duv[y]*u_u* v_v - d_d_d_svvx*a * ceff_map_dvv[y]* v_v* v_v)*theMap[y*ncoords_base+x];
+			kGrad[3*x+1] -= (-(d_a_d_ruy*d+d_d_d_ruy*a) * ceff_map_du[y]*u_u-(d_a_d_rvy*d+d_d_d_rvy*a) * ceff_map_dv[y]* v_v - d_a_d_suuy*d * ceff_map_duu[y]*u_u*u_u - (d_a_d_suvy*d + d_d_d_suvy*a) * ceff_map_duv[y]*u_u* v_v - d_d_d_svvy*a * ceff_map_dvv[y]* v_v* v_v)*theMap[y*ncoords_base+x];
+			kGrad[3*x+2] -= (-(d_a_d_ruz*d+d_d_d_ruz*a) * ceff_map_du[y]*u_u-(d_a_d_rvz*d+d_d_d_rvz*a) * ceff_map_dv[y]* v_v - d_a_d_suuz*d * ceff_map_duu[y]*u_u*u_u - (d_a_d_suvz*d + d_d_d_suvz*a) * ceff_map_duv[y]*u_u* v_v - d_d_d_svvz*a * ceff_map_dvv[y]* v_v* v_v)*theMap[y*ncoords_base+x];
+			
+			// bc terms, overall minus in -=
+			kGrad[3*x+0] += (-(d_c_d_rux*b+d_b_d_rux*c) * ceff_map_du[y]*u_u-(d_c_d_rvx*b+d_b_d_rvx*c) * ceff_map_dv[y]* v_v - d_c_d_suux*b * ceff_map_duu[y]*u_u*u_u - (d_c_d_suvx*b + d_b_d_suvx*c) * ceff_map_duv[y]*u_u* v_v - d_b_d_svvx*c * ceff_map_dvv[y]* v_v* v_v)*theMap[y*ncoords_base+x];
+			kGrad[3*x+1] += (-(d_c_d_ruy*b+d_b_d_ruy*c) * ceff_map_du[y]*u_u-(d_c_d_rvy*b+d_b_d_rvy*c) * ceff_map_dv[y]* v_v - d_c_d_suuy*b * ceff_map_duu[y]*u_u*u_u - (d_c_d_suvy*b + d_b_d_suvy*c) * ceff_map_duv[y]*u_u* v_v - d_b_d_svvy*c * ceff_map_dvv[y]* v_v* v_v)*theMap[y*ncoords_base+x];
+			kGrad[3*x+2] += (-(d_c_d_ruz*b+d_b_d_ruz*c) * ceff_map_du[y]*u_u-(d_c_d_rvz*b+d_b_d_rvz*c) * ceff_map_dv[y]* v_v - d_c_d_suuz*b * ceff_map_duu[y]*u_u*u_u - (d_c_d_suvz*b + d_b_d_suvz*c) * ceff_map_duv[y]*u_u* v_v - d_b_d_svvz*c * ceff_map_dvv[y]* v_v* v_v)*theMap[y*ncoords_base+x];
+
+
 		}
 	}
 	else
@@ -3894,6 +4018,17 @@ d_a_d_rvz += d_a_d_g * d_g_d_rvz;
 			hGrad[3*x+0] = -(d_a_d_rux+d_d_d_rux) * ceff_map_du[x]-(d_a_d_rvx+d_d_d_rvx) * ceff_map_dv[x] - d_a_d_suux * ceff_map_duu[x] - (d_a_d_suvx + d_d_d_suvx) * ceff_map_duv[x] - d_d_d_svvx * ceff_map_dvv[x];
 			hGrad[3*x+1] = -(d_a_d_ruy+d_d_d_ruy) * ceff_map_du[x]-(d_a_d_rvy+d_d_d_rvy) * ceff_map_dv[x] - d_a_d_suuy * ceff_map_duu[x] - (d_a_d_suvy + d_d_d_suvy) * ceff_map_duv[x] - d_d_d_svvy * ceff_map_dvv[x];
 			hGrad[3*x+2] = -(d_a_d_ruz+d_d_d_ruz) * ceff_map_du[x]-(d_a_d_rvz+d_d_d_rvz) * ceff_map_dv[x] - d_a_d_suuz * ceff_map_duu[x] - (d_a_d_suvz + d_d_d_suvz) * ceff_map_duv[x] - d_d_d_svvz * ceff_map_dvv[x];
+			// Gaussian curvature
+		
+			// ad terms:	
+			kGrad[3*x+0] -= (-(d_a_d_rux*d+d_d_d_rux*a) * ceff_map_du[x]*u_u-(d_a_d_rvx*d+d_d_d_rvx*a) * ceff_map_dv[x]* v_v - d_a_d_suux*d * ceff_map_duu[x]*u_u*u_u - (d_a_d_suvx*d + d_d_d_suvx*a) * ceff_map_duv[x]*u_u* v_v - d_d_d_svvx*a * ceff_map_dvv[x]* v_v* v_v);
+			kGrad[3*x+1] -= (-(d_a_d_ruy*d+d_d_d_ruy*a) * ceff_map_du[x]*u_u-(d_a_d_rvy*d+d_d_d_rvy*a) * ceff_map_dv[x]* v_v - d_a_d_suuy*d * ceff_map_duu[x]*u_u*u_u - (d_a_d_suvy*d + d_d_d_suvy*a) * ceff_map_duv[x]*u_u* v_v - d_d_d_svvy*a * ceff_map_dvv[x]* v_v* v_v);
+			kGrad[3*x+2] -= (-(d_a_d_ruz*d+d_d_d_ruz*a) * ceff_map_du[x]*u_u-(d_a_d_rvz*d+d_d_d_rvz*a) * ceff_map_dv[x]* v_v - d_a_d_suuz*d * ceff_map_duu[x]*u_u*u_u - (d_a_d_suvz*d + d_d_d_suvz*a) * ceff_map_duv[x]*u_u* v_v - d_d_d_svvz*a * ceff_map_dvv[x]* v_v* v_v);
+			
+			// bc terms, 
+			kGrad[3*x+0] += (-(d_c_d_rux*b+d_b_d_rux*c) * ceff_map_du[x]*u_u-(d_c_d_rvx*b+d_b_d_rvx*c) * ceff_map_dv[x]* v_v - d_c_d_suux*b * ceff_map_duu[x]*u_u*u_u - (d_c_d_suvx*b + d_b_d_suvx*c) * ceff_map_duv[x]*u_u* v_v - d_b_d_svvx*c * ceff_map_dvv[x]* v_v* v_v);
+			kGrad[3*x+1] += (-(d_c_d_ruy*b+d_b_d_ruy*c) * ceff_map_du[x]*u_u-(d_c_d_rvy*b+d_b_d_rvy*c) * ceff_map_dv[x]* v_v - d_c_d_suuy*b * ceff_map_duu[x]*u_u*u_u - (d_c_d_suvy*b + d_b_d_suvy*c) * ceff_map_duv[x]*u_u* v_v - d_b_d_svvy*c * ceff_map_dvv[x]* v_v* v_v);
+			kGrad[3*x+2] += (-(d_c_d_ruz*b+d_b_d_ruz*c) * ceff_map_du[x]*u_u-(d_c_d_rvz*b+d_b_d_rvz*c) * ceff_map_dv[x]* v_v - d_c_d_suuz*b * ceff_map_duu[x]*u_u*u_u - (d_c_d_suvz*b + d_b_d_suvz*c) * ceff_map_duv[x]*u_u* v_v - d_b_d_svvz*c * ceff_map_dvv[x]* v_v* v_v);
 		}
 	}
 	

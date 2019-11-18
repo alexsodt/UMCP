@@ -382,7 +382,8 @@ void surface::measureLipidCurvature( double *r, int pre_equil )
 	{
 		int f = theTriangles[t].f;
 		
-		double cmid = c(f,1.0/3.0,1.0/3.0, r);	
+		double k;
+		double cmid = c(f,1.0/3.0,1.0/3.0, r,&k);	
 
 		for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 		{

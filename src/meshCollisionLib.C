@@ -16,6 +16,7 @@
 #include "Point.h"
 #include "fast_mm.h"
 #include "parallel.h"
+#include "M_matrix.h"
 #define SKIP_SUPPORT_CHECK
 #define MEGA_DEL (10.0)
 
@@ -912,16 +913,11 @@ void surface::box_system( double edge_length ) {
         double max_x=0, max_y=0, max_z=0;
 	Point* averageTris = new Point[nt];
 	
-	double *M5 = (double *)malloc( sizeof(double) * 4 * 11 * 12 ); 
-	double *M6 = (double *)malloc( sizeof(double) * 4 * 12 * 12 ); 
-	double *M7 = (double *)malloc( sizeof(double) * 4 * 13 * 13 );
-
 	int mlow = 5;
 	int mhigh = 7;
+	double **M;
+	getM(&M,&mlow,&mhigh);
 
-	double *M[3] = { M5, M6, M7 };
-
-	generateSubdivisionMatrices( M, mlow, mhigh );
 
                 for( int t = 0; t < nt; t++ )
                 {
@@ -1015,9 +1011,6 @@ void surface::box_system( double edge_length ) {
 			averageTris[t] = average;
                 }
 
-	free(M5);
-	free(M6);
-	free(M7);
 
         // target about 20 x 20 x 20?
 
@@ -1282,16 +1275,11 @@ void surface::rebox_system( void )
         double max_x=0, max_y=0, max_z=0;
 	Point* averageTris = new Point[nt];
 	
-	double *M5 = (double *)malloc( sizeof(double) * 4 * 11 * 12 ); 
-	double *M6 = (double *)malloc( sizeof(double) * 4 * 12 * 12 ); 
-	double *M7 = (double *)malloc( sizeof(double) * 4 * 13 * 13 );
-
 	int mlow = 5;
 	int mhigh = 7;
+	double **M;
+	getM(&M,&mlow,&mhigh);
 
-	double *M[3] = { M5, M6, M7 };
-
-	generateSubdivisionMatrices( M, mlow, mhigh );
 
                 for( int t = 0; t < nt; t++ )
                 {
@@ -1385,9 +1373,6 @@ void surface::rebox_system( void )
 			averageTris[t] = average;
                 }
 
-	free(M5);
-	free(M6);
-	free(M7);
 
 	double rmax = max_x;
 	if( max_y > max_x )

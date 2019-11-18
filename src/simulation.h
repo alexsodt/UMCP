@@ -39,6 +39,7 @@ typedef struct surface_record
 	double *qdot;
 	double *qdot0;
 	int nc;
+	int gather_flip;
 
 	// for minimization
 	int temp_min_offset;
@@ -137,6 +138,10 @@ typedef struct Simulation
 	int AddComplex( pcomplex *addMe );	
 	void RemoveComplexDelayed( int id );
 	void GarbageCollection( void );
+	
+	// GATHER
+	double nearCurvature(double*rpt, double *cout, double *kout, double *dp_out, double *dz_out, int *leaflet_out);
+	void gather( parameterBlock *block );
 } Simulation;
 
 

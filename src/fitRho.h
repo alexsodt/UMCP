@@ -3,5 +3,6 @@
 
 #ifndef __fitrhoc__
 extern double fitCoupling;
+extern int fitRho_activated;
 #endif
 #endif

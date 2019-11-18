@@ -22,6 +22,9 @@
 #include "sans.h"
 #include "globals.h"
 #include "init.h"
+#include "fitRho.h"
+#include "M_matrix.h"
+
 #ifdef USE_CUDA
 #include "local_cuda.h"
 #endif
@@ -141,6 +144,8 @@ int main( int argc, char **argv )
 //1.3e-13;
 	double dt = block.time_step;
 
+	fitCoupling = block.fitCoupling;
+
 	Simulation *theSimulation = (Simulation *)malloc( sizeof(Simulation) );
 	theSimulation->visualization_cache = 0;
 	theSimulation->current_time = 0;
@@ -165,14 +170,10 @@ int main( int argc, char **argv )
 	double Lz = theSurface1->PBC_vec[2][2];
 
 	theSurface1->generatePlan();
+	double **M;
+	int mlow,mhigh;
 
-	double *M5 = (double *)malloc( sizeof(double) * 4 * 11 * 12 ); 
-	double *M6 = (double *)malloc( sizeof(double) * 4 * 12 * 12 ); 
-	double *M7 = (double *)malloc( sizeof(double) * 4 * 13 * 13 );
-	double *M[3] = { M5, M6, M7 };
-	int mlow = 5;
-	int mhigh = 7;
-	theSurface1->generateSubdivisionMatrices( M, mlow, mhigh );
+	getM( &M, &mlow, &mhigh );
 
 	// parameters from SOPC, table 1 from Rand/Parsegian BBA 988/1989/351-376, orig Ref Rand/Fuller/Parsegian/Rau 1988 v27 20 7711-7722, Table II
 	double collision_alpha = 2.11*2;
@@ -377,9 +378,14 @@ int main( int argc, char **argv )
 	sprintf(fname, "%s.psf", block.jobName );
 	tpsf = fopen(fname,"w");
 	sprintf(fname, "%s.xyz", block.jobName );
-	FILE *tFile = fopen(fname,"w");
 	theSimulation->writeLimitingSurfacePSF(tpsf);
 	fclose(tpsf);
+
+	FILE *tFile = NULL;
+	if( block.movie )
+	{
+		tFile = fopen(fname,"w");
+	}
 	int o_lim = nsteps;
 
 	double hours = block.hours;
@@ -782,6 +788,12 @@ int main( int argc, char **argv )
 			for( int c = 0; c < theSimulation->ncomplex; c++ ) theSimulation->allComplexes[c]->refresh(theSimulation);
 			if( par_info.my_id == BASE_TASK )
 	 			theSimulation->writeLimitingSurface(minFile);
+
+			if(block.minimizeResetG )
+			{
+				for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+					sRec->theSurface->setg0(sRec->r,0.1);
+			}
 		}
 		if( par_info.my_id == BASE_TASK )
 		{
@@ -791,6 +803,10 @@ int main( int argc, char **argv )
 		}
 		
 	}
+
+	if( block.do_gather )
+		theSimulation->gather(&block);
+
 	
 //	if( block.timestep_analysis && taskid == BASE_TASK )
 //		theSurface->timestep_analysis( r, theForceSet, effective_mass, allComplexes, theSimulation->ncomplex, dt );
@@ -1950,6 +1966,14 @@ int main( int argc, char **argv )
 		
 	}
 #endif
+	if( block.outputMesh )
+	{
+		char *fileName = (char *)malloc( sizeof(char) * strlen(block.jobName) + 6 );
+		sprintf(fileName, "%s.mesh", block.jobName );
+
+		theSimulation->allSurfaces->theSurface->saveSurface(fileName);	
+	}
+
 	if( block.create_all_atom )
 	{
 		printf("WARNING: creating all atom from the first surface.\n");

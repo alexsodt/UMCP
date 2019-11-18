@@ -8,7 +8,7 @@
 #include "interp.h"
 #include "l-bfgs.h"
 #include "m_triangles.h"
-
+#include "M_matrix.h"
 #define FIXED_SEED
 
 void surfaceSurfaceCollisionForces( surface *surface1, surface *surface2, double *grad1, double *grad2, double alpha, double v0, double **M, int mlow, int mhigh );
@@ -116,13 +116,10 @@ int main( int argc, char **argv )
 		r2[3*v+0] += start_at_step * (double)(sep/2) / (double)nsteps;
 
 
-	double *M5 = (double *)malloc( sizeof(double) * 4 * 11 * 12 ); 
-	double *M6 = (double *)malloc( sizeof(double) * 4 * 12 * 12 ); 
-	double *M7 = (double *)malloc( sizeof(double) * 4 * 13 * 13 ); 
 	int mlow=5,mhigh=7;
-	double *M[3]={M5,M6,M7};
 
-	theSurface1->generateSubdivisionMatrices( M, 5, 7 );
+	double **M;
+	getM(&M,&mlow,&mhigh);
 
 	int was_collision = 0;
 
