@@ -14,14 +14,25 @@ AC_CHECK_FILE("./qhull-2011.1/lib/libqhullstatic.a",
 	[AC_MSG_NOTICE("Found qhull library. Assuming this is built for the proper architecture")],
 	[AC_MSG_ERROR("Could not find file qhull-2011.1/lib/libqhullstatic.a. Make this file first")])
 
+AC_LANG([C++])
 
 AC_ARG_ENABLE(parallel, [AC_HELP_STRING([--parallel],[compile using MPI])], parallel=yes, parallel=no)
+AC_ARG_WITH([loos], [AC_HELP_STRING([--with-loos=ARG],[support trajectory and structure I/O with LOOS, @<:@default=check@:>@])], 
+	loos=$withval,
+	loos=check)
 AC_ARG_ENABLE(cuda, [AC_HELP_STRING([--cuda],[Use CUDA GPU for special tasks])], cuda=yes, cuda=no)
 
-if test -z $CXXFLAGS; then
+
+#AS_IF([test "x$loos" == xcheck],
+#	[AC_CHECK_LIB([loos], [main],
+#	[AC_SUBST([LIBLOOS], ["-lloos"])
+#	 AC_DEFINE([HAVE_LIBLOOS], [1], [Define if you have libloos])
+#	])])
+
+if test -z "$CXXFLAGS"; then
     CXXFLAGS=''
 fi
-if test -z $CFLAGS; then
+if test -z "$CFLAGS"; then
     CFLAGS=''
 fi
 
@@ -52,10 +63,10 @@ AC_PROG_MAKE_SET
 AC_CHECK_HEADERS([float.h limits.h stddef.h stdlib.h string.h sys/time.h unistd.h])
 AC_CHECK_HEADERS([gsl/gsl_nan.h],
 	[],
-	[AC_MSG_ERROR("Couldn't find GSL header file. Is its path in your CPPFLAGS?")])
+	[AC_MSG_ERROR("Couldn't find a GSL header file. Is its path in your CPPFLAGS?")])
 AC_CHECK_HEADERS([fftw3.h],
 	[],
-	[AC_MSG_ERROR("Couldn't find fftw3.h header file. Is its path in your CPPFLAGS?")])
+	[AC_MSG_ERROR("Couldn't find the fftw3.h header file. Is its path in your CPPFLAGS?")])
 	
 
 
@@ -73,6 +84,7 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([], [dsyev_()])],[AC_MSG_RESULT(yes)
 		usingMacAcclerate="yes"
 		linearAlgebraString="-framework Accelerate"], [AC_MSG_RESULT(no)]) 
 LDFLAGS=$save_LDFLAGS
+
 
 if test "$linearAlgebraString" = "no"; then 
 AC_MSG_CHECKING([for vecLib framework.])
@@ -122,6 +134,43 @@ fi
 
 AM_LDADD="$AM_LDADD $linearAlgebraString"
 
+gotLOOS="no"
+
+AS_IF([test "x$loos" != xcheck],
+	AS_IF([test "x$loos" != xno],
+	[
+		AC_MSG_NOTICE([Checking to see if we can link LOOS])
+		save_LDFLAGS=$LDFLAGS
+		LDFLAGS="$save_LDFLAGS -L $loos"
+		AC_CHECK_LIB([loos], [main],
+			[AC_SUBST([LIBLOOS], ["-lloos"])
+		 AC_DEFINE([HAVE_LIBLOOS], [1], [Define if you have libloos])
+			],
+		AC_MSG_ERROR("Couldn't link to LOOS.")
+			)
+		LDFLAGS=$save_LDFLAGS
+		save_CPPFLAGS=$CPPFLAGS
+		CPPFLAGS="$CPPFLAGS -I$loos/src"
+		AC_MSG_NOTICE($CPPFLAGS)
+		AC_CHECK_HEADERS([loos.hpp], [my_found_loos_headers=yes], [AC_MSG_ERROR("Couldn't either find or use the loos.hpp header file.")])
+		CPPFLAGS=$save_CPPFLAGS
+		AM_LDFLAGS="$AM_LDFLAGS -L $loos"
+		AM_INCLUDE="$AM_INCLUDE -I$loos/src"
+		gotLOOS=yes
+	]),
+	[
+		AC_MSG_NOTICE([Checking to see if we can link LOOS with default LDFLAGS])
+		AC_CHECK_LIB([loos], [main],
+			AC_CHECK_HEADERS([loos.hpp], [my_found_loos_headers=yes], [AC_MSG_NOTICE("Couldn't find the loos.hpp header file. Is its path in your CPPFLAGS?")]),
+			AC_MSG_NOTICE("Couldn't link to LOOS. Not including this functionality.")
+			)
+	])
+		
+if test "$gotLOOS" = "yes"; then
+AM_LDADD="$AM_LDADD -lloos"
+AC_DEFINE([HAVE_LIBLOOS], [1], [Define if you have libloos])
+fi
+	
 # Checks for libraries.
 # FIXME: Replace `main' with a function in `-lm':
 AC_CHECK_LIB([m], [main])
@@ -158,7 +207,7 @@ AC_TYPE_SIZE_T
 AC_CHECK_TYPES([ptrdiff_t])
 
 AM_QHULL="../qhull-2011.1/lib/libqhullstatic.a"
-AM_INCLUDE="-I../qhull-2011.1/src/libqhull"
+AM_INCLUDE="$AM_INCLUDE -I../qhull-2011.1/src/libqhull"
 
 # Checks for library functions.
 AC_FUNC_ERROR_AT_LINE
@@ -168,9 +217,10 @@ AC_FUNC_STRTOD
 AC_CHECK_FUNCS([floor gettimeofday memset pow sqrt strcasecmp strchr strncasecmp strpbrk strrchr strstr strtol])
 
 AC_SUBST(AM_LDADD)
+AC_SUBST(AM_LDFLAGS)
 AC_SUBST(AM_INCLUDE)
 AC_SUBST(AM_QHULL)
 AC_SUBST(AM_CUDA)
 
-AC_CONFIG_FILES([Makefile optimized/Makefile debug/Makefile examples/test/Makefile])
+AC_CONFIG_FILES([Makefile optimized/Makefile debug/Makefile util/Makefile examples/test/Makefile])
 AC_OUTPUT
