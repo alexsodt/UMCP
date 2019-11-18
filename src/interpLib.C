@@ -77,7 +77,6 @@ double phase2 = 0;
 //#define G_Q_P_PRINT
 //#define G_Q_DEBUG
 //#define G_Q_DEBUG_2
-//#define DEBUG_G
 //#define DEBUG_C1
 //#define DEBUG_NRMX
 //#define PRINT_A
@@ -3366,6 +3365,7 @@ double surface::ifenergy( int f, double *r, double *p_uv )
 
 		int *cp = theIrregularFormulas[frm].cp;
 		int np = theIrregularFormulas[frm].ncoor;
+		int tri = theIrregularFormulas[frm].tri;
 
 		for( int p = 0; p < np; p++ )
 		{
@@ -3455,8 +3455,11 @@ double surface::ifenergy( int f, double *r, double *p_uv )
 
 //		printf("e1: %lf e2: %lf\n e3: %lf\n", en_tot, en_tot_2, en_kg );
 
+#ifdef LOCAL_LIPID_ENERGY
+		double en = kg * c1 * c2;
+#else
 		double en = 0.5 * kc * (c1+c2-c0 ) * (c1+c2-c0) + kg * c1 * c2;
-
+#endif
 //		printf("e1: %lf e2: %lf\n e3: %lf\n en: %lf\n", en_tot, en_tot_2, en_kg, en );
 
 		if( !( en >0 || en < 1 ) )
@@ -3491,13 +3494,31 @@ double surface::ifenergy( int f, double *r, double *p_uv )
 //		VR += k_reg * (RuRv-RuRv0) * (RuRv-RuRv0);
 //		if( g > 0 )
 		{
-#ifdef DEBUG_G
-			e += c2;
-#else
+
+#ifdef LOCAL_LIPID_ENERGY
+			double atot_o=0, atot_i=0;
+			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+			{
+				atot_o += bilayerComp.APL[x] * theTriangles[tri].composition.outerLeaflet[x];
+				atot_i += bilayerComp.APL[x] * theTriangles[tri].composition.innerLeaflet[x];
+			}
+			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+			{
+				double f_o = bilayerComp.APL[x] * theTriangles[tri].composition.outerLeaflet[x] / atot_o;
+				double f_i = bilayerComp.APL[x] * theTriangles[tri].composition.innerLeaflet[x] / atot_i;
+
+				double dc_o = ( c1+c2 - bilayerComp.c0[x]);
+				double dc_i = (-c1-c2 - bilayerComp.c0[x]);
+
+				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
+				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
+			}
+#endif
 			e += dudv * dA * en; 			
 			VC += dudv * dA * en;
 			AVC += dudv *dA * (c1+c2);
-			face_energy_density += dudv * dA * 0.5 * kc * (c1+c2-c0 ) * (c1+c2-c0);
+//			face_energy_density += dudv * dA * 0.5 * kc * (c1+c2-c0 ) * (c1+c2-c0);
+			face_energy_density += dudv * dA * en;
 			face_area += dudv *dA ; 
 
 			double a_strain = (A-A0)/A0;
@@ -3508,20 +3529,11 @@ double surface::ifenergy( int f, double *r, double *p_uv )
 			}
 #ifdef MICRO_KA
 			VA += 2 * 0.5 * A0 * micro_KA * ((AP-A0)/A0) * ((AP-A0)/A0);
-#ifdef USE_KA4
-			e += 2 * 0.5 * A0 * KA4 * pow( (AP-A0)/A0, 4.0 );
-			VA4 += 2 * 0.5 * A0 * KA4 * pow( (AP-A0)/A0, 4.0 );
-#endif
 			e += 2 * 0.5 * A0 * micro_KA * ((AP-A0)/A0) * ((AP-A0)/A0); 
 #else
 #ifndef GLOBAL_AREA
 			VA += 2 * 0.5 * A0 * KA * ((A-A0)/A0) * ((A-A0)/A0);
-#ifdef USE_KA4
-			e += 2 * 0.5 * A0 * KA4 * pow( (A-A0)/A0, 4.0 );
-			VA4 += 2 * 0.5 * A0 * KA4 * pow( (A-A0)/A0, 4.0 );
-#endif
 			e += 2 * 0.5 * A0 * KA * ((A-A0)/A0) * ((A-A0)/A0); 
-#endif
 #endif
 #endif
 			 
@@ -3560,6 +3572,7 @@ double surface::fenergy( int f, double *r, double *p_uv )
 
 		int *cp = theFormulas[f*nf_g_q_p+p].cp;
 		int np = theFormulas[f*nf_g_q_p+p].ncoor;
+		int tri = theFormulas[frm].tri;
 
 		for( int p = 0; p < np; p++ )
 		{
@@ -3649,14 +3662,17 @@ double surface::fenergy( int f, double *r, double *p_uv )
 		
 //		printf("%d %d REG %lf %lf %lf c %le %le g: %.14le\n", f, p, R[0], R[1], R[2], c1, c2, g  );
 	
-		double en_tot = 0.5 * kc * (c1+c2-c0 ) * (c1+c2-c0) ;
+		double en_tot = 0.5 * kc * (c1+c2-c0 ) * (c1+c2-c0)  - 0.5 * kc * c0 * c0;
 		double en_tot_2 = 0.5 * kc * (c1+c2 ) * (c1+c2) ;
 		double en_kg = kg * c1 * c2;
 
 //		printf("e1: %lf e2: %lf\n e3: %lf\n", en_tot, en_tot_2, en_kg );
 
+#ifdef LOCAL_LIPID_ENERGY
+		double en = kg * c1 * c2;
+#else
 		double en = 0.5 * kc * (c1+c2-c0 ) * (c1+c2-c0) + kg * c1 * c2;
-
+#endif
 //		printf("e1: %lf e2: %lf\n e3: %lf\n en: %lf\n", en_tot, en_tot_2, en_kg, en );
 
 		if( !( en >0 || en < 1 ) )
@@ -3693,13 +3709,29 @@ double surface::fenergy( int f, double *r, double *p_uv )
 
 //		if( g > 0 )
 		{
-#ifdef DEBUG_G
-			e += c2;
-#else
 			if( en > 1e8 )
 			{
 //				printf("Hm: e: %le %lf %lf\n", en, dudv, dA );
 			}
+#ifdef LOCAL_LIPID_ENERGY
+			double atot_o=0, atot_i=0;
+			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+			{
+				atot_o += bilayerComp.APL[x] * theTriangles[tri].composition.outerLeaflet[x];
+				atot_i += bilayerComp.APL[x] * theTriangles[tri].composition.innerLeaflet[x];
+			}
+			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+			{
+				double f_o = bilayerComp.APL[x] * theTriangles[tri].composition.outerLeaflet[x] / atot_o;
+				double f_i = bilayerComp.APL[x] * theTriangles[tri].composition.innerLeaflet[x] / atot_i;
+
+				double dc_o = ( c1+c2 - bilayerComp.c0[x]);
+				double dc_i = (-c1-c2 - bilayerComp.c0[x]);
+
+				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
+				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
+			}
+#endif
 			e += dudv * dA * en; 			
 			VC += dudv * dA * en;
 //			if( f == 40 && p == 0 )
@@ -3715,24 +3747,17 @@ double surface::fenergy( int f, double *r, double *p_uv )
 			{
 				max_area_strain = fabs(a_strain);
 			}
+
+
 #ifdef MICRO_KA
 			VA += 2 * 0.5 * A0 * micro_KA * ((AP-A0)/A0) * ((AP-A0)/A0);
-#ifdef USE_KA4
-			e += 2 * 0.5 * A0 * KA4 * pow( (AP-A0)/A0, 4.0 );
-			VA4 += 2 * 0.5 * A0 * KA4 * pow( (AP-A0)/A0, 4.0 );
-#endif
 			e += 2 * 0.5 * A0 * micro_KA * ((AP-A0)/A0) * ((AP-A0)/A0); 
 #else
 #ifndef GLOBAL_AREA
 			VA += 2 * 0.5 * A0 * KA * ((A-A0)/A0) * ((A-A0)/A0);
-#ifdef USE_KA4
-			e += 2 * 0.5 * A0 * KA4 * pow( (A-A0)/A0, 4.0 );
-			VA4 += 2 * 0.5 * A0 * KA4 * pow( (A-A0)/A0, 4.0 );
-#endif
 			e += 2 * 0.5 * A0 * KA * ((A-A0)/A0) * ((A-A0)/A0); 
 
 			
-#endif
 #endif
 #endif
 			 
@@ -3838,7 +3863,7 @@ double surface::fenergym( int f, double *r, double *p_uv )
       double en_tot = 0.5 * kc * (d2hdy2 + d2hdx2 - c0) * (d2hdy2 + d2hdx2 - c0);
       double en_tot_2 = 0.5 * kc * (d2hdy2 + d2hdx2) * (d2hdy2 + d2hdx2);
 
-      double en = 0.5 * kc * (d2hdy2 + d2hdx2 - c0) * (d2hdy2 + d2hdx2 -c0);
+      double en = 0.5 * kc * (d2hdy2 + d2hdx2 - c0) * (d2hdy2 + d2hdx2 -c0) - 0.5 * kc * c0 * c0;
 //      printf("etot: %lf etot2: %lf\n ekg: %lf\n en: %lf\n", en_tot, en_tot_2, en_kg, en );
       if( !( en >0 || en < 1 ) ) 
 	{
@@ -3863,9 +3888,6 @@ double surface::fenergym( int f, double *r, double *p_uv )
       area += dudv * dA;
 
       {
-#ifdef DEBUG_G
-	e += c2;
-#else
 	if( en > 1e8 )
 	  {
 //	    printf("Hm: e: %le %lf %lf\n", en, dudv, dA );
@@ -3885,21 +3907,11 @@ double surface::fenergym( int f, double *r, double *p_uv )
 
 #ifdef MICRO_KA
 	VA += 2 * 0.5 * A0 * micro_KA * ((AP-A0)/A0) * ((AP-A0)/A0);
-#ifdef USE_KA4
-	e += 2 * 0.5 * A0 * KA4 * pow( (AP-A0)/A0, 4.0 );
-	VA4 += 2 * 0.5 * A0 * KA4 * pow( (AP-A0)/A0, 4.0 );
-#endif
 	e += 2 * 0.5 * A0 * micro_KA * ((AP-A0)/A0) * ((AP-A0)/A0);
 #else
 #ifndef GLOBAL_AREA
 	VA += 2 * 0.5 * A0 * KA * ((A-A0)/A0) * ((A-A0)/A0);
-#ifdef USE_KA4
-	e += 2 * 0.5 * A0 * KA4 * pow( (A-A0)/A0, 4.0 );
-	VA4 += 2 * 0.5 * A0 * KA4 * pow( (A-A0)/A0, 4.0 );
-#endif
-
 	e += 2 * 0.5 * A0 * KA * ((A-A0)/A0) * ((A-A0)/A0);
-#endif
 #endif
 #endif
 
@@ -4672,29 +4684,17 @@ double surface::energyMonge( double *r, int do_vertex)
 	
 	//		if( g > 0 )
 			{
-#ifdef DEBUG_G
-				e += c2;
-#else
 				e += dudv * dA * en; 			
 				VC += dudv * dA * en;
 				AVC += dudv *dA * (d2hdx2+d2hdy2);
 
 #ifdef MICRO_KA
 				VA += 2 * 0.5 * A0 * micro_KA * ((AP-A0)/A0) * ((AP-A0)/A0);
-#ifdef USE_KA4
-				e += 2 * 0.5 * A0 * KA4 * pow( (AP-A0)/A0, 4.0 );
-				VA4 += 2 * 0.5 * A0 * KA4 * pow( (AP-A0)/A0, 4.0 );
-#endif
 				e += 2 * 0.5 * A0 * micro_KA * ((AP-A0)/A0) * ((AP-A0)/A0); 
 #else
 #ifndef GLOBAL_AREA
 				VA += 2 * 0.5 * A0 * KA * ((A-A0)/A0) * ((A-A0)/A0);
-#ifdef USE_KA4
-				e += 2 * 0.5 * A0 * KA4 * pow( (A-A0)/A0, 4.0 );
-				VA4 += 2 * 0.5 * A0 * KA4 * pow( (A-A0)/A0, 4.0 );
-#endif
 				e += 2 * 0.5 * A0 * KA * ((A-A0)/A0) * ((A-A0)/A0); 
-#endif
 #endif
 #endif
 //			printf("E %d %.14le %.14le\n", f*nf_g_q_p+p, dudv * dA * en, 2 * 0.5 * A0 * KA * ((A-A0)/A0) * ((A-A0)/A0) );
@@ -4843,16 +4843,11 @@ double surface::irregularEnergy( double *r )
 	
 	//		if( g > 0 )
 			{
-#ifdef DEBUG_G
-				e += c2;
-#else
 				e += dudv * dA * en; 			
 				VC += dudv * dA * en;
 				AVC += dudv *dA * (c1+c2);
 				VA += 2 * 0.5 * A0 * KA * ((A-A0)/A0) * ((A-A0)/A0);
 				e += 2 * 0.5 * A0 * KA * ((A-A0)/A0) * ((A-A0)/A0); 
-#endif
-
 			}
 
 //			printf("p: %d n_v_finite: %d en: %le dA: %le\n", p, n_v_finite, en, dA );

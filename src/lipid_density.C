@@ -32,7 +32,7 @@ void surface::set_g0_from_f(int f)
 			c0_o += bilayerComp.c0[x] * bilayerComp.APL[x] * theTriangles[tri].composition.outerLeaflet[x];
 			atot_o += bilayerComp.APL[x] * theTriangles[tri].composition.outerLeaflet[x];
 
-			// opposite sign for inner leaflet.
+			// opposite sign for inner leaflet, taken into account below.
 			c0_i += bilayerComp.c0[x] * bilayerComp.APL[x] * theTriangles[tri].composition.innerLeaflet[x];
 			atot_i += bilayerComp.APL[x] * theTriangles[tri].composition.innerLeaflet[x];
 		}
@@ -65,7 +65,7 @@ void surface::set_g0_from_f(int f)
 			c0_o += bilayerComp.c0[x] * bilayerComp.APL[x] * theTriangles[tri].composition.outerLeaflet[x];
 			atot_o += bilayerComp.APL[x] * theTriangles[tri].composition.outerLeaflet[x];
 
-			// opposite sign for inner leaflet.
+			// opposite sign for inner leaflet, taken into account below
 			c0_i -= bilayerComp.c0[x] * bilayerComp.APL[x] * theTriangles[tri].composition.innerLeaflet[x];
 			atot_i += bilayerComp.APL[x] * theTriangles[tri].composition.innerLeaflet[x];
 		}
@@ -235,7 +235,7 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 					{
 						E0 =  faceEnergy( f1, r, NULL, 0 );
 						E0 += faceEnergy( f2, r, NULL, 0 );
-					
+	
 						// move lipid material between triangles.
 		
 						double nL1 = comp1[x];
@@ -259,6 +259,29 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 			
 							double E1 =  faceEnergy( f1, r, NULL, 0 );
 							E1 += faceEnergy( f2, r, NULL, 0 );
+						
+							if( !strcasecmp( bilayerComp.names[x], "DOPE") && leaf == 1)	
+							{
+								double k;
+								double c0_1 = c( f1, 1.0/3.0, 1.0/3.0, r, &k );
+								double c0_2 = c( f2, 1.0/3.0, 1.0/3.0, r, &k );
+								printf("Moving %lf lipids %s with c0 %lf from curvature %le to %le dE: %le\n", 65*dL, bilayerComp.names[x], bilayerComp.c0[x],
+								c0_1, c0_2, E1-E0 );
+
+								if( E1 < E0 && c0_2 > c0_1 )
+								{
+									double E1 =  faceEnergy( f1, r, NULL, 0 );
+									E1 += faceEnergy( f2, r, NULL, 0 );
+									comp1[x] += dL;
+									comp2[x] -= dL;
+									set_g0_from_f(f1);				
+									set_g0_from_f(f2);				
+									double E0 =  faceEnergy( f1, r, NULL, 0 );
+									E0 += faceEnergy( f2, r, NULL, 0 );
+									printf("Confirm: dE: %le\n", E1-E0 );
+									exit(1);
+								}
+							}
 			
 							double p = exp(-beta*(E1-E0));
 			
@@ -269,7 +292,7 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 			
 							if( rn < p && rat1 > 0.25 && rat2 > 0.25 )
 							{
-								printf("Moving %le (out of %le %le) %s from %d to %d.\n", dL, comp1[x], comp2[x], bilayerComp.names[x], t1, t2 );
+//								printf("Moving %le (out of %le %le) %s from %d to %d.\n", dL, comp1[x], comp2[x], bilayerComp.names[x], t1, t2 );
 								nacc++;
 							}
 							else

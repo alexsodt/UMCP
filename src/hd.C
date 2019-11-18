@@ -584,8 +584,11 @@ int main( int argc, char **argv )
 		memset( sRec->qdot, 0, sizeof(double) * 3 * nv );	
 		memset( sRec->qdot0, 0, sizeof(double) * 3 * nv );	
 		memset( sRec->qdot_temp, 0, sizeof(double) * 3 * nv );	
+	
+		printf("sRec->NQ: %d\n", sRec->NQ );
 	}
 	
+
 	double KE = 0;
 
 	FILE *srdXYZFile = NULL;

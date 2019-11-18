@@ -185,7 +185,7 @@ double surface::rhoWorker( double * r, double *gr, double PBC_vec[3][3], int do_
 
 	double e = 0;
 
-	int pgrid = 3;
+	int pgrid = 1;
 
 	int use_max = 20;
 
@@ -293,8 +293,11 @@ double surface::rhoWorker( double * r, double *gr, double PBC_vec[3][3], int do_
 
 				double arg = eps_f_min + eval_rho( fractional[0], fractional[1], fractional[2] );
 
+#ifdef USE_LOG
 				e += -fitCoupling * log( eps_f_min + eval_rho( fractional[0], fractional[1], fractional[2] ) );
-
+#else
+				e += -fitCoupling * eval_rho( fractional[0], fractional[1], fractional[2] );
+#endif
 				if( do_grad )
 				{
 					double rho_g[3] = {0,0,0};
@@ -337,6 +340,7 @@ double surface::rhoWorker( double * r, double *gr, double PBC_vec[3][3], int do_
 						d_Ry_d_vz += nrm[1] * fitThickness * fitThickness * hGrad[3*cx+2]; 
 						d_Rz_d_vz += nrm[2] * fitThickness * fitThickness * hGrad[3*cx+2]; 
 
+#ifdef USE_LOG
 						gr[3*coor_list[cx]+0] -= fitCoupling * ( 1.0/arg) * rho_g[0] / PBC_vec[0][0] * alpha_x * d_Rx_d_vx;	
 						gr[3*coor_list[cx]+1] -= fitCoupling * ( 1.0/arg) * rho_g[0] / PBC_vec[0][0] * alpha_x * d_Rx_d_vy;	
 						gr[3*coor_list[cx]+2] -= fitCoupling * ( 1.0/arg) * rho_g[0] / PBC_vec[0][0] * alpha_x * d_Rx_d_vz;	
@@ -348,11 +352,29 @@ double surface::rhoWorker( double * r, double *gr, double PBC_vec[3][3], int do_
 						gr[3*coor_list[cx]+0] -= fitCoupling * ( 1.0/arg) * rho_g[2] / PBC_vec[2][2] * alpha_z * d_Rz_d_vx;	
 						gr[3*coor_list[cx]+1] -= fitCoupling * ( 1.0/arg) * rho_g[2] / PBC_vec[2][2] * alpha_z * d_Rz_d_vy;	
 						gr[3*coor_list[cx]+2] -= fitCoupling * ( 1.0/arg) * rho_g[2] / PBC_vec[2][2] * alpha_z * d_Rz_d_vz;	
+#else
+						gr[3*coor_list[cx]+0] -= fitCoupling * rho_g[0] / PBC_vec[0][0] * alpha_x * d_Rx_d_vx;	
+						gr[3*coor_list[cx]+1] -= fitCoupling * rho_g[0] / PBC_vec[0][0] * alpha_x * d_Rx_d_vy;	
+						gr[3*coor_list[cx]+2] -= fitCoupling * rho_g[0] / PBC_vec[0][0] * alpha_x * d_Rx_d_vz;	
+						
+						gr[3*coor_list[cx]+0] -= fitCoupling * rho_g[1] / PBC_vec[1][1] * alpha_y * d_Ry_d_vx;	
+						gr[3*coor_list[cx]+1] -= fitCoupling * rho_g[1] / PBC_vec[1][1] * alpha_y * d_Ry_d_vy;	
+						gr[3*coor_list[cx]+2] -= fitCoupling * rho_g[1] / PBC_vec[1][1] * alpha_y * d_Ry_d_vz;	
+						
+						gr[3*coor_list[cx]+0] -= fitCoupling * rho_g[2] / PBC_vec[2][2] * alpha_z * d_Rz_d_vx;	
+						gr[3*coor_list[cx]+1] -= fitCoupling * rho_g[2] / PBC_vec[2][2] * alpha_z * d_Rz_d_vy;	
+						gr[3*coor_list[cx]+2] -= fitCoupling * rho_g[2] / PBC_vec[2][2] * alpha_z * d_Rz_d_vz;	
+
+#endif
 					}
 				}
 			}	
 		}	
 	} 
+
+	free(rGrad);
+	free(nGrad);
+	free(hGrad);
 
 	return e;	
 }
