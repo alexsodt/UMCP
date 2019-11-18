@@ -5,6 +5,7 @@
 #include "util.h"
 #include "mutil.h"
 #include <math.h>
+#include "M_matrix.h"
 
 static double solvation_cutoff = 2.5;
 static double ion_cutoff = 5.0;
@@ -678,14 +679,11 @@ void surface::createAllAtom( parameterBlock *block )
 	
 	double rel_vol[2] = {0,0};
 
-	double *M5 = (double *)malloc( sizeof(double) * 4 * 11 * 12 ); 
-	double *M6 = (double *)malloc( sizeof(double) * 4 * 12 * 12 ); 
-	double *M7 = (double *)malloc( sizeof(double) * 4 * 13 * 13 );
-	double *M[3] = { M5, M6, M7 };
+	double **M;
 	int mlow = 5;
 	int mhigh = 7;
 
-	generateSubdivisionMatrices( M, mlow, mhigh );
+	getM(&M,&mlow,&mhigh);	
 	
 	if( block->addSalt )
 	{
@@ -2101,9 +2099,6 @@ void surface::createAllAtom( parameterBlock *block )
 		free(theBoxes[b].plist);
 	free(theBoxes);
 		
-	free(M5);
-	free(M6);
-	free(M7);
 }
 
 // getCoordinateSystem

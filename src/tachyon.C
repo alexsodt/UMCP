@@ -11,6 +11,7 @@
 #include "mutil.h"
 #include "input.h"
 #include "lapack_we_use.h"
+#include "M_matrix.h"
 #define SMOOTH_TRIANGLES
 // routine to write the current structure to a tachyon input file, including the option to linearly interpolate frames for smoothing.
 
@@ -41,13 +42,10 @@ int surface::writeTachyon( const char *name,
 				int face_center // put the origin on this face.
 			)
 {
-	double *M5 = (double *)malloc( sizeof(double) * 4 * 11 * 12 ); 
-	double *M6 = (double *)malloc( sizeof(double) * 4 * 12 * 12 ); 
-	double *M7 = (double *)malloc( sizeof(double) * 4 * 13 * 13 );
-	double *M[3] = { M5, M6, M7 };
+	double **M;
 	int mlow = 5;
 	int mhigh = 7;
-	generateSubdivisionMatrices( M, mlow, mhigh );
+	getM(&M,&mlow,&mhigh);
 	double cur_area;
 	double area0;
 	double spec_mag = 0.2;
@@ -88,8 +86,8 @@ int surface::writeTachyon( const char *name,
 	double mesh_overlay_radius = sqrt(area0/nt/20);
 	int np = nv;
 	int nsites_total = nv+1;
-	for( int c = 0; c < ncomplex; c++ )
-		nsites_total += allComplexes[c]->nsites;
+	for( int ic = 0; ic < ncomplex; ic++ )
+		nsites_total += allComplexes[ic]->nsites;
 
 	int n_frames_to_write = nint;
 	if( nint < 1 )
@@ -723,7 +721,8 @@ forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light
 							use_u *= 0.999 / scale;
 							use_v *= 0.999 / scale;
 						}
-						curve[iseq] = c( f, use_u, use_v, use_frame );
+						double k;
+						curve[iseq] = c( f, use_u, use_v, use_frame, &k );
 					}
 		                }
 
@@ -742,7 +741,8 @@ forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light
 					if( params->tachyon_curvature || params->tachyon_gauss )
 					{
 						double cd1[2],cd2[2],c1,c2;
-						double ctot = c( f, 1.0/3, 1.0/3, use_frame, cd1, cd2, &c1, &c2 );
+						double k;
+						double ctot = c( f, 1.0/3, 1.0/3, use_frame, &k, cd1, cd2, &c1, &c2 );
 						double f_use =0;
 						if( params->tachyon_flip_sense )
 							ctot *= -1;
@@ -1019,9 +1019,6 @@ forced_light_dir[0]-updir[0]*0.3, forced_light_dir[1]-updir[1]*0.3, forced_light
 	free(use_frame);
 	free(tris);
 				
-	free(M5);
-	free(M6);
-	free(M7);
 
 	return n_frames_written;
 }

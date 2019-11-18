@@ -918,7 +918,8 @@ int main( int argc, char **argv )
 						{
 //							printf("CLOSE UPPER %le\n", r2_u );
 							close_upper = r2_u;
-							c_at_u = sign_flip_upper * upperSurface->c( f_u, col_u_u, col_v_u, ru );
+							double k;
+							c_at_u = sign_flip_upper * upperSurface->c( f_u, col_u_u, col_v_u, ru, &k );
 							close_point_upper[0] = pt_upper[0];
 							close_point_upper[1] = pt_upper[1];
 							close_point_upper[2] = pt_upper[2];

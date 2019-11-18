@@ -12,6 +12,7 @@
 #include <ctype.h>
 #include "globals.h"
 #include "rd.h"
+#include "M_matrix.h"
 
 //#define DISABLE_POINT_GRADIENT_DEBUG
 
@@ -1147,7 +1148,7 @@ void pcomplex::propagate_surface_q( Simulation *theSimulation,  double dt )
 				}*/
 				refresh(theSimulation);
 
-#define DEBUG_DIFFUSION		
+//#define DEBUG_DIFFUSION		
 #ifdef DEBUG_DIFFUSION
 		if( fabs(dt-1e-12) < 1e-11)
 		{
@@ -1579,15 +1580,10 @@ void surface::loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterB
 	int nspace = 1;
 	(*allComplexes) = (pcomplex **)malloc( sizeof(pcomplex *) );
 
-	// need to do inside/outside checks, so get M matrices.
-	double *M5 = (double *)malloc( sizeof(double) * 4 * 11 * 12 ); 
-	double *M6 = (double *)malloc( sizeof(double) * 4 * 12 * 12 ); 
-	double *M7 = (double *)malloc( sizeof(double) * 4 * 13 * 13 );
-	double *M[3] = { M5, M6, M7 };
+	double **M;
 	int mlow = 5;
 	int mhigh = 7;
-	generateSubdivisionMatrices( M, mlow, mhigh );
-
+	getM( &M, &mlow, &mhigh );
 	double *rsurf = (double *)malloc( sizeof(double) * ( 3*nv+3) );
 	get(rsurf);
 
@@ -1735,9 +1731,6 @@ void surface::loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterB
 
 	}	
 
-	free(M5);
-	free(M6);
-	free(M7);
 	free(rsurf);
 }
 
@@ -2114,7 +2107,8 @@ double pcomplex::AttachV( Simulation *theSimulation )
 	for( int s = 0; s < nattach; s++ )
 	{
 		struct surface_record *sRec = theSimulation->fetch(sid[s]);
-		double curv = sRec->theSurface->c( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], sRec->r);
+		double k;
+		double curv = sRec->theSurface->c( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], sRec->r, &k);
 
 
 		pot += 0.5 * kc * p_area[s] * ( curv - p_c0[s]) * (curv - p_c0[s]); 
@@ -2135,7 +2129,8 @@ double pcomplex::AttachG( Simulation *theSimulation,  double *pg )
 	{
 		struct surface_record *sRec = theSimulation->fetch(sid[s]);
 		sRec->theSurface->particle_H_grad( sRec->r, sRec->g, grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], p_area[s], p_c0[s], pg + 2 *s );
-		double curv = sRec->theSurface->c( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], sRec->r );
+		double k;
+		double curv = sRec->theSurface->c( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], sRec->r, &k );
 
 		pot += 0.5 * kc * p_area[s] * ( curv - p_c0[s]) * (curv - p_c0[s]); 
 	}
@@ -2152,7 +2147,8 @@ double pcomplex::local_curvature( Simulation *theSimulation )
 	for( int s = 0; s < nattach; s++ )
 	{
 		struct surface_record *sRec = theSimulation->fetch(sid[s]);
-		double curv = sRec->theSurface->c( fs[s], puv[2*s+0], puv[2*s+1], sRec->r );
+		double k;
+		double curv = sRec->theSurface->c( fs[s], puv[2*s+0], puv[2*s+1], sRec->r, &k );
 
 		av += curv/nattach;
 	}

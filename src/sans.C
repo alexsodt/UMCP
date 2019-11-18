@@ -146,8 +146,9 @@ void Simulation::sample_B_hist( double *B_hist, double *A2dz2_sampled,
 			double w1 = theSurface->g(f1,u1,v1,rmesh);
 			double c1  = 0;
 
+			double k;
 			if( shape_correction )
-				c1 = theSurface->c(f1,u1,v1,rmesh);
+				c1 = theSurface->c(f1,u1,v1,rmesh,&k);
 
 			total_area += w1;
 			for( int nz = 0; nz < draw_z; nz++)

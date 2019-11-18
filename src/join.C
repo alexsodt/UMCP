@@ -99,8 +99,8 @@ void getVertPath( surface *theSurface, int vert, double join_radius, int **path_
 
 	double cd1[2], cd2[2], c1,c2;
 		
-
-	theSurface->c( f, uvcen[0], uvcen[1], r, cd1, cd2, &c1, &c2 );
+	double k;
+	theSurface->c( f, uvcen[0], uvcen[1], r, &k, cd1, cd2, &c1, &c2 );
 		
 	double drdu[3];
 	double drdv[3];

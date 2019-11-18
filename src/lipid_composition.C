@@ -1,38 +1,34 @@
+#define __lipidcompositionc__
 #include "interp.h"
 #include "util.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "library.h"
 
-struct fixed_lipid
-{	
-	const char *name;
-	double c0;
-	double APL;
-};
-
-struct lipid
-{
-	char *name;
-	double c0;
-	double APL;
-};
-
-static lipid *lipidLibrary = NULL;
 static int nlipid_space = 0;
 static int nlipids = 0;
+
+int nLipidsInLibrary(void)
+{
+	return nlipids;
+}
 
 const fixed_lipid library_fixed[] =
 {
 	// Chen/Rand 1997
 	// PO values copied from DO.
-	{ "POPC", -1.0/87.3, 68.3 },
-	{ "DOPE", -1.0/29.4, 63.4 },
-	{ "POPE", -1.0/29.4, 58.8 },
-	{ "DOPC", -1.0/87.3, 69.7 }, 
-	{ "CHOL", -1.0/27.2, 31.0 }, 
-	{ "DOG",  -1.0/11.5, 59.0 },
-	{ "DOPS",  1.0/144.0, 71.6 } // Fuller 2003, area from charmm f.f.
+	{ "POPC", -1.0/87.3, 68.3,  "C21" },
+	{ "DOPE", -1.0/29.4, 63.4,  "C21" },
+	{ "POPE", -1.0/29.4, 58.8,  "C21" },
+	{ "DOPC", -1.0/87.3, 69.7,  "C21" }, 
+	{ "CHOL", -1.0/27.2, 31.0,  "C21" }, 
+	{ "CHL1", -1.0/27.2, 31.0,  "O3" }, 
+	{ "DOG",  -1.0/11.5, 59.0,  "C21" },
+	{ "DOPS",  1.0/144.0, 71.6, "C21" }, // Fuller 2003, area from charmm f.f.
+	{ "CER180",	  0, 59.0,  "C1F" },
+	{ "SSM",  	0,   59.0,  "C1F" },
+	{ "PSM",  	0,   59.0,  "C1F" }
 };
 
 void dumpLibrary( void )
@@ -57,6 +53,8 @@ void surface::readLipidComposition( FILE *inputFile )
 		lipidLibrary[i].APL = library_fixed[i].APL;
 		lipidLibrary[i].name = (char *)malloc( sizeof(char)* (1+strlen(library_fixed[i].name)) );
 		strcpy( lipidLibrary[i].name, library_fixed[i].name );
+		lipidLibrary[i].ns_atom = (char *)malloc( sizeof(char)* (1+strlen(library_fixed[i].ns_atom)) );
+		strcpy( lipidLibrary[i].ns_atom, library_fixed[i].ns_atom );
 	}
 	nlipids = nlipid_space;
 
@@ -154,9 +152,10 @@ void surface::readLipidComposition( FILE *inputFile )
 						double APL;
 						double c0;
 		
-						int nr = sscanf( buffer, "%s %s %s %lf %lf", 
-							junk, command, lipidName, &APL, &c0 );
-						if( nr == 5 )
+						char nsName[256];
+						int nr = sscanf( buffer, "%s %s %s %lf %lf %s", 
+							junk, command, lipidName, &APL, &c0, nsName );
+						if( nr >= 5 )
 						{
 							int found = -1;
 
@@ -180,6 +179,8 @@ void surface::readLipidComposition( FILE *inputFile )
 								strcpy( lipidLibrary[nlipids].name, lipidName );
 								lipidLibrary[nlipids].c0 = c0;
 								lipidLibrary[nlipids].APL = APL;
+								lipidLibrary[nlipids].ns_atom = NULL;
+								found = nlipids;
 								nlipids++;
 							}
 							else
@@ -187,6 +188,14 @@ void surface::readLipidComposition( FILE *inputFile )
 								printf("Replacing lipid %s with c0 %lf and area-per-lipid %lf in the library.\n", lipidName, c0, APL );
 								lipidLibrary[found].c0 = c0;
 								lipidLibrary[found].APL = APL;
+							}
+
+							if( nr >= 6 )
+							{
+								if( lipidLibrary[found].ns_atom ) 
+									free(lipidLibrary[found].ns_atom );
+								lipidLibrary[found].ns_atom = (char *)malloc( sizeof(char) * (1+strlen(nsName) ) );
+								strcpy( lipidLibrary[found].ns_atom, nsName );
 							}
 						}	
 						else

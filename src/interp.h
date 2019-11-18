@@ -295,7 +295,7 @@ struct surface
 
 	int loadLattice( const char *fileName, double noise, surface *copyFrom=NULL );
 	int loadAndCopyLattice( const char *fileName, surface *altSurface );
-	void setg0(double *r);
+	void setg0(double *r, double reset_factor = 0);
 	double energy( double *r, double *puv, int do_vertex=-1, int *plist = NULL, int *np_found = NULL, int doMonge=0 );
 	void getModifiedFaces( int do_vertex, int *flist, int *nf, int *plist, int *np );
 	double faceEnergy( int f, double *r, double *puv, int doMonge );
@@ -388,9 +388,9 @@ struct surface
 	double openCLEnergy( double *r, double *oarr );
 	double fixEdgeGrad( double *r, double *g);
 	double fixEdgePotential( double *r );
-	double rhoEnergy( double * r, double PBC_vec[3][3] );
-	double rhoGrad( double *r, double *g, double PBC_vec[3][3] );
-	double rhoWorker( double * r, double *gr, double PBC_vec[3][3], int do_grad);
+	double rhoEnergy( double * r, double PBC_vec[3][3], double thick_i, double thick_o );
+	double rhoGrad( double *r, double *g, double PBC_vec[3][3], double thick_i, double thick_o, double *thick_i_g, double *thick_o_g  );
+	double rhoWorker( double * r, double *gr, double PBC_vec[3][3], int do_grad, double thick_i, double thick_o, double *thick_i_g, double *thick_o_g );
 	void removeEdge( int e );
 	int createEdge( int i, int j, int k ); // creates a single triangle.
 	int sealEdge( int i, int j, int k ); // creates two triangles
@@ -418,9 +418,6 @@ struct surface
 	void sortFaces( void );
 	void constructIrregularKernels( void );
 
-	// COLLISION CHECKING
-	void generateSubdivisionMatrices( double **M, int mlow, int mhigh );
-
 	// BOUNDARY CONDITIONS
 	double BCEnergy( double *r );
 	void BCGrad( double *r, double *g);
@@ -440,7 +437,7 @@ struct surface
 	void ru( int f, double u, double v, double *r, double *dr_u );
 	void rv( int f, double u, double v, double *r, double *dr_v );
 	void r2der( int f, double u, double v, double *r, double *dr_uu, double *dr_uv, double *dr_vv );
-	double c( int f, double u, double v, double *r, double *c_vec_1=NULL, double *c_vec_2=NULL, double *c_val_1=NULL, double *c_val_2=NULL);
+	double c( int f, double u, double v, double *r, double *k, double *c_vec_1=NULL, double *c_vec_2=NULL, double *c_val_1=NULL, double *c_val_2=NULL);
 	double dG( int f, double u, double v, double grad[5], double *r );
 	void get_pt_coeffs( int f, double u, double v, double *coeffs, int *coord_list, int *ncoords );
         void get_pt_dcoeffs( int f, double u, double v, double *coeffs, int *coord_list, int *ncoords );
@@ -450,8 +447,9 @@ struct surface
 		double *rGrad, // dim 3 by nCoor
 		double *nGrad, // dim 3 by nCoor
 		double *hGrad, // dim nCoor	
+		double *kGrad, // dim nCoor	
 		int *nCoor,
-		int *vecList );
+		int *vecList, double *k );
 
 	void fetchPuv( int f, double u, double v, double *P_uv, double *rsurf );
 	int fetchdP_duv( int f, double u, double v, double **dP_duv, double *rsurf );
@@ -550,6 +548,7 @@ struct surface
 	int getCoordinateSystem( int source_f,   double *source_u,  double *source_v, 
 				double *dr, double strain, int leaflet,
 				  double *dx_duv, double *dy_duv, double *rsurf );
+
 };
 
 struct volel

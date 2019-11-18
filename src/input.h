@@ -31,6 +31,10 @@ class parameterBlock
 	char *rxnDiffusionInfoName;
 	double rho;
 
+	// gather
+	int do_gather;
+	char *dcdName;
+	char *structureName;
 
 	int timestep_analysis;
 	int mass_scaling;
@@ -43,10 +47,14 @@ class parameterBlock
 	int nsteps;
 	int nequil; // number of 
 	int nmin; // number of steps of minimization
+
+	int minimizeResetG; // area-based viscous regularization
+
 	int z_only;
 	int silent;
 	int nruns;
 
+	int outputMesh;
 
 	int lipid_mc_period; // period which to do monte-carlo lipid movement
 	int npt_mc_period; // period which to do monte-carlo lipid movement
