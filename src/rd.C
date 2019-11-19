@@ -67,6 +67,9 @@ void RD::init( Simulation * theSimulation, double time_step_in, parameterBlock *
 		if( allReactions[r].binding_radius > max_binding_radius )
 			max_binding_radius = allReactions[r].binding_radius;
 	}
+	
+	// TO-DO: temporary hack to set lipid/protein binding radius correctly.
+	block->bound_sigma = max_binding_radius;
 
 	max_Rmax = max_binding_radius + 3 * sqrt( 2 * max_diff_c * dt ); 
 }

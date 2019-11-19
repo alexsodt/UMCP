@@ -18,5 +18,7 @@ void printCompilationTime(void);
 //#define M_MIN -1 
 //#define M_MAX 1
 //#define DISABLE_RD
+#define FIXED_A
+#define LOCAL_LIPID_ENERGY
 #define FFTW
 #define DISABLE_ALIGNMENT

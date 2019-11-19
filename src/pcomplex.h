@@ -163,6 +163,13 @@ struct simpleLipid : pcomplex
 	virtual void init( surface *theSurface, double *, int f, double u, double v ); 
 };
 
+struct simpleBound : simpleLipid
+{
+	double bound_sigma;
+	void loadParams( parameterBlock *block );
+	virtual void init( surface *theSurface, double *, int f, double u, double v ); 
+};
+
 struct simpleDimer : simpleLipid
 {
 	void loadParams( parameterBlock *block );

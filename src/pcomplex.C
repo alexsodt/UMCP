@@ -1528,8 +1528,10 @@ pcomplex *loadComplex( const char *name )
 		the_complex = new MAB;
 	else if( !strcasecmp( name, "crowder" ) )
 		the_complex = new elasticCrowder;
-	else if( !strcasecmp( name, "simple" ) )
+	else if( !strcasecmp( name, "simpleParticle" ) )
 		the_complex = new simpleParticle;
+	else if( !strcasecmp( name, "simpleBound" ) )
+		the_complex = new simpleBound;
 	else if( !strcasecmp( name, "simpleLipid" ) )
 		the_complex = new simpleLipid;
 	else if( !strcasecmp( name, "simpleDimer" ) )
@@ -1768,6 +1770,12 @@ void simpleDimer::loadParams( parameterBlock *block )
 	c0_val = block->dimer_c0;
 }
 
+void simpleBound::loadParams( parameterBlock *block )
+{
+	bound_sigma = block->bound_sigma;
+}
+
+
 
 void simpleLipid::init( surface *theSurface, double *rsurf, int f, double u, double v )
 {
@@ -1782,6 +1790,47 @@ void simpleDimer::init( surface *theSurface, double *rsurf, int f, double u, dou
 
 	p_c0[0] = c0_val;
 	p_area[0] = 2 * default_particle_area;
+}
+
+void simpleBound::init( surface *theSurface, double *rsurf, int f, double u, double v )
+{
+	base_init();
+
+	nsites = 2;
+	nattach = 1;
+
+	alloc();
+
+	grad_fs[0] = fs[0] = f;
+	grad_puv[0] = puv[0] = u;
+	grad_puv[1] = puv[1] = v;
+	
+	mass[0] = default_mass;
+	mass[1] = default_mass;
+
+	bound = 1;
+	
+	double rp[3];
+	double nrm[3];
+
+	DC[0] = lipid_DC;
+	DC[1] = solution_DC;
+	
+	grad_puv[0] = puv[0] = u;
+	grad_puv[1] = puv[1] = v;
+	grad_fs[0] = fs[0] = f;
+
+	theSurface->evaluateRNRM( f, u, v, rp, nrm, rsurf);
+	
+	rall[0] = rp[0];
+	rall[1] = rp[1];
+	rall[2] = rp[2];
+	
+	// ``solution'' particle.
+
+	rall[3] = rp[0] + bound_sigma * nrm[0];
+	rall[4] = rp[1] + bound_sigma * nrm[1];
+	rall[5] = rp[2] + bound_sigma * nrm[2];
 }
 
 
@@ -2059,7 +2108,7 @@ double pcomplex::AttachV( Simulation *theSimulation )
 	{
 		struct surface_record *sRec = theSimulation->fetch(sid[s]);
 		double k;
-		double curv = sRec->theSurface->c( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], sRec->r, &k);
+		double curv = sRec->theSurface->c( fs[s],puv[2*s+0], puv[2*s+1], sRec->r, &k);
 
 
 		pot += 0.5 * kc * p_area[s] * ( curv - p_c0[s]) * (curv - p_c0[s]); 

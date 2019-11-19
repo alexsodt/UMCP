@@ -492,6 +492,9 @@ double surface::rhoWorker( double * r, double *gr, double PBC_vec[3][3], int do_
 		}	
 	} 
 
+	free(rGrad);
+	free(nGrad);
+	free(hGrad);
 	// thickness penalty to prohibit locking onto a single leaflet.
 
 #if 1	

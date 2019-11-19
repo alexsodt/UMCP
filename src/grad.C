@@ -111,6 +111,15 @@ void surface::grad( double *r, double *gr, double *puv, double *pg )
 
 		double face_area = 0;
 		double energy_density = 0;
+		
+#ifdef LOCAL_LIPID_ENERGY	
+		double atot_o=0, atot_i=0;
+		for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+		{
+			atot_o += bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x];
+			atot_i += bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x];
+		}
+#endif
 	
 		for( int p = 0; p < nf_g_q_p; p++ )
 		{
@@ -179,12 +188,39 @@ void surface::grad( double *r, double *gr, double *puv, double *pg )
 			
 			double c0 = theFormulas[frm].c0;
 //		printf("e1: %lf e2: %lf\n", e1, e2 );
+
+#ifdef LOCAL_LIPID_ENERGY
+			double en = 0;
+			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+			{
+				double f_o = bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x] / atot_o;
+				double f_i = bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x] / atot_i;
+
+				double dc_o = ( e1+e2 - bilayerComp.c0[x]);
+				double dc_i = (-e1-e2 - bilayerComp.c0[x]);
+
+#ifdef FIXED_A
+				energy_density += 0.5 * kc * dc_o*dc_o * theTriangles[t].composition.outerLeaflet[x] * 0.5;
+				energy_density += 0.5 * kc * dc_i*dc_i * theTriangles[t].composition.innerLeaflet[x] * 0.5;
+#else
+				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
+				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
+#endif
+			}
+#else
 			double en = 0.5 * kc * (e1 + e2 - c0 ) * (e1+e2 - c0);
+#endif
+
+#ifdef FIXED_A
+			double dAf = g0 * theFormulas[frm].weight;
 			double dA = g * theFormulas[frm].weight;
-			
+#else
+			double dAf = g * theFormulas[frm].weight;
+			double dA = g * theFormulas[frm].weight;
+#endif			
 	
-			face_area  += g                   * theFormulas[frm].weight;	
-			energy_density += 0.5 * kc * ( e1 + e2 - c0 ) * ( e1 + e2 - c0 ) * g * theFormulas[frm].weight;
+			face_area  += dA;	
+			energy_density += en * dAf;
 		}
 
 		for( int p = 0; p < nf_g_q_p; p++ )
@@ -266,17 +302,42 @@ void surface::grad( double *r, double *gr, double *puv, double *pg )
 		double e2 = -0.5*(a+d+sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d));
 			
 		double c0 = theFormulas[frm].c0;
-//		printf("e1: %lf e2: %lf\n", e1, e2 );
+#ifdef LOCAL_LIPID_ENERGY
+		double en = 0;
+		for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+		{
+			double f_o = bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x] / atot_o;
+			double f_i = bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x] / atot_i;
+
+			double dc_o = ( e1+e2 - bilayerComp.c0[x]);
+			double dc_i = (-e1-e2 - bilayerComp.c0[x]);
+
+#ifdef FIXED_A
+			en += 0.5 * kc * dc_o*dc_o * theTriangles[t].composition.outerLeaflet[x] * 0.5;
+			en += 0.5 * kc * dc_i*dc_i * theTriangles[t].composition.innerLeaflet[x] * 0.5;
+#else
+			en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
+			en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
+#endif
+		}
+#else
 		double en = 0.5 * kc * (e1 + e2 - c0 ) * (e1+e2 - c0);
+#endif
+
+#ifdef FIXED_A
+		double dAf = g0 * theFormulas[frm].weight;
 		double dA = g * theFormulas[frm].weight;
-		
+#else
+		double dAf = g * theFormulas[frm].weight;
+		double dA = g * theFormulas[frm].weight;
+#endif		
 
 		A += dudv * g * theFormulas[frm].weight;
 		A0 += dudv * g0 * theFormulas[frm].weight;
 
-		r_val += dudv * dA * (e1+e2)/2;
-		area += dudv * dA;
-		e += dudv * dA * en; 			
+		r_val += dudv * dAf * (e1+e2)/2;
+		area += dudv * dAf;
+		e += dudv * dAf * en; 			
 
 double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=0,d_nrmz_d_rvz=0,d_nrmy_d_rux=0,d_nrmy_d_ruy=0,d_nrmy_d_ruz=0,d_nrmy_d_rvx=0,d_nrmy_d_rvy=0,d_nrmy_d_rvz=0,d_nrmx_d_rux=0,d_nrmx_d_ruy=0,d_nrmx_d_ruz=0,d_nrmx_d_rvx=0,d_nrmx_d_rvy=0,d_nrmx_d_rvz=0,d_RuRu_d_rux=0,d_RuRu_d_ruy=0,d_RuRu_d_ruz=0,d_nsvv_d_rux=0,d_nsvv_d_ruy=0,d_nsvv_d_ruz=0,d_nsvv_d_rvx=0,d_nsvv_d_rvy=0,d_nsvv_d_rvz=0,d_nsvv_d_svvx=0,d_nsvv_d_svvy=0,d_nsvv_d_svvz=0,d_RuRv_d_rux=0,d_RuRv_d_ruy=0,d_RuRv_d_ruz=0,d_RuRv_d_rvx=0,d_RuRv_d_rvy=0,d_RuRv_d_rvz=0,d_nsuv_d_rux=0,d_nsuv_d_ruy=0,d_nsuv_d_ruz=0,d_nsuv_d_rvx=0,d_nsuv_d_rvy=0,d_nsuv_d_rvz=0,d_nsuv_d_suvx=0,d_nsuv_d_suvy=0,d_nsuv_d_suvz=0,d_RvRv_d_rvx=0,d_RvRv_d_rvy=0,d_RvRv_d_rvz=0,d_nsuu_d_rux=0,d_nsuu_d_ruy=0,d_nsuu_d_ruz=0,d_nsuu_d_rvx=0,d_nsuu_d_rvy=0,d_nsuu_d_rvz=0,d_nsuu_d_suux=0,d_nsuu_d_suuy=0,d_nsuu_d_suuz=0,d_g_d_rux=0,d_g_d_ruy=0,d_g_d_ruz=0,d_g_d_rvx=0,d_g_d_rvy=0,d_g_d_rvz=0,d_e_d_rux=0,d_e_d_ruy=0,d_e_d_ruz=0,d_e_d_rvx=0,d_e_d_rvy=0,d_e_d_rvz=0,d_e_d_suux=0,d_e_d_suuy=0,d_e_d_suuz=0,d_e_d_suvx=0,d_e_d_suvy=0,d_e_d_suvz=0,d_e_d_svvx=0,d_e_d_svvy=0,d_e_d_svvz=0,d_c2_d_rux=0,d_c2_d_ruy=0,d_c2_d_ruz=0,d_c2_d_rvx=0,d_c2_d_rvy=0,d_c2_d_rvz=0,d_c2_d_suux=0,d_c2_d_suuy=0,d_c2_d_suuz=0,d_c2_d_suvx=0,d_c2_d_suvy=0,d_c2_d_suvz=0,d_c2_d_svvx=0,d_c2_d_svvy=0,d_c2_d_svvz=0,d_d_d_rux=0,d_d_d_ruy=0,d_d_d_ruz=0,d_d_d_rvx=0,d_d_d_rvy=0,d_d_d_rvz=0,d_d_d_suvx=0,d_d_d_suvy=0,d_d_d_suvz=0,d_d_d_svvx=0,d_d_d_svvy=0,d_d_d_svvz=0,d_c_d_rux=0,d_c_d_ruy=0,d_c_d_ruz=0,d_c_d_rvx=0,d_c_d_rvy=0,d_c_d_rvz=0,d_c_d_suux=0,d_c_d_suuy=0,d_c_d_suuz=0,d_c_d_suvx=0,d_c_d_suvy=0,d_c_d_suvz=0,d_b_d_rux=0,d_b_d_ruy=0,d_b_d_ruz=0,d_b_d_rvx=0,d_b_d_rvy=0,d_b_d_rvz=0,d_b_d_suvx=0,d_b_d_suvy=0,d_b_d_suvz=0,d_b_d_svvx=0,d_b_d_svvy=0,d_b_d_svvz=0,d_a_d_rux=0,d_a_d_ruy=0,d_a_d_ruz=0,d_a_d_rvx=0,d_a_d_rvy=0,d_a_d_rvz=0,d_a_d_suux=0,d_a_d_suuy=0,d_a_d_suuz=0,d_a_d_suvx=0,d_a_d_suvy=0,d_a_d_suvz=0,d_c1_d_rux=0,d_c1_d_ruy=0,d_c1_d_ruz=0,d_c1_d_rvx=0,d_c1_d_rvy=0,d_c1_d_rvz=0,d_c1_d_suux=0,d_c1_d_suuy=0,d_c1_d_suuz=0,d_c1_d_suvx=0,d_c1_d_suvy=0,d_c1_d_suvz=0,d_c1_d_svvx=0,d_c1_d_svvy=0,d_c1_d_svvz=0,d_g_d_RvRv=0,d_g_d_RuRv=0,d_g_d_RuRu=0,d_nsvv_d_nrmz=0,d_nsvv_d_nrmy=0,d_nsvv_d_nrmx=0,d_nsuv_d_nrmz=0,d_nsuv_d_nrmy=0,d_nsuv_d_nrmx=0,d_nsuu_d_nrmz=0,d_nsuu_d_nrmy=0,d_nsuu_d_nrmx=0,d_d_d_RuRv=0,d_d_d_nsuv=0,d_d_d_RuRu=0,d_d_d_nsvv=0,d_d_d_g=0,d_c_d_RuRv=0,d_c_d_nsuv=0,d_c_d_RuRu=0,d_c_d_nsuu=0,d_c_d_g=0,d_b_d_RuRv=0,d_b_d_nsuv=0,d_b_d_RvRv=0,d_b_d_nsvv=0,d_b_d_g=0,d_a_d_RuRv=0,d_a_d_nsuv=0,d_a_d_RvRv=0,d_a_d_nsuu=0,d_a_d_g=0,d_e_d_c2=0,d_e_d_c1=0,d_e_d_g=0,d_c2_d_d=0,d_c2_d_c=0,d_c2_d_b=0,d_c2_d_a=0,d_c1_d_d=0,d_c1_d_c=0,d_c1_d_b=0,d_c1_d_a=0,junk;
 			// the basic variables.
@@ -338,23 +399,69 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 
 		/* here are the energy terms */
 
-			d_e_d_g  = (0.5 * kc * ( e1 + e2 - c0) * ( e1 + e2 - c0) + kg * e1 * e2 ) * dudv * theFormulas[frm].weight;
+#ifndef FIXED_A
+			d_e_d_g  = (kg * e1 * e2 ) * dudv * theFormulas[frm].weight;
+#endif
+#ifdef LOCAL_LIPID_ENERGY
+			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+			{
+				double f_o = bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x] / atot_o;
+				double f_i = bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x] / atot_i;
 
-			d_e_d_c1 = kc * (e1 + e2 - c0) * dudv * g * theFormulas[frm].weight;
-			d_e_d_c2 = kc * (e1 + e2 - c0) * dudv * g * theFormulas[frm].weight;
+				double dc_o = ( e1+e2 - bilayerComp.c0[x]);
+				double dc_i = (-e1-e2 - bilayerComp.c0[x]);
 
-			d_e_d_c1 += kg * e2 * dudv * g * theFormulas[frm].weight;
-			d_e_d_c2 += kg * e1 * dudv * g * theFormulas[frm].weight;
+				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
+				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
+#ifdef FIXED_A				
+				d_e_d_c1 += kc * dc_o * 0.5 * theTriangles[t].composition.outerLeaflet[x];
+				d_e_d_c1 -= kc * dc_i * 0.5 * theTriangles[t].composition.innerLeaflet[x];
 
-			d_e_d_g += 2* KA * ((A-A0)/A0) * theFormulas[frm].weight * dudv;
-			// particles need gradient.
+				d_e_d_c2 += kc * dc_o * 0.5 * theTriangles[t].composition.outerLeaflet[x];
+				d_e_d_c2 -= kc * dc_i * 0.5 * theTriangles[t].composition.innerLeaflet[x];
+#else
+				d_e_d_g += 0.5  * kc * dc_o * dc_o * f_o * 0.5 * dudv  * theFormulas[frm].weight;
+				d_e_d_g += 0.5  * kc * dc_i * dc_i * f_i * 0.5 * dudv  * theFormulas[frm].weight;
+
+				d_e_d_c1 += kc * dc_o * f_o * 0.5 * dudv * dAf;
+				d_e_d_c1 -= kc * dc_i * f_i * 0.5 * dudv * dAf;
+
+				d_e_d_c2 += kc * dc_o * f_o * 0.5 * dudv * dAf;
+				d_e_d_c2 -= kc * dc_i * f_i * 0.5 * dudv * dAf;
+#endif
 			
+			}
+			
+			// NOT SURE ABOUT THIS YET: !!!!
+
+
+#ifndef FIXED_A
 			// derivative of dA in the numerator:
 			d_e_d_g  += -p_face_area *  0.5 * kc * (e1+e2-c0)*(e1+e2-c0) * theFormulas[frm].weight / face_area;
 			// derivative of dA in the denominator:
 			d_e_d_g  += +p_face_area * energy_density * theFormulas[frm].weight / face_area / face_area;
-			d_e_d_c1 += -p_face_area *  dA *  kc * (e1+e2-c0) / face_area;
-			d_e_d_c2 += -p_face_area *  dA *  kc * (e1+e2-c0) / face_area;
+#endif
+			d_e_d_c1 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
+			d_e_d_c2 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
+#else
+			d_e_d_g  += (0.5*kc * (e1+e2-c0)*(e1+e2-c0)) * dudv * theFormulas[frm].weight;
+			d_e_d_c1  += (kc * (e1+e2-c0)) *  dudv * dAf;
+			d_e_d_c2  += (kc * (e1+e2-c0)) *  dudv * dAf;
+
+#ifndef FIXED_A			
+			// derivative of dA in the numerator:
+			d_e_d_g  += -p_face_area *  0.5 * kc * (e1+e2-c0)*(e1+e2-c0) * theFormulas[frm].weight / face_area;
+			// derivative of dA in the denominator:
+			d_e_d_g  += +p_face_area * energy_density * theFormulas[frm].weight / face_area / face_area;
+#endif
+			d_e_d_c1 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
+			d_e_d_c2 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
+#endif
+			d_e_d_c1 += kg * e2 * dudv * dAf;
+			d_e_d_c2 += kg * e1 * dudv * dAf;
+			
+			d_e_d_g += 2* KA * ((A-A0)/A0) * theFormulas[frm].weight * dudv;
+			// particles need gradient.
 
 		/* end energy terms */
 
@@ -6388,7 +6495,15 @@ void surface::igrad( double *r, double *gr )
 		double face_area = 0;
 		double energy_density = 0;
 //		double A=0,A0=0; would prefer to do it this way.
-
+		
+#ifdef LOCAL_LIPID_ENERGY	
+		double atot_o=0, atot_i=0;
+		for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+		{
+			atot_o += bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x];
+			atot_i += bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x];
+		}
+#endif
 		for( int p = 0; p < nf_irr_pts; p++ )
 		{
 			int frm = f*nf_irr_pts+p;
@@ -6456,14 +6571,35 @@ void surface::igrad( double *r, double *gr )
 			
 		double c0 = theIrregularFormulas[frm].c0;
 //		printf("e1: %lf e2: %lf\n", e1, e2 );
-		double en = 0.5 * kc * (e1 + e2 - c0 ) * (e1+e2 - c0);
+#ifdef FIXED_A
+		double dAf = g0 * theIrregularFormulas[frm].weight;
 		double dA = g * theIrregularFormulas[frm].weight;
-
+#else
+		double dAf = g * theIrregularFormulas[frm].weight;
+		double dA = g * theIrregularFormulas[frm].weight;
+#endif
 //		would prefer to do it this way, especially for irregular faces!!		
 //			A +=  g * theIrregularFormulas[frm].weight;
 //			A0 += g0 * theIrregularFormulas[frm].weight;
 
 			face_area  += dudv * g                   * theIrregularFormulas[frm].weight;	
+
+#ifdef LOCAL_LIPID_ENERGY
+			double en = 0;
+			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+			{
+				double f_o = bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x] / atot_o;
+				double f_i = bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x] / atot_i;
+
+				double dc_o = ( e1+e2 - bilayerComp.c0[x]);
+				double dc_i = (-e1-e2 - bilayerComp.c0[x]);
+
+				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
+				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
+			}
+#else
+			double en = 0.5 * kc * (e1 + e2 - c0 ) * (e1+e2 - c0);
+#endif
 			energy_density += 0.5 * kc * ( e1 + e2 - c0 ) * ( e1 + e2 - c0 ) * g * theIrregularFormulas[frm].weight;
 		}
 
@@ -6549,14 +6685,21 @@ void surface::igrad( double *r, double *gr )
 		double c0 = theIrregularFormulas[frm].c0;
 //		printf("e1: %lf e2: %lf\n", e1, e2 );
 		double en = 0.5 * kc * (e1 + e2 - c0 ) * (e1+e2 - c0);
+
+#ifdef FIXED_A
+		double dAf = g0 * theIrregularFormulas[frm].weight;
 		double dA = g * theIrregularFormulas[frm].weight;
+#else
+		double dAf = g * theIrregularFormulas[frm].weight;
+		double dA = g * theIrregularFormulas[frm].weight;
+#endif
 		
-		A =  g * theIrregularFormulas[frm].weight;
+		A =  dA;
 		A0 = g0 * theIrregularFormulas[frm].weight;
 
-		r_val += dudv * dA * (e1+e2)/2;
+		r_val += dudv * dAf * (e1+e2)/2;
 		area += dudv * dA;
-		e += dudv * dA * en; 			
+		e += dudv * dAf * en; 			
 double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=0,d_nrmz_d_rvz=0,d_nrmy_d_rux=0,d_nrmy_d_ruy=0,d_nrmy_d_ruz=0,d_nrmy_d_rvx=0,d_nrmy_d_rvy=0,d_nrmy_d_rvz=0,d_nrmx_d_rux=0,d_nrmx_d_ruy=0,d_nrmx_d_ruz=0,d_nrmx_d_rvx=0,d_nrmx_d_rvy=0,d_nrmx_d_rvz=0,d_RuRu_d_rux=0,d_RuRu_d_ruy=0,d_RuRu_d_ruz=0,d_nsvv_d_rux=0,d_nsvv_d_ruy=0,d_nsvv_d_ruz=0,d_nsvv_d_rvx=0,d_nsvv_d_rvy=0,d_nsvv_d_rvz=0,d_nsvv_d_svvx=0,d_nsvv_d_svvy=0,d_nsvv_d_svvz=0,d_RuRv_d_rux=0,d_RuRv_d_ruy=0,d_RuRv_d_ruz=0,d_RuRv_d_rvx=0,d_RuRv_d_rvy=0,d_RuRv_d_rvz=0,d_nsuv_d_rux=0,d_nsuv_d_ruy=0,d_nsuv_d_ruz=0,d_nsuv_d_rvx=0,d_nsuv_d_rvy=0,d_nsuv_d_rvz=0,d_nsuv_d_suvx=0,d_nsuv_d_suvy=0,d_nsuv_d_suvz=0,d_RvRv_d_rvx=0,d_RvRv_d_rvy=0,d_RvRv_d_rvz=0,d_nsuu_d_rux=0,d_nsuu_d_ruy=0,d_nsuu_d_ruz=0,d_nsuu_d_rvx=0,d_nsuu_d_rvy=0,d_nsuu_d_rvz=0,d_nsuu_d_suux=0,d_nsuu_d_suuy=0,d_nsuu_d_suuz=0,d_g_d_rux=0,d_g_d_ruy=0,d_g_d_ruz=0,d_g_d_rvx=0,d_g_d_rvy=0,d_g_d_rvz=0,d_e_d_rux=0,d_e_d_ruy=0,d_e_d_ruz=0,d_e_d_rvx=0,d_e_d_rvy=0,d_e_d_rvz=0,d_e_d_suux=0,d_e_d_suuy=0,d_e_d_suuz=0,d_e_d_suvx=0,d_e_d_suvy=0,d_e_d_suvz=0,d_e_d_svvx=0,d_e_d_svvy=0,d_e_d_svvz=0,d_c2_d_rux=0,d_c2_d_ruy=0,d_c2_d_ruz=0,d_c2_d_rvx=0,d_c2_d_rvy=0,d_c2_d_rvz=0,d_c2_d_suux=0,d_c2_d_suuy=0,d_c2_d_suuz=0,d_c2_d_suvx=0,d_c2_d_suvy=0,d_c2_d_suvz=0,d_c2_d_svvx=0,d_c2_d_svvy=0,d_c2_d_svvz=0,d_d_d_rux=0,d_d_d_ruy=0,d_d_d_ruz=0,d_d_d_rvx=0,d_d_d_rvy=0,d_d_d_rvz=0,d_d_d_suvx=0,d_d_d_suvy=0,d_d_d_suvz=0,d_d_d_svvx=0,d_d_d_svvy=0,d_d_d_svvz=0,d_c_d_rux=0,d_c_d_ruy=0,d_c_d_ruz=0,d_c_d_rvx=0,d_c_d_rvy=0,d_c_d_rvz=0,d_c_d_suux=0,d_c_d_suuy=0,d_c_d_suuz=0,d_c_d_suvx=0,d_c_d_suvy=0,d_c_d_suvz=0,d_b_d_rux=0,d_b_d_ruy=0,d_b_d_ruz=0,d_b_d_rvx=0,d_b_d_rvy=0,d_b_d_rvz=0,d_b_d_suvx=0,d_b_d_suvy=0,d_b_d_suvz=0,d_b_d_svvx=0,d_b_d_svvy=0,d_b_d_svvz=0,d_a_d_rux=0,d_a_d_ruy=0,d_a_d_ruz=0,d_a_d_rvx=0,d_a_d_rvy=0,d_a_d_rvz=0,d_a_d_suux=0,d_a_d_suuy=0,d_a_d_suuz=0,d_a_d_suvx=0,d_a_d_suvy=0,d_a_d_suvz=0,d_c1_d_rux=0,d_c1_d_ruy=0,d_c1_d_ruz=0,d_c1_d_rvx=0,d_c1_d_rvy=0,d_c1_d_rvz=0,d_c1_d_suux=0,d_c1_d_suuy=0,d_c1_d_suuz=0,d_c1_d_suvx=0,d_c1_d_suvy=0,d_c1_d_suvz=0,d_c1_d_svvx=0,d_c1_d_svvy=0,d_c1_d_svvz=0,d_g_d_RvRv=0,d_g_d_RuRv=0,d_g_d_RuRu=0,d_nsvv_d_nrmz=0,d_nsvv_d_nrmy=0,d_nsvv_d_nrmx=0,d_nsuv_d_nrmz=0,d_nsuv_d_nrmy=0,d_nsuv_d_nrmx=0,d_nsuu_d_nrmz=0,d_nsuu_d_nrmy=0,d_nsuu_d_nrmx=0,d_d_d_RuRv=0,d_d_d_nsuv=0,d_d_d_RuRu=0,d_d_d_nsvv=0,d_d_d_g=0,d_c_d_RuRv=0,d_c_d_nsuv=0,d_c_d_RuRu=0,d_c_d_nsuu=0,d_c_d_g=0,d_b_d_RuRv=0,d_b_d_nsuv=0,d_b_d_RvRv=0,d_b_d_nsvv=0,d_b_d_g=0,d_a_d_RuRv=0,d_a_d_nsuv=0,d_a_d_RvRv=0,d_a_d_nsuu=0,d_a_d_g=0,d_e_d_c2=0,d_e_d_c1=0,d_e_d_g=0,d_c2_d_d=0,d_c2_d_c=0,d_c2_d_b=0,d_c2_d_a=0,d_c1_d_d=0,d_c1_d_c=0,d_c1_d_b=0,d_c1_d_a=0,junk;
 
 			// the basic variables.
@@ -6617,39 +6760,94 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 			d_c2_d_d = -0.5*(1 + (-2*a + 2*d)/(1e-100+2.*Sqrt(SAFETY+Power(a,2) + 4*b*c - 2*a*d + Power(d,2))));
 
 			//d_e_d_g  = 0.5 * kc * ( e1 + e2 - c0) * ( e1 + e2 - c0) * dudv * theIrregularFormulas[frm].weight;
-#ifdef FIXED_A
-			d_e_d_g = 0;
-			d_e_d_c1 = kc * (e1 + e2 - c0) * dudv * g0 * theIrregularFormulas[frm].weight;
-			d_e_d_c2 = kc * (e1 + e2 - c0) * dudv * g0 * theIrregularFormulas[frm].weight;
-#else
-			d_e_d_g  = (0.5 * kc * ( e1 + e2 - c0) * ( e1 + e2 - c0) + kg * e1 * e2 ) * dudv * theIrregularFormulas[frm].weight;
-//			if( g < 0 )
-//				d_e_d_g *= -1;
 
-			d_e_d_c1 = kc * (e1 + e2 - c0) * dudv * g * theIrregularFormulas[frm].weight;
-			d_e_d_c2 = kc * (e1 + e2 - c0) * dudv * g * theIrregularFormulas[frm].weight;
-
-			d_e_d_c1 += kg * e2 * dudv * g * theIrregularFormulas[frm].weight;
-			d_e_d_c2 += kg * e1 * dudv * g * theIrregularFormulas[frm].weight;
+			// insert marker
+#ifndef FIXED_A
+			d_e_d_g  = (kg * e1 * e2 ) * dudv * theFormulas[frm].weight;
 #endif
 
-/*			if( g < 0 )
+#ifdef LOCAL_LIPID_ENERGY
+			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 			{
-				printf("zero-ing curvature.\n");
-				d_e_d_g = 0;
-				d_e_d_c1 = 0;
-				d_e_d_c2 = 0;
-			}
-*/			
-			d_e_d_g += 2* KA * ((A-A0)/A0) * theIrregularFormulas[frm].weight * dudv;
+				double f_o = bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x] / atot_o;
+				double f_i = bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x] / atot_i;
 
+				double dc_o = ( e1+e2 - bilayerComp.c0[x]);
+				double dc_i = (-e1-e2 - bilayerComp.c0[x]);
+
+				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
+				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
+				
+#ifndef FIXED_AREA
+				d_e_d_g += 0.5  * kc * dc_o * dc_o * f_o * 0.5 * dudv  * theIrregularFormulas[frm].weight;
+				d_e_d_g += 0.5  * kc * dc_i * dc_i * f_i * 0.5 * dudv  * theIrregularFormulas[frm].weight;
+#endif		
+				d_e_d_c1 += kc * dc_o * f_o * 0.5 * dAf;
+				d_e_d_c1 -= kc * dc_i * f_i * 0.5 * dAf;
+
+				d_e_d_c2 += kc * dc_o * f_o * 0.5 * dAf;
+				d_e_d_c2 -= kc * dc_i * f_i * 0.5 * dAf;
+			}
 			
+			// NOT SURE ABOUT THIS YET: !!!!
+
+#ifndef FIXED_A
 			// derivative of dA in the numerator:
 			d_e_d_g  += -p_face_area *  0.5 * kc * (e1+e2-c0)*(e1+e2-c0) * theIrregularFormulas[frm].weight / face_area;
 			// derivative of dA in the denominator:
 			d_e_d_g  += +p_face_area * energy_density * theIrregularFormulas[frm].weight / face_area / face_area;
-			d_e_d_c1 += -p_face_area *  dA *  kc * (e1+e2-c0) / face_area;
-			d_e_d_c2 += -p_face_area *  dA *  kc * (e1+e2-c0) / face_area;
+#endif
+			d_e_d_c1 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
+			d_e_d_c2 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
+#else
+#ifndef FIXED_A
+			d_e_d_g  += (0.5 * kc * (e1+e2-c0)* (e1+e2-c0)) * dudv * theIrregularFormulas[frm].weight;
+#endif
+			d_e_d_c1  += (kc * (e1+e2-c0)) * dudv * dAf;
+			d_e_d_c2  += (kc * (e1+e2-c0)) * dudv * dAf;
+			
+			// derivative of dA in the numerator:
+#ifndef FIXED_A
+			d_e_d_g  += -p_face_area *  0.5 * kc * (e1+e2-c0)*(e1+e2-c0) * theIrregularFormulas[frm].weight / face_area;
+			// derivative of dA in the denominator:
+			d_e_d_g  += +p_face_area * energy_density * theIrregularFormulas[frm].weight / face_area / face_area;
+#endif
+			d_e_d_c1 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
+			d_e_d_c2 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
+#endif
+			d_e_d_c1 += kg * e2 * dAf;
+			d_e_d_c2 += kg * e1 * dAf;
+
+			d_e_d_g += 2* KA * ((A-A0)/A0) * theIrregularFormulas[frm].weight * dudv;
+			// end insert marker
+	
+// # //			// CLIP OUT START HERE
+// # //#ifdef FIXED_A
+// # //			d_e_d_g = 0;
+// # //			d_e_d_c1 = kc * (e1 + e2 - c0) * dudv * g0 * theIrregularFormulas[frm].weight;
+// # //			d_e_d_c2 = kc * (e1 + e2 - c0) * dudv * g0 * theIrregularFormulas[frm].weight;
+// # //#else
+// # //			d_e_d_g  = (0.5 * kc * ( e1 + e2 - c0) * ( e1 + e2 - c0) + kg * e1 * e2 ) * dudv * theIrregularFormulas[frm].weight;
+// # ////			if( g < 0 )
+// # ////				d_e_d_g *= -1;
+// # //
+// # //			d_e_d_c1 = kc * (e1 + e2 - c0) * dudv * g * theIrregularFormulas[frm].weight;
+// # //			d_e_d_c2 = kc * (e1 + e2 - c0) * dudv * g * theIrregularFormulas[frm].weight;
+// # //
+// # //			d_e_d_c1 += kg * e2 * dudv * g * theIrregularFormulas[frm].weight;
+// # //			d_e_d_c2 += kg * e1 * dudv * g * theIrregularFormulas[frm].weight;
+// # //#endif
+// # //
+// # //			d_e_d_g += 2* KA * ((A-A0)/A0) * theIrregularFormulas[frm].weight * dudv;
+// # //
+// # //			
+// # //			// derivative of dA in the numerator:
+// # //			d_e_d_g  += -p_face_area *  0.5 * kc * (e1+e2-c0)*(e1+e2-c0) * theIrregularFormulas[frm].weight / face_area;
+// # //			// derivative of dA in the denominator:
+// # //			d_e_d_g  += +p_face_area * energy_density * theIrregularFormulas[frm].weight / face_area / face_area;
+// # //			d_e_d_c1 += -p_face_area *  dA *  kc * (e1+e2-c0) / face_area;
+// # //			d_e_d_c2 += -p_face_area *  dA *  kc * (e1+e2-c0) / face_area;
+// # //// CLIP OUT TO HERE
 
 //			double fac = Power(Power(Ru[1]*Rv[0] - Ru[0]*Rv[1],2) + Power(Ru[2]*Rv[0] - Ru[0]*Rv[2],2) + Power(Ru[2]*Rv[1] - Ru[1]*Rv[2],2),1.5);
 			double fac = Power(Power(Ru[1]*Rv[0] - Ru[0]*Rv[1],2) + Power(Ru[2]*Rv[0] - Ru[0]*Rv[2],2) + Power(Ru[2]*Rv[1] - Ru[1]*Rv[2],2),1.5);

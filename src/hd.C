@@ -590,8 +590,11 @@ int main( int argc, char **argv )
 		memset( sRec->qdot, 0, sizeof(double) * 3 * nv );	
 		memset( sRec->qdot0, 0, sizeof(double) * 3 * nv );	
 		memset( sRec->qdot_temp, 0, sizeof(double) * 3 * nv );	
+	
+		printf("sRec->NQ: %d\n", sRec->NQ );
 	}
 	
+
 	double KE = 0;
 
 	FILE *srdXYZFile = NULL;
@@ -760,6 +763,13 @@ int main( int argc, char **argv )
 			any_do_gen_q = 1;	
 	}
 
+// DEBUG
+	{
+		surface_record *sRec = theSimulation->allSurfaces;
+		for( int x = 0; x < 10; x++ )
+			sRec->theSurface->local_lipidMCMove( sRec->r, theSimulation->allComplexes, theSimulation->ncomplex, time_step, 1.0 / temperature );
+	}
+//end
 
 	if( block.nmin > 0 )
 	{
@@ -1205,7 +1215,7 @@ int main( int argc, char **argv )
 				theSimulation->allComplexes[c]->cache();
 			}
 
-			////// FIRST: propagate BD particles. their timesteps are never divided, and they never undergo reactions.
+			////// FIRST: propagate BD particles. their timesteps are never divided.
 
 			while( ! rd_consistent && rd_niter < 100)
 			{

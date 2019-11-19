@@ -1744,6 +1744,14 @@ int surface::nextFace( int f, double *u_in, double *v_in, double *du_in, double 
 
 	}
 
+	// are we moving directly along a face within some tolerance?
+	if( fabs(du + dv) < 1e-10 && fabs(du)+fabs(dv) > 1e-10 )
+		du += 1e-12;
+	if( fabs(du) < 1e-10 && fabs(dv) > 1e-10 )
+		du += 1e-12;
+	if( fabs(dv) < 1e-10 && fabs(du) > 1e-10 )
+		du += 1e-12;
+
 	// compute t parameter for leaving each face.
 
 	double t_1 = 1e10;

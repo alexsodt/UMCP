@@ -83,7 +83,11 @@ void setDefaults( parameterBlock *block )
 	block->do_ld = 0;
 	block->do_bd_membrane = 0;
 	block->do_bd_particles = 0;
+
+
 	block->do_rd = 0;
+	block->bound_sigma = 10.0;
+
 	block->nve_switch = -1; // switch to NVE dynamics at this timestep.
 	block->gamma_langevin = 10; 
 	block->planar_topology = 0;
