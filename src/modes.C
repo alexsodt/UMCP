@@ -1785,8 +1785,8 @@ void surface::getSparseEffectiveMass( force_set * theForceSet, int *use_map, int
 		char uplo = 'U';
 		char jobz = 'V';
 		double ev[ngen];
-		double *work = (double *)malloc( sizeof(double) * ngen*ngen);
 		int lwork = (ngen+2)*ngen;
+		double *work = (double *)malloc( sizeof(double) * lwork);
 		int info;
 		dsyev(&jobz, &uplo, &ngen, copy, &ngen, ev, work, &lwork, &info );	
 		
