@@ -763,6 +763,13 @@ int main( int argc, char **argv )
 			any_do_gen_q = 1;	
 	}
 
+// DEBUG
+	{
+		surface_record *sRec = theSimulation->allSurfaces;
+		for( int x = 0; x < 10; x++ )
+			sRec->theSurface->local_lipidMCMove( sRec->r, theSimulation->allComplexes, theSimulation->ncomplex, time_step, 1.0 / temperature );
+	}
+//end
 
 	if( block.nmin > 0 )
 	{

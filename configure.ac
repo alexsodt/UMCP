@@ -77,6 +77,8 @@ AM_CONDITIONAL(CUDA, test "$cuda" = "yes" )
 linearAlgebraString="no"
 usingUnderscore="yes"
 
+# switch to C for these tests
+AC_LANG([C])
 save_LDFLAGS=$LDFLAGS
 AC_MSG_CHECKING([for Accelerate framework.])
 LDFLAGS="$LDFLAGS -framework Accelerate"
@@ -94,6 +96,8 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([], [dsyev_()])],[AC_MSG_RESULT(yes)
 		linearAlgebraString="-framework vecLib"], [AC_MSG_RESULT(no)]) 
 LDFLAGS=$save_LDFLAGS
 fi
+# switch back to C++
+AC_LANG([C++])
 
 if test "$linearAlgebraString" = "no"; then 
 # test for ATLAS linear algebra, optional.

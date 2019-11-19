@@ -17,6 +17,8 @@ struct bilayerComposition
 	double *c0;
 	double *APL;
 	char **names;
+	double *input_innerLeaflet;
+	double *input_outerLeaflet;
 };
 
 #endif

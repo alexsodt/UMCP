@@ -132,6 +132,11 @@ void surface::readLipidComposition( FILE *inputFile )
 					memset( theTriangles[t].composition.innerLeaflet, 0, sizeof(double) * bilayerComp.nlipidTypes );
 					memset( theTriangles[t].composition.outerLeaflet, 0, sizeof(double) * bilayerComp.nlipidTypes );
 				}
+					
+				bilayerComp.input_innerLeaflet = (double *)malloc( sizeof(double) * bilayerComp.nlipidTypes );
+				bilayerComp.input_outerLeaflet = (double *)malloc( sizeof(double) * bilayerComp.nlipidTypes );
+				memset( bilayerComp.input_innerLeaflet, 0, sizeof(double) * bilayerComp.nlipidTypes );
+				memset( bilayerComp.input_outerLeaflet, 0, sizeof(double) * bilayerComp.nlipidTypes );
 			}
 			if( inputFile )
 				rewind( inputFile );
@@ -258,11 +263,13 @@ void surface::readLipidComposition( FILE *inputFile )
 							{
 								for( int t = 0; t < nt; t++ )
 									theTriangles[t].composition.innerLeaflet[gotit] += parts;	
+								bilayerComp.input_innerLeaflet[gotit] += parts;
 							}
 							else
 							{
 								for( int t = 0; t < nt; t++ )
 									theTriangles[t].composition.outerLeaflet[gotit] += parts;	
+								bilayerComp.input_outerLeaflet[gotit] += parts;
 							}
 						}
 					}

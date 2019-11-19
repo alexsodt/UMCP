@@ -23,7 +23,7 @@
 
 #define THRESH (1e-4)
 
-//#define LOW_RES
+#define LOW_RES
 #define MAX_INV_VALENCE 12
 
 #define USE_G0
@@ -1610,84 +1610,6 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 							theTriangles[nt].edges[edge_code[parse]] = gotit[parse]-1;
 						}
 					}
-#if 0
-					if( !gotit[0]  )
-					{
-						theEdges[nedges].vertices[0] = i;
-						theEdges[nedges].vertices[1] = j;
-						theEdges[nedges].faces[0] = nt;
-						theEdges[nedges].faces[1] = -1;
-						theEdges[nedges].faces[2] = -1;
-						theEdges[nedges].code[0] = 2;
-						theTriangles[nt].edges[0] = nedges;
-						nedges++;
-					}
-					else
-					{
-						if( theEdges[gotit[0]-1].faces[1]  == -1 )
-						{
-							theEdges[gotit[0]-1].faces[1] = nt;
-							theEdges[gotit[0]-1].code[1] = 2;
-						}
-						else
-						{
-							theEdges[gotit[0]-1].faces[2] = nt;
-							theEdges[gotit[0]-1].code[2] = 2;
-						}
-						theTriangles[nt].edges[0] = gotit[0]-1;
-					}
-					if( !gotit[1]  )
-					{
-						theEdges[nedges].vertices[0] = i;
-						theEdges[nedges].vertices[1] = k;
-						theEdges[nedges].faces[0] = nt;
-						theEdges[nedges].faces[1] = -1;
-						theEdges[nedges].faces[2] = -1;
-						theEdges[nedges].code[0] = 1;
-						theTriangles[nt].edges[2] = nedges;
-						nedges++;
-					}
-					else
-					{
-						if( theEdges[gotit[1]-1].faces[1]  == -1 )
-						{
-							theEdges[gotit[1]-1].faces[1] = nt;
-							theEdges[gotit[1]-1].code[1] = 1;
-						}
-						else
-						{
-							theEdges[gotit[1]-1].faces[2] = nt;
-							theEdges[gotit[1]-1].code[2] = 1;
-						}
-						theTriangles[nt].edges[2] = gotit[1]-1;
-					}
-					if( !gotit[2]  )
-					{
-
-						theEdges[nedges].vertices[0] = j;
-						theEdges[nedges].vertices[1] = k;
-						theEdges[nedges].faces[0] = nt;
-						theEdges[nedges].faces[1] = -1;
-						theEdges[nedges].faces[2] = -1;
-						theEdges[nedges].code[0] = 0;
-						theTriangles[nt].edges[1] = nedges;
-						nedges++;
-					}
-					else
-					{
-						if( theEdges[gotit[2]-1].faces[1]  == -1 )
-						{
-							theEdges[gotit[2]-1].faces[1] = nt;
-							theEdges[gotit[2]-1].code[1] = 0;
-						}
-						else
-						{
-							theEdges[gotit[2]-1].faces[2] = nt;
-							theEdges[gotit[2]-1].code[2] = 0;
-						}
-						theTriangles[nt].edges[1] = gotit[2]-1;
-					}
-#endif
 					nt++;
 				}
 			}
@@ -3184,9 +3106,11 @@ void surface::setg0( double *r, double reset_factor )
 		}
 		theFormulas[frm].RuRv0 = RuRv / sqrt(RuRu*RvRv);
 
-		A += g * 0.5 * theFormulas[frm].weight;
+		double dudv = 0.5;
 
-		nlipids += g * 0.5 / area_per_lipid;
+		A += g * dudv * theFormulas[frm].weight;
+
+		nlipids += g * dudv / area_per_lipid;
 		}
 
 		int t = theFormulas[f*nf_g_q_p].tri;
@@ -3199,6 +3123,76 @@ void surface::setg0( double *r, double reset_factor )
 		if( theTriangles[t].composition.innerLeaflet &&
 	            theTriangles[t].composition.outerLeaflet )
 		{
+
+			memset( theTriangles[t].composition.innerLeaflet, 0, sizeof(double) * bilayerComp.nlipidTypes );
+			memset( theTriangles[t].composition.outerLeaflet, 0, sizeof(double) * bilayerComp.nlipidTypes );
+			double area_target = A;
+			double fr_i[bilayerComp.nlipidTypes];
+			double fr_o[bilayerComp.nlipidTypes];
+			memset(fr_i,0,sizeof(double)* bilayerComp.nlipidTypes);
+			memset(fr_o,0,sizeof(double)* bilayerComp.nlipidTypes);
+			double sum_i=0,sum_o=0;
+			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+			{	
+				fr_i[x] = bilayerComp.input_innerLeaflet[x];
+				fr_o[x] = bilayerComp.input_outerLeaflet[x];
+				sum_i += fr_i[x];
+				sum_o += fr_o[x];
+			}
+			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+			{	
+				fr_i[x] /= sum_i;
+				fr_o[x] /= sum_o;
+			}
+
+			// sum to this point.
+			for( int x = 1; x < bilayerComp.nlipidTypes; x++ )
+				fr_i[x] += fr_i[x-1];
+			for( int x = 1; x < bilayerComp.nlipidTypes; x++ )
+				fr_o[x] += fr_o[x-1];
+
+			double a_i=0,a_o=0;
+
+			int done = 0;
+
+			double area_per_lipid_av = 65.0;
+			
+			theTriangles[t].composition.A0 = A;
+
+			while( !done )
+			{
+				double rn = rand() / (double)RAND_MAX;
+				
+				int idone=0,odone=0;	
+	
+				if( a_i > 0 && a_i > area_target -0.5 * area_per_lipid_av)
+					idone=1;
+				if( a_o > 0 && a_o > area_target -0.5 * area_per_lipid_av )
+					odone=1;
+			
+				if( idone && odone ) break;	
+
+				for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+				{
+					if( rn < fr_i[x] && ! idone )
+					{
+						theTriangles[t].composition.innerLeaflet[x] += bilayerComp.APL[x];
+						idone = 1;
+						a_i += bilayerComp.APL[x];
+					}
+					if( rn < fr_o[x] && ! odone )
+					{
+						theTriangles[t].composition.outerLeaflet[x] += bilayerComp.APL[x];
+						odone = 1;
+						a_o += bilayerComp.APL[x];
+					}
+				}
+			}	
+		}
+#if 0	// this is commented out from when I was doing fractional lipid moves.
+		if( theTriangles[t].composition.innerLeaflet &&
+	            theTriangles[t].composition.outerLeaflet )
+		{
 			double i_area_unorm = 0;
 			double o_area_unorm = 0;
 	
@@ -3208,17 +3202,18 @@ void surface::setg0( double *r, double reset_factor )
 				o_area_unorm += theTriangles[t].composition.outerLeaflet[x] * bilayerComp.APL[x];
 			}
 	
-			theTriangles[t].composition.A0 = A;
 	
+			theTriangles[t].composition.A0 = A;
 			double NFAC_i = A / i_area_unorm;
 			double NFAC_o = A / i_area_unorm;
 			
 			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 			{
-				theTriangles[t].composition.innerLeaflet[x] *= NFAC_i;// / bilayerComp.APL[x];
-				theTriangles[t].composition.outerLeaflet[x] *= NFAC_o;// / bilayerComp.APL[x];
+				theTriangles[t].composition.innerLeaflet[x] *= bilayerComp.APL[x] * NFAC_i;// / bilayerComp.APL[x];
+				theTriangles[t].composition.outerLeaflet[x] *= bilayerComp.APL[x] * NFAC_o;// / bilayerComp.APL[x];
 			}
 		}
+#endif
 	} 
 	
 	for( int f = 0; f < nf_irr_faces; f++ )
@@ -3288,7 +3283,76 @@ void surface::setg0( double *r, double reset_factor )
 		theTriangles[t].nlipids = nlipids;
 		theTriangles[t].f_lipids = 1.0;
 		theTriangles[t].f_lipids_stashed = 1.0;
+		theTriangles[t].composition.A0 = A;
+		
+		if( theTriangles[t].composition.innerLeaflet &&
+	            theTriangles[t].composition.outerLeaflet )
+		{
+			memset( theTriangles[t].composition.innerLeaflet, 0, sizeof(double) * bilayerComp.nlipidTypes );
+			memset( theTriangles[t].composition.outerLeaflet, 0, sizeof(double) * bilayerComp.nlipidTypes );
+			double area_target = A;
+			double fr_i[bilayerComp.nlipidTypes];
+			double fr_o[bilayerComp.nlipidTypes];
+			memset(fr_i,0,sizeof(double)* bilayerComp.nlipidTypes);
+			memset(fr_o,0,sizeof(double)* bilayerComp.nlipidTypes);
+			double sum_i=0,sum_o=0;
+			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+			{	
+				fr_i[x] = bilayerComp.input_innerLeaflet[x];
+				fr_o[x] = bilayerComp.input_outerLeaflet[x];
+				sum_i += fr_i[x];
+				sum_o += fr_o[x];
+			}
+			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+			{	
+				fr_i[x] /= sum_i;
+				fr_o[x] /= sum_o;
+			}
 
+			// sum to this point.
+			for( int x = 1; x < bilayerComp.nlipidTypes; x++ )
+				fr_i[x] += fr_i[x-1];
+			for( int x = 1; x < bilayerComp.nlipidTypes; x++ )
+				fr_o[x] += fr_o[x-1];
+
+			double a_i=0,a_o=0;
+
+			int done = 0;
+
+			double area_per_lipid_av = 65.0;
+
+			while( !done )
+			{
+				double rn = rand() / (double)RAND_MAX;
+				
+				int idone=0,odone=0;	
+	
+				if( a_i > 0 && a_i > area_target -0.5 * area_per_lipid_av)
+					idone=1;
+				if( a_o > 0 && a_o > area_target -0.5 * area_per_lipid_av )
+					odone=1;
+				
+				if( idone && odone ) break;	
+
+				for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
+				{
+					if( rn < fr_i[x] && ! idone )
+					{
+						theTriangles[t].composition.innerLeaflet[x] += bilayerComp.APL[x];
+						idone = 1;
+						a_i += bilayerComp.APL[x];
+					}
+					if( rn < fr_o[x] && ! odone )
+					{
+						theTriangles[t].composition.outerLeaflet[x] += bilayerComp.APL[x];
+						odone = 1;
+						a_o += bilayerComp.APL[x];
+					}
+				}
+			}	
+		}
+
+#if 0
 		if( theTriangles[t].composition.innerLeaflet &&
 	            theTriangles[t].composition.outerLeaflet )
 		{
@@ -3308,10 +3372,11 @@ void surface::setg0( double *r, double reset_factor )
 			
 			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 			{
-				theTriangles[t].composition.innerLeaflet[x] *= NFAC_i;// / bilayerComp.APL[x];
-				theTriangles[t].composition.outerLeaflet[x] *= NFAC_o;// / bilayerComp.APL[x];
+				theTriangles[t].composition.innerLeaflet[x] *= bilayerComp.APL[x] * NFAC_i;// / bilayerComp.APL[x];
+				theTriangles[t].composition.outerLeaflet[x] *= bilayerComp.APL[x] * NFAC_o;// / bilayerComp.APL[x];
 			}
 		}
+#endif
 	} 
 }
 
@@ -3479,8 +3544,10 @@ double surface::ifenergy( int f, double *r, double *p_uv )
 
 //		printf("c1: %.14le c2: %.14le g: %.14le en: %.14le\n", c1, c2, g, en );
 #ifdef FIXED_A
-		double dA = theIrregularFormulas[frm].g0 * theIrregularFormulas[frm].weight;
+		double dAf = theIrregularFormulas[frm].g0 * theIrregularFormulas[frm].weight;
+		double dA = g * theIrregularFormulas[frm].weight;
 #else
+		double dAf = g * theIrregularFormulas[frm].weight;
 		double dA = g * theIrregularFormulas[frm].weight;
 #endif	
 		double dudv = 1.0; // this is merged into the weight, for irregular vertices.
@@ -3519,16 +3586,21 @@ double surface::ifenergy( int f, double *r, double *p_uv )
 				double dc_o = ( c1+c2 - bilayerComp.c0[x]);
 				double dc_i = (-c1-c2 - bilayerComp.c0[x]);
 
+#ifdef FIXED_A
+				e += 0.5 * kc * dc_o*dc_o * theTriangles[tri].composition.outerLeaflet[x] * 0.5;
+				e += 0.5 * kc * dc_i*dc_i * theTriangles[tri].composition.innerLeaflet[x] * 0.5;
+#else
 				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
 				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
+#endif
 			}
 #endif
-			e += dudv * dA * en; 			
-			VC += dudv * dA * en;
-			AVC += dudv *dA * (c1+c2);
+			e += dudv * dAf * en; 			
+			VC += dudv * dAf * en;
+			AVC += dudv *dAf * (c1+c2);
 //			face_energy_density += dudv * dA * 0.5 * kc * (c1+c2-c0 ) * (c1+c2-c0);
-			face_energy_density += dudv * dA * en;
-			face_area += dudv *dA ; 
+			face_energy_density += dudv * dAf * en;
+			face_area += dudv *dAf ; 
 
 			double a_strain = (A-A0)/A0;
 
@@ -3692,8 +3764,10 @@ double surface::fenergy( int f, double *r, double *p_uv )
 
 //		printf("c1: %.14le c2: %.14le g: %.14le en: %.14le\n", c1, c2, g, en );
 #ifdef FIXED_A
-		double dA = theFormulas[frm].g0 * theFormulas[frm].weight;
+		double dAf = theFormulas[frm].g0 * theFormulas[frm].weight;
+		double dA = g * theFormulas[frm].weight;
 #else
+		double dAf = g * theFormulas[frm].weight; // may be fixed or not depending on FIXED_A.
 		double dA = g * theFormulas[frm].weight;
 #endif	
 		double dudv = 0.5;
@@ -3736,19 +3810,31 @@ double surface::fenergy( int f, double *r, double *p_uv )
 
 				double dc_o = ( c1+c2 - bilayerComp.c0[x]);
 				double dc_i = (-c1-c2 - bilayerComp.c0[x]);
-
-				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
-				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
-			}
+#if 0
+				printf("Lipid %s outer c %le endens %le tri %d fr %le a_l %le etot %le\n", bilayerComp.names[x], c1+c2, 0.5 * kc * dc_o*dc_o , tri,f_o,theTriangles[tri].composition.outerLeaflet[x],0.5 * kc * dc_o*dc_o * f_o * 0.5* theTriangles[tri].composition.outerLeaflet[x]); 
+				printf("Lipid %s inner c %le endens %le tri %d fr %le a_l %le etot %le\n", bilayerComp.names[x],-c1-c2, 0.5 * kc * dc_i*dc_i , tri,f_i,theTriangles[tri].composition.innerLeaflet[x],0.5 * kc * dc_i*dc_i * f_i * 0.5* theTriangles[tri].composition.innerLeaflet[x]); 
 #endif
-			e += dudv * dA * en; 			
-			VC += dudv * dA * en;
+// this is based on using g0:
+//				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
+//				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
+#ifdef FIXED_A
+				e += 0.5 * kc * dc_o*dc_o * theTriangles[tri].composition.outerLeaflet[x] * 0.5;
+				e += 0.5 * kc * dc_i*dc_i * theTriangles[tri].composition.innerLeaflet[x] * 0.5;
+#else
+				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5 * dA;
+				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5 * dA;
+#endif
+			}
+#else
+			e += dudv * dAf * en; 			
+			VC += dudv * dAf * en;
+#endif
 //			if( f == 40 && p == 0 )
 //			printf("e %d %d %le dA %le c1 %le c2 %le\n", f, p, dudv*dA*en,
 //				dA, c1, c2 );
-			AVC += dudv *dA * (c1+c2);
-			face_energy_density += dudv * dA * 0.5 * kc * (c1+c2-c0 ) * (c1+c2-c0);
-			face_area += dudv *dA; 
+			AVC += dudv *dAf * (c1+c2);
+			face_energy_density += dudv * dAf * 0.5 * kc * (c1+c2-c0 ) * (c1+c2-c0);
+			face_area += dudv *dAf; 
 
 			double a_strain = (A-A0)/A0;
 

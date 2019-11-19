@@ -2108,7 +2108,7 @@ double pcomplex::AttachV( Simulation *theSimulation )
 	{
 		struct surface_record *sRec = theSimulation->fetch(sid[s]);
 		double k;
-		double curv = sRec->theSurface->c( grad_fs[s], grad_puv[2*s+0], grad_puv[2*s+1], sRec->r, &k);
+		double curv = sRec->theSurface->c( fs[s],puv[2*s+0], puv[2*s+1], sRec->r, &k);
 
 
 		pot += 0.5 * kc * p_area[s] * ( curv - p_c0[s]) * (curv - p_c0[s]); 

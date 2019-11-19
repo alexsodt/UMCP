@@ -498,6 +498,8 @@ void Simulation::minimize( int freeze_membrane  )
 	printf("Entering minimize with e_init: %le\n", e_init );
 	l_bfgs_setup( use_m, num_params, p, 1.0, surface_f, surface_fdf); 
 
+	full_fd_test(p);
+	exit(1);
 	if( mag_init > 1e-20 )
 	{
 		for( int x = 0; x < nsteps; x++ )
@@ -513,7 +515,6 @@ void Simulation::minimize( int freeze_membrane  )
 		printf("Initial gradient zero.\n");
 	}	
 	l_bfgs_clear();
-	full_fd_test(p);
 
 	double v =surface_fdf(p,g);
 	double e = surface_f(p);

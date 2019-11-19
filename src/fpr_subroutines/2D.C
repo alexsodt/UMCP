@@ -101,7 +101,7 @@ double get_2D_2D_rxn_prob( double R1, double kr, double bindrad, double Dtot, do
 				R1, Dtot, deltat, prev_sep, ps_prev, rtol, bindrad);
 		if( *p0_ratio < 0 || *p0_ratio > 1e100 )		
 		{
-			printf("funny p0_ratio.\n");
+			printf("funny p0_ratio %le.\n", *p0_ratio);
 		}
 	}
 	else
