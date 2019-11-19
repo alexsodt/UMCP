@@ -767,7 +767,7 @@ int main( int argc, char **argv )
 	{
 		surface_record *sRec = theSimulation->allSurfaces;
 		for( int x = 0; x < 10; x++ )
-			sRec->theSurface->local_lipidMCMove( sRec->r, theSimulation->allComplexes, theSimulation->ncomplex, time_step, 1.0 / temperature );
+			sRec->theSurface->local_lipidMCMove( sRec->r, theSimulation->allComplexes, theSimulation->ncomplex, time_step, 1.0 / temperature, block.lipid_mc_swap_only );
 	}
 //end
 
@@ -1072,7 +1072,7 @@ int main( int argc, char **argv )
 					PartialSyncVertices(sRec->r,sRec->id);
 					if( global_cntr % block.lipid_mc_period == 0 )
 					{
-						sRec->theSurface->local_lipidMCMove( sRec->r, theSimulation->allComplexes, theSimulation->ncomplex, time_step, 1.0 / temperature );
+						sRec->theSurface->local_lipidMCMove( sRec->r, theSimulation->allComplexes, theSimulation->ncomplex, time_step, 1.0 / temperature, block.lipid_mc_swap_only );
 					}
 				}	 
 			

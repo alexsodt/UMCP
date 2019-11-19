@@ -117,70 +117,9 @@ void surface::unstashf( void )
 	set_g0_from_f();	
 }
 
-void surface::lipidMCMove( double *r, pcomplex **allComplexes, int ncomplex, double dt, double beta)
-{
-	printf("No longer valid. A bad idea to begin with.\n");
-	exit(1);
-
-	// move lipids between adjacent faces using montecarlo moves.
-	// for now ignore the complexes.
-	
-	double E0 = energy(r,NULL);
-	stashf();
-	// let's set this based on dt.
-	double nL_move_average = 1./1000.0; // times the area.
-
-	for( int t1 = 0; t1 < nt; t1++ )
-	{
-		for( int bt = 0; bt < 3; bt++ )
-		{
-			int t2 = theTriangles[t1].border_tri[bt];
-
-			if( t2 < t1 ) continue;
-
-			// move lipid material between triangles.
-
-			double nL1 = theTriangles[t1].nlipids * theTriangles[t1].f_lipids;
-			double nL2 = theTriangles[t2].nlipids * theTriangles[t2].f_lipids;	
-
-			double dL = 2*((double)rand() / (double)RAND_MAX - 0.5 ) * theTriangles[t1].nlipids * nL_move_average;
-	
-			theTriangles[t1].f_lipids = (nL1 + dL) / theTriangles[t1].nlipids;
-			theTriangles[t2].f_lipids = (nL2 - dL) / theTriangles[t2].nlipids;
-
-			if( theTriangles[t1].f_lipids < F_CUTOFF || 
-			    theTriangles[t2].f_lipids < F_CUTOFF )
-			{
-				theTriangles[t1].f_lipids = nL1 / theTriangles[t1].nlipids;
-				theTriangles[t2].f_lipids = nL2 / theTriangles[t2].nlipids;
-			}
-		}
-	}
-#ifdef PARALLEL		
-	lipidSync();
-	set_g0_from_f();	
-#endif
-	
-	double E1 = energy(r,NULL);
-
-	double p = exp(-beta*(E1-E0));
-
-	double rn = ((double)rand())/(double)RAND_MAX;
-
-	if( rn < p )
-	{
-	}
-	else
-		unstashf();
-		
-#ifdef PARALLEL
-	lipidSync();
-	set_g0_from_f();
-#endif
-}
 
 
-void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomplex, double dt, double beta)
+void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomplex, double dt, double beta, int swap_only)
 {
 	// move lipids between adjacent faces using montecarlo moves.
 	// for now ignore the complexes.
@@ -230,7 +169,13 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 						comp1 = theTriangles[t1].composition.outerLeaflet;
 						comp2 = theTriangles[t2].composition.outerLeaflet;
 					}
-		
+	
+					int from_1 = rand() % bilayerComp.nlipidTypes;
+					int from_2 = from_1;
+				
+					if( swap_only )
+						from_2 = rand() % bilayerComp.nlipidTypes; 
+	
 					for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 					{
 						E0 =  faceEnergy( f1, r, NULL, 0 );
@@ -238,25 +183,38 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 	
 						// move lipid material between triangles.
 		
-						double nL1 = comp1[x];
-						double nL2 = comp2[x];
+						double nL1 = comp1[from_1];
+						double nL2 = comp2[from_2];
 			
 //						double dL = 2*((double)rand() / (double)RAND_MAX - 0.5 ) * (theTriangles[t1].composition.A0) * nL_move_average;
-						double dL = bilayerComp.APL[x] * (rand() %2 == 0 ? 1 : -1);
-					
+						double dL = bilayerComp.APL[from_1] * (rand() %2 == 0 ? 1 : -1);
+						double dL2 = -dL;
+
+						if( swap_only )
+							dL2 = bilayerComp.APL[from_2] * (dL/bilayerComp.APL[from_1]);
 			
-						comp1[x] -= dL;
-						comp2[x] += dL;
-		
+						comp1[from_1] -= dL;
+						comp2[from_1] += dL;
+						if( swap_only )
+						{
+							comp1[from_2] += dL2;
+							comp2[from_2] -= dL2;
+						}
 						double sum1 =0,sum2=0;
+
 						for( int y = 0; y < bilayerComp.nlipidTypes; y++ ) sum1 += comp1[y];
 						for( int y = 0; y < bilayerComp.nlipidTypes; y++ ) sum2 += comp2[y];
 
-						if( comp1[x] < 0 || 
-						    comp2[x] < 0 || sum1<1e-3 || sum2 < 1e-3)
+						if( comp1[from_1] < 0 || comp2[from_1] < 0 || 
+						    comp2[from_2] < 0 || comp1[from_2] < 0 || sum1<1e-3 || sum2 < 1e-3)
 						{
-							comp1[x] += dL;
-							comp2[x] -= dL;
+							comp1[from_1] += dL;
+							comp2[from_1] -= dL;
+							if( swap_only )
+							{
+								comp1[from_2] -= dL2;
+								comp2[from_2] += dL2;
+							}
 						}	
 						else
 						{
@@ -308,8 +266,14 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 							{
 								nrej++;
 						
-								comp1[x] += dL;
-								comp2[x] -= dL;
+
+								comp1[from_1] += dL;
+								comp2[from_1] -= dL;
+								if( swap_only )
+								{
+									comp1[from_2] -= dL2;
+									comp2[from_2] += dL2;
+								}
 							
 								set_g0_from_f(f1);				
 								set_g0_from_f(f2);				

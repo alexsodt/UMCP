@@ -518,8 +518,7 @@ struct surface
 	void set_g0_from_f(int f);
 	void stashf(void);
 	void unstashf(void);
-	void lipidMCMove( double *r, pcomplex **allComplexes, int ncomplex, double dt, double beta);
-	void local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomplex, double dt, double beta);
+	void local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomplex, double dt, double beta, int swap_only=0);
 	void measureLipidCurvature( double *r, int pre_equil /* don't do running average */ ); // part of lipid redistribution
 
 

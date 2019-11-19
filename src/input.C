@@ -131,6 +131,7 @@ void setDefaults( parameterBlock *block )
 	block->tachyon_interp = 1;
 
 	block->lipid_mc_period = 0;
+	block->lipid_mc_swap_only = 0;
 	block->npt_mc_period = 0;
 	block->cyl_tension_mc_period = 0;
 	block->alpha_restraint_x = -1;
@@ -680,6 +681,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->write_alpha_period = atoi( word2 );
 		else if( !strcasecmp( word1, "nruns" ) )
 			block->nruns = atoi( word2 );
+		else if( !strcasecmp( word1, "lipid_mc_swap_only" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->lipid_mc_swap_only = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->lipid_mc_swap_only = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
 		else if( !strcasecmp( word1, "minimizeResetG" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )

@@ -57,6 +57,7 @@ class parameterBlock
 	int outputMesh;
 
 	int lipid_mc_period; // period which to do monte-carlo lipid movement
+	int lipid_mc_swap_only; // only swap lipids between the mesh (don't allow total movement of particles)
 	int npt_mc_period; // period which to do monte-carlo lipid movement
 	int cyl_tension_mc_period;
 
