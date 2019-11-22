@@ -2618,7 +2618,7 @@ double surface::c( int f, double u, double v, double *r, double *k, double *c_ve
 				*c_val_1 = c1;
 				*c_val_2 = c2;
 
-				if( fabs(c) > 1e-10 )
+				if( fabs(c) > 1e-6)
 				{
 					double vec1[2] = { -(-a+d+fac)/(2*c),1.0};
 	
@@ -2638,7 +2638,7 @@ double surface::c( int f, double u, double v, double *r, double *k, double *c_ve
 					c_vec_2[0] = vec2[0];
 					c_vec_2[1] = vec2[1];
 				}
-				else if( fabs(b) > 1e-10 )
+				else if( fabs(b) > 1e-6)
 				{
 					
 					double vec1[2] = { -(b)/(a-d),1.0};
@@ -2891,7 +2891,7 @@ double surface::c( int f, double u, double v, double *r, double *k, double *c_ve
 			{
 				*c_val_1 = c1;
 				*c_val_2 = c2;
-				if( fabs(c) > 1e-10 )
+				if( fabs(c) > 1e-6 ) // could just fetch perpendicular vector.
 				{
 					
 					double vec1[2] = { -(-a+d+fac)/(2*c),1.0};
@@ -2913,7 +2913,7 @@ double surface::c( int f, double u, double v, double *r, double *k, double *c_ve
 					c_vec_2[0] = vec2[0];
 					c_vec_2[1] = vec2[1];
 				}
-				else if( fabs(b) > 1e-10 )
+				else if( fabs(b) > 1e-6)
 				{
 					
 					double vec1[2] = { -(b)/(a-d),1.0};

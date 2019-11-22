@@ -70,7 +70,7 @@ int main( int argc, char **argv )
 	}
 	surface *theSurface =(surface *)malloc( sizeof(surface) );
 	theSurface->loadLattice( argv[1], 0. );
-
+	theSurface->readLipidComposition(NULL);
 	theSurface->generatePlan();
 
 	Simulation *theSimulation = (Simulation *)malloc( sizeof(Simulation) );

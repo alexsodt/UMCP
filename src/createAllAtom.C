@@ -60,6 +60,19 @@ void surface::createAllAtom( parameterBlock *block )
 	rsurf[3*nv+1] = 1.0;
 	rsurf[3*nv+2] = 1.0;
 
+	// write the mesh we are building into all-atom. Remove this later but I need it to debug.
+
+	FILE *tpsf = NULL;
+	char fname[256];
+	sprintf(fname, "%s_create.psf", block->jobName );
+	tpsf = fopen(fname,"w");
+	sprintf(fname, "%s_create.xyz", block->jobName );
+	writeLimitingSurfacePSF(tpsf);
+	fclose(tpsf);
+	FILE *tFile = fopen(fname,"w");
+	writeLimitingSurface(tFile);
+	fclose(tFile);
+
 	// outputs in CHARMM coordinate format
 
 	// breakdown system into as many approximately square patches as possible, with the correct areas?
@@ -357,6 +370,7 @@ void surface::createAllAtom( parameterBlock *block )
 		for( int a = 0; a < curNAtoms(); a++ )
 		{
 			if( !strcasecmp( at[a].resname, "TIP3") ) continue;
+			if( !strcasecmp( at[a].resname, "W") ) continue;
 			if( !strcasecmp( at[a].resname, "SOD") ) continue;
 			if( !strcasecmp( at[a].resname, "POT") ) continue;
 			if( !strcasecmp( at[a].resname, "CLA") ) continue;
@@ -575,7 +589,8 @@ void surface::createAllAtom( parameterBlock *block )
 		double cvec1[2] = {0,0}, cvec2[2]={0,0};
 		double gv = g(f, 1.0/3.0, 1.0/3.0, rsurf );
 		double c1=0,c2=0;
-		double ctot = c(f,u_cen,v_cen,rsurf,cvec1,cvec2,&c1,&c2);
+		double k;
+		double ctot = c(f,u_cen,v_cen,rsurf,&k,cvec1,cvec2,&c1,&c2);
 		
 		JZ += (c1+c2)*gv;
 		KZ += c1*c2 * gv;
@@ -603,8 +618,44 @@ void surface::createAllAtom( parameterBlock *block )
 		nregions = area0 / ( (use_area_lower)/4);
 	else
 		nregions = area0 / ( (use_area_upper)/4);
-		
 
+	nregions = nt/4;
+
+//	nregions *= 2;
+	if( nregions > nt )
+		nregions = nt;	
+	//int debug_ids[3] = { 24, 26, 77 };
+	//int debug_ids[3] = { 26, 77, 100 };
+	int debug_ids[3] = { 28, 30, 340 };
+	int debug_t = -1;
+	int debug_f = -1;
+
+	for( int t = 0; t < nt; t++ )
+	{
+		int tids[3] = {theTriangles[t].ids[0],theTriangles[t].ids[1],theTriangles[t].ids[2] };
+		sort3(tids);
+
+		if( 
+			tids[0] == debug_ids[0] &&	
+			tids[1] == debug_ids[1] &&	
+			tids[2] == debug_ids[2] )	
+		{
+			debug_t = t;
+			debug_f = theTriangles[t].f;
+		}
+	}
+
+	if( nregions > nt / 2 )
+	{
+		nregions = nt;
+		for( int t = 0;  t < nt; t++ )
+		{
+			regions_for_tri[t] = t;
+			regions_for_face[theTriangles[t].f] = t;
+		}
+	}
+	else
+	{
 	// target one fourth of the area?
 
 	printf("Using %d regions.\n", nregions );
@@ -613,7 +664,7 @@ void surface::createAllAtom( parameterBlock *block )
 
 	for( int t = 0;  t < nt; t++ )
 		regions_for_face[theTriangles[t].f] = regions_for_tri[t];
-
+	}
 	// Eventually I'd like to place lipids with as few seams,
 	// and as little lateral tension inhomogeneity as possible.
 	// for now I'll just put them on the faces.
@@ -669,7 +720,7 @@ void surface::createAllAtom( parameterBlock *block )
 	sprintf(cur_segname, "%s%d", out_in[0], seg_cntr ); 
 
 	int seed = rand();
-
+	int patch_warning = 0; // cntr for warning about large patches
 	int nplaced = 0;
 	int nplacedSpace = 100;
 	double *placed_atoms = (double *)malloc( sizeof(double) * 3 * nplacedSpace );
@@ -720,7 +771,8 @@ void surface::createAllAtom( parameterBlock *block )
 		printf("rel vol: %lf %lf\n", rel_vol[0], rel_vol[1] );
 	}
 
-
+	int *regional_face = (int *)malloc( sizeof(int) * nt );
+	memset( regional_face, 0, sizeof(int) * nt );
 
 	for( int pass = 0; pass < 2; pass++ )
 	{
@@ -759,13 +811,26 @@ void surface::createAllAtom( parameterBlock *block )
 		
 				double tri_cen[3] = {0,0,0};
 		
+				int debug_me = 0;
+				double patch_area = 0;
+
 				for( int t = 0; t < nt; t++ )
 				{
 					if( regions_for_face[t] == r )
 					{
+						regional_face[t] = 1;
+						if( t == debug_f )
+							debug_me = 1;
 						double rc[3],nc[3];
 						evaluateRNRM( t, 1.0/3.0, 1.0/3.0, rc, nc, rsurf );
-					
+	
+						double *v1 = rsurf + 3 * theTriangles[t].ids[0];
+						double *v2 = rsurf + 3 * theTriangles[t].ids[1];
+						double *v3 = rsurf + 3 * theTriangles[t].ids[2];
+			
+						patch_area += 0.5 * g( t, 1.0/3.0, 1.0/3.0, rsurf ) ;	
+						
+
 		//				if( r < natom_names )
 		//				printf("%s %lf %lf %lf\n", atom_name[r], rc[0], rc[1], rc[2] );
 		
@@ -838,8 +903,27 @@ void surface::createAllAtom( parameterBlock *block )
 			
 				// x, y to u, v'
 			
-				for( int l = 0; l < nlipids; l++ )
+			
+				double sim_area = Lx*Ly;
+
+				int del_PBC_x = 1;
+				int del_PBC_y = 1;
+				if( sim_area / patch_area < 2)
 				{
+					del_PBC_x = 1+(int)ceil(sqrt(patch_area/sim_area));
+					del_PBC_y = 1+(int)ceil(sqrt(patch_area/sim_area));
+				}
+
+				if( del_PBC_x > 5 && patch_warning < 5)
+				{
+					printf("WARNING: PATCH AREAS ARE VERY LARGE COMPARED TO SIMULATION.\n");
+					patch_warning += 1;
+				}
+				for( int l = 0; l < nlipids; l++ )
+				for( int dx_pbc = -del_PBC_x; dx_pbc <= del_PBC_x; dx_pbc += 1 )
+				for( int dy_pbc = -del_PBC_x; dy_pbc <= del_PBC_x; dy_pbc += 1 )
+				{
+				
 					if( leaflet[l] != leaflet[l_cen] ) continue;
 	//				if( l != l_cen ) continue;
 					// if the segment is a protein or glycosphingolipid we'll try to help the user with patch commands.
@@ -850,12 +934,15 @@ void surface::createAllAtom( parameterBlock *block )
 					double dx = lipid_xyz[3*l+0]-upper_cen[0];
 					double dy = lipid_xyz[3*l+1]-upper_cen[1];
 		
-					double shift[2] = {0,0};
+					double shift[2] = {dx_pbc * Lx, dy_pbc * Ly};
 					while( dx < -Lx/2 ) {dx += Lx; shift[0] += Lx; }
 					while( dx >  Lx/2 ) {dx -= Lx; shift[0] -= Lx; }
 					while( dy < -Ly/2 ) {dy += Ly; shift[1] += Ly; }
 					while( dy >  Ly/2 ) {dy -= Ly; shift[1] -= Ly; }
-				
+			
+					dx += dx_pbc * Lx;
+					dy += dy_pbc * Ly;
+	
 					double use_r[3] = { alpha * dx, alpha * dy, lipid_xyz[3*l+2] };
 					double eval_cen[3];
 		
@@ -866,7 +953,7 @@ void surface::createAllAtom( parameterBlock *block )
 					int main_f_eval = f;
 					double main_u_cen = spot_u;
 					double main_v_cen = spot_v;
-	
+					int ncrosses = 0;	
 
 					// everything must be evaluated at this spot to retain the x,y to u/v mapping.
 #if METHOD_ONE
@@ -876,7 +963,24 @@ void surface::createAllAtom( parameterBlock *block )
 					double dx_uv[2], dy_uv[2];
 					double source_r[3] = { alpha * dx, alpha * dy, lipid_xyz[3*l+2] };
 					int fout = getCoordinateSystem( f, &spot_u, &spot_v, source_r, -strain[x_leaflet], leaflet[l],
-							dx_uv, dy_uv, rsurf ); 
+							dx_uv, dy_uv, rsurf, regional_face, &ncrosses ); 
+					if( debug_me && x_leaflet == 1)
+					{
+						double rpt[3], rnrm[3];
+						evaluateRNRM( fout, spot_u, spot_v, rpt,rnrm, rsurf );
+							
+						if( regions_for_face[fout]== r )
+						{
+							printf("N %lf %lf %lf\n", source_r[0], source_r[1], source_r[2] );
+							printf("C %lf %lf %lf\n", rpt[0], rpt[1], rpt[2] );
+						}
+						else
+						{
+							printf("F %lf %lf %lf\n", source_r[0], source_r[1], source_r[2] );
+							printf("O %lf %lf %lf\n", rpt[0], rpt[1], rpt[2] );
+						}
+//						printf("%lf %lf evaluates to %d %lf %lf %s\n", source_r[0], source_r[1], fout, spot_u, spot_v, (regions_for_face[fout]== r ? "INSIDE" : "OUTSIDE") ); 
+					}
 #endif
 					
 					double w_use = 1.0;
@@ -894,10 +998,6 @@ void surface::createAllAtom( parameterBlock *block )
 					{
 						double nrm[3];
 						double rpt[3];
-						if( cur_res == 45 && !strcasecmp( cur_segname, "IN20" ) )
-						{
-							printf("check rim here.\n");
-						}				
 		
 						evaluateRNRM( fout, spot_u, spot_v, rpt, nrm, rsurf );
 		
@@ -949,10 +1049,14 @@ void surface::createAllAtom( parameterBlock *block )
 						}
 
 					}			
-			
+	
 		
-					if( regions_for_face[fout] == r )
+					if( regions_for_face[fout] == r && ncrosses < 2 )
 					{
+					if( fout == debug_f && x_leaflet == 1 && pass == 1)
+					{
+						printf("Ok!\n");
+					}		
 						nlipids_placed += 1;
 						if( x_leaflet == 0 )
 							nlipids_placed_inside += 1;
@@ -1046,10 +1150,6 @@ void surface::createAllAtom( parameterBlock *block )
 							double transp_u = main_u_cen;
 							double transp_v = main_v_cen;
 							
-							if( !strcasecmp( cur_segname, "IN14") && cur_res == 31 )	
-							{
-								printf("14/31\n");
-							}		
 					
 #ifdef METHOD_ONE
 							evaluate_at( eval, use_r, main_f_eval, &transp_u, &transp_v, rsurf, leaflet[l], -strain[x_leaflet],NULL, NULL, w_use, w_rim, rimp, rimn );
@@ -1192,6 +1292,8 @@ void surface::createAllAtom( parameterBlock *block )
 					}
 		
 				}
+
+				memset( regional_face, 0, sizeof(int) * nt );
 			}
 			
 			if( nrim > 0 )
@@ -2113,7 +2215,7 @@ void surface::createAllAtom( parameterBlock *block )
 int surface::getCoordinateSystem( int source_f,   double *source_u,  double *source_v, 
 //				  int distance_f, double distant_u, double distant_v, 
 				  double dr[3], double strain, int leaflet,
-				  double *dx_duv, double *dy_duv, double *rsurf )
+				  double *dx_duv, double *dy_duv, double *rsurf, int *regional_face, int *ncrosses )
 {
 	double drdu[3]={0,0,0}, drdv[3]={0,0,0};	
 	double u_cen = *source_u;
@@ -2161,7 +2263,8 @@ int surface::getCoordinateSystem( int source_f,   double *source_u,  double *sou
 	double c1=0, c2=0;
 	double cvec1[2], cvec2[2];
 
-	double ctot = c(source_f,u_cen,v_cen,rsurf,cvec1,cvec2,&c1,&c2);
+	double k;
+	double ctot = c(source_f,u_cen,v_cen,rsurf,&k,cvec1,cvec2,&c1,&c2);
 
 	// use the cvec1 and cvec2 as the x/y coordinate system.
 
@@ -2241,6 +2344,9 @@ int surface::getCoordinateSystem( int source_f,   double *source_u,  double *sou
 		double dv_pre = dv;
 
 		int f2 = nextFace( fp, &u_cen, &v_cen, &du, &dv, rsurf, dx );	
+
+		if( regional_face[f2] == 0 )
+			(*ncrosses)++;
 
 		if( f2 == fp ) 
 			done = 1;
@@ -2382,7 +2488,8 @@ int surface::simple_evaluate_at( double eval[3], double dr[3], int f, double *u,
 	double c1=0, c2=0;
 	double cvec1[2], cvec2[2];
 
-	double ctot = c(f,u_cen,v_cen,rsurf,cvec1,cvec2,&c1,&c2);
+	double k;
+	double ctot = c(f,u_cen,v_cen,rsurf,&k,cvec1,cvec2,&c1,&c2);
 
 	// use the cvec1 and cvec2 as the x/y coordinate system.
 
@@ -2466,7 +2573,13 @@ int surface::simple_evaluate_at( double eval[3], double dr[3], int f, double *u,
 		cvec2[0] * drdu[1] + cvec2[1] * drdv[1],
 		cvec2[0] * drdu[2] + cvec2[1] * drdv[2] };
 	
-
+/*
+	if( f == nf_faces )
+	{
+		printf("x: %le %le %le ", x_dir[0], x_dir[1], x_dir[2] );
+		printf("y: %le %le %le\n", y_dir[0], y_dir[1], y_dir[2] );
+	}
+*/
 	double use_PP = exp(strain)*PP;
 
 	double lat_scale = 1.0;
@@ -2579,7 +2692,8 @@ int surface::evaluate_at( double eval[3], double dr[3], int f, double *u, double
 	double c1=0, c2=0;
 	double cvec1[2], cvec2[2];
 
-	double ctot = c(f,u_cen,v_cen,rsurf,cvec1,cvec2,&c1,&c2);
+	double k;
+	double ctot = c(f,u_cen,v_cen,rsurf,&k,cvec1,cvec2,&c1,&c2);
 
 	// use the cvec1 and cvec2 as the x/y coordinate system.
 
@@ -2967,7 +3081,8 @@ void generateRimRing( surface *theSurface, double *rsurf, double **rim_triangles
 		double c1=0, c2=0;
 		double cvec1[2], cvec2[2];
 	
-		double ctot = theSurface->c(test_f,test_u, test_v,rsurf,cvec1,cvec2,&c1,&c2);
+		double k;
+		double ctot = theSurface->c(test_f,test_u, test_v,rsurf,&k,cvec1,cvec2,&c1,&c2);
 
 		double drdu[3], drdv[3];
 		theSurface->ru( test_f, test_u, test_v,  rsurf, drdu ); 
@@ -2995,7 +3110,6 @@ void generateRimRing( surface *theSurface, double *rsurf, double **rim_triangles
 			if( fabs(vec_c2[2]) < best_dp )
 				best_dp = fabs(vec_c2[2]);
 
-			printf("Accepting!\n");
 
 			// accept
 		
@@ -3016,7 +3130,8 @@ void generateRimRing( surface *theSurface, double *rsurf, double **rim_triangles
 	double c1=0, c2=0;
 	double cvec1[2], cvec2[2];
 	
-	double ctot = theSurface->c( cur_f, cur_u, cur_v, rsurf,cvec1,cvec2,&c1,&c2);
+	double k;	
+	double ctot = theSurface->c( cur_f, cur_u, cur_v, rsurf,&k,cvec1,cvec2,&c1,&c2);
 
 	// now cast out!
 
@@ -3198,6 +3313,11 @@ void EndSegment( FILE *charmmFile, char *cur_filename, char *cur_segment, char *
 		
 	sprintf(cur_filename, "segment_%s%d.crd", out_in[x_leaflet], *seg_cntr );
 	sprintf(cur_segname, "%s%d", out_in[x_leaflet], *seg_cntr ); 
+
+	if( !strcasecmp( cur_segname, "OUT559" ) )
+	{
+		printf("here.\n");
+	}
 
 	*cur_size = 0;
 	*cur_natoms = 0;

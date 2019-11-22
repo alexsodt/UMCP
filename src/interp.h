@@ -546,7 +546,7 @@ struct surface
 	double *dx_duv=NULL, double *dy_duv=NULL, double w_use=1.0, double w_rim=0.0, double *rimp=NULL, double *rimn = NULL );
 	int getCoordinateSystem( int source_f,   double *source_u,  double *source_v, 
 				double *dr, double strain, int leaflet,
-				  double *dx_duv, double *dy_duv, double *rsurf );
+				  double *dx_duv, double *dy_duv, double *rsurf, int *regional_face, int *ncrosses );
 
 };
 

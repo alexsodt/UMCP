@@ -1359,7 +1359,6 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 
 	printf("Read %d lattice points.\n", nv);
 	
-	writeVertexXYZandPSFPeriodic( "check" );
 
 	assignEdgePBC();
 
@@ -3572,6 +3571,7 @@ double surface::ifenergy( int f, double *r, double *p_uv )
 		{
 
 #ifdef LOCAL_LIPID_ENERGY
+			double lec=0; //local curvature energy.
 			double atot_o=0, atot_i=0;
 			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 			{
@@ -3587,13 +3587,15 @@ double surface::ifenergy( int f, double *r, double *p_uv )
 				double dc_i = (-c1-c2 - bilayerComp.c0[x]);
 
 #ifdef FIXED_A
-				e += 0.5 * kc * dc_o*dc_o * theTriangles[tri].composition.outerLeaflet[x] * 0.5;
-				e += 0.5 * kc * dc_i*dc_i * theTriangles[tri].composition.innerLeaflet[x] * 0.5;
+				lec += 0.5 * kc * dc_o*dc_o * theTriangles[tri].composition.outerLeaflet[x] * 0.5;
+				lec += 0.5 * kc * dc_i*dc_i * theTriangles[tri].composition.innerLeaflet[x] * 0.5;
 #else
 				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
 				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
 #endif
 			}
+			e += lec;
+			VC += lec;
 #endif
 			e += dudv * dAf * en; 			
 			VC += dudv * dAf * en;
@@ -3797,6 +3799,7 @@ double surface::fenergy( int f, double *r, double *p_uv )
 //				printf("Hm: e: %le %lf %lf\n", en, dudv, dA );
 			}
 #ifdef LOCAL_LIPID_ENERGY
+			double lec = 0; // local curvature energy
 			double atot_o=0, atot_i=0;
 			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 			{
@@ -3818,17 +3821,19 @@ double surface::fenergy( int f, double *r, double *p_uv )
 //				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
 //				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
 #ifdef FIXED_A
-				e += 0.5 * kc * dc_o*dc_o * theTriangles[tri].composition.outerLeaflet[x] * 0.5;
-				e += 0.5 * kc * dc_i*dc_i * theTriangles[tri].composition.innerLeaflet[x] * 0.5;
+				lec += 0.5 * kc * dc_o*dc_o * theTriangles[tri].composition.outerLeaflet[x] * 0.5;
+				lec += 0.5 * kc * dc_i*dc_i * theTriangles[tri].composition.innerLeaflet[x] * 0.5;
 #else
 				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5 * dA;
 				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5 * dA;
 #endif
 			}
+			VC += lec;
+			e += lec;
 #else
+#endif
 			e += dudv * dAf * en; 			
 			VC += dudv * dAf * en;
-#endif
 //			if( f == 40 && p == 0 )
 //			printf("e %d %d %le dA %le c1 %le c2 %le\n", f, p, dudv*dA*en,
 //				dA, c1, c2 );

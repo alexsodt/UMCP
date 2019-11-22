@@ -293,6 +293,10 @@ void surface::readLipidComposition( FILE *inputFile )
 			theTriangles[t].composition.outerLeaflet[0] = 1;
 		if( pi == 0 )
 			theTriangles[t].composition.innerLeaflet[0] = 1;
+		if( po == 0 )
+			bilayerComp.input_outerLeaflet[0] = 1;
+		if( pi == 0 )
+			bilayerComp.input_innerLeaflet[0] = 1;
 	}
 
 	printf("--------------\n");
