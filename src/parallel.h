@@ -51,8 +51,8 @@ typedef struct parallel_info
 
 } parallel_info;
 
-#ifndef __parallelc__
 extern parallel_info par_info;
+#ifndef __parallelc__
 extern int setup_for_parallel;
 #endif
 

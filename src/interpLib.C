@@ -9564,3 +9564,11 @@ void surface::setEdgeRev( void )
 		}
 	}
 }
+
+extern "C" void hd_umcp_link_check( void);
+
+void hd_umcp_link_check( void )
+{
+	printf("HD/UMCP Link available.\n");
+}
+

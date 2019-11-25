@@ -210,11 +210,6 @@ struct boxing
 struct surface
 {
 	int surface_id; // global id.
-#ifdef FFTW
-	fftw_complex *h_in;
-	fftw_complex *h_out;
-	fftw_plan fftw_p;
-#endif
 	bilayerComposition bilayerComp;		
 	boundary_condition *bcs;
 	int nbc;
@@ -548,6 +543,11 @@ struct surface
 				double *dr, double strain, int leaflet,
 				  double *dx_duv, double *dy_duv, double *rsurf, int *regional_face, int *ncrosses );
 
+#ifdef FFTW
+	fftw_complex *h_in;
+	fftw_complex *h_out;
+	fftw_plan fftw_p;
+#endif
 };
 
 struct volel

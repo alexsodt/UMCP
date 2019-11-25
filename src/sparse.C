@@ -1233,10 +1233,11 @@ void SparseMatrix::SquareRoot( SparseMatrix **root_output )
 	Zk->freeMem();
 	Zkp1->freeMem();
 
-	delete temp;
-	delete Ykp1;
-	delete Zk;
-	delete Zkp1;
+	free(temp);
+	free(Ykp1);
+	free(Zk);
+	free(Zkp1);
+
 
 	// unprecondition the matrix.
 	for( int t = 0; t < n; t++ )

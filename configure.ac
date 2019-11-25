@@ -52,6 +52,7 @@ if test "a$cuda" = "ayes"; then
 	AM_CUDA="-lcudart"
 fi
 
+AC_PROG_RANLIB
 AC_PROG_CC([$c_compilers])
 AC_PROG_CXX([$cxx_compilers])
 AC_PROG_CPP

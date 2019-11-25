@@ -495,8 +495,6 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 	if( !block->defaults_set )
 		setDefaults(block);
 
-	if( !strcasecmp( argv[0] + strlen(argv[0])-3, "bar" ) )
-		block->do_bar = 1;
 	int ERROR = 0;
 
 	while( pass != END_PASS )

@@ -327,3 +327,128 @@ void surface::readLipidComposition( FILE *inputFile )
 	printf("--------------\n");
 	
 }
+
+void surface::getVPassData( double **verts, int *nvert, int **tris, int ** eft_tris, int *ntri, int **edges, int *nedges_in, int edge_dim )
+{
+	*nvert = nv;
+
+	(*verts) = (double *)malloc( sizeof(double) * 3 * nv );
+
+	for( int v = 0; v < nv; v++ )
+	{
+		(*verts)[3*v+0] = theVertices[v].r[0];
+		(*verts)[3*v+1] = theVertices[v].r[1];
+		(*verts)[3*v+2] = theVertices[v].r[2];
+	}
+
+	(*tris) = (int *)malloc( sizeof(int) * 3 * nt );
+	(*eft_tris) = (int *)malloc( sizeof(int) * 3 * nt );
+
+	*ntri = nt;
+
+	for( int t = 0; t < nt; t++ )
+	{
+		(*tris)[3*t+0] = theTriangles[t].ids[0];
+		(*tris)[3*t+1] = theTriangles[t].ids[1];
+		(*tris)[3*t+2] = theTriangles[t].ids[2];
+
+		(*eft_tris)[3*t+0] = theTriangles[t].edges[0];
+		(*eft_tris)[3*t+1] = theTriangles[t].edges[1];
+		(*eft_tris)[3*t+2] = theTriangles[t].edges[2];
+	}
+
+	*(nedges_in) = nedges;
+	
+	(*edges) = (int *)malloc( sizeof(int) * (2+edge_dim) * nedges );	
+
+	for( int e = 0; e < nedges; e++ )
+	{
+		(*edges)[e*(2+edge_dim)+0] = theEdges[e].vertices[0];
+		(*edges)[e*(2+edge_dim)+1] = theEdges[e].vertices[1];
+		(*edges)[e*(2+edge_dim)+2] = theEdges[e].faces[0];
+		(*edges)[e*(2+edge_dim)+3] = theEdges[e].faces[1];
+	}
+}
+
+void surface::lipidSync(void)
+{
+#ifdef PARALLEL
+	int *list = (int *)malloc( sizeof(int) * nt );
+	double *fl = (double *)malloc( sizeof(double) * nt * 2 * bilayerComp.nlipidTypes);
+
+	for( int p = 0; p < par_info.nprocs; p++ )
+	{
+		if( p == par_info.my_id )
+		{
+			for( int fx = 0; fx < par_info.nf[surface_id]; fx++ )
+			{
+				int f = par_info.faces[surface_id][fx];
+				int t;
+				if( f < nf_faces )
+					t = theFormulas[f*nf_g_q_p].tri;
+				else
+					t = theIrregularFormulas[(f-nf_faces)*nf_irr_pts].tri;
+
+				list[fx] = t;
+
+				for( int lx = 0; lx < bilayerComp.nlipidTypes; lx++ )
+				{
+					fl[fx*bilayerComp.nlipidTypes*2+lx] = theTriangles[t].composition.innerLeaflet[lx];
+					fl[fx*bilayerComp.nlipidTypes*2+bilayerComp.nlipidTypes+lx] = theTriangles[t].composition.outerLeaflet[lx];
+				}
+			}
+		}
+
+		int nvals = par_info.nf[surface_id];
+		
+		MPI_Bcast( &nvals, 1, MPI_INT, p, MPI_COMM_WORLD );		
+		MPI_Bcast( list, nvals, MPI_INT, p, MPI_COMM_WORLD ); 
+		MPI_Bcast( fl, nvals*bilayerComp.nlipidTypes*2, MPI_DOUBLE, p, MPI_COMM_WORLD ); 
+	
+		for( int tx = 0; tx < nvals; tx++ )
+		{
+			int t = list[tx];
+
+			for( int lx = 0; lx < bilayerComp.nlipidTypes; lx++ )
+			{
+				theTriangles[t].composition.innerLeaflet[lx]	=	fl[tx*bilayerComp.nlipidTypes*2+lx];
+				theTriangles[t].composition.outerLeaflet[lx]	=	fl[tx*bilayerComp.nlipidTypes*2+bilayerComp.nlipidTypes+lx];
+			}
+		}
+	}
+	free(list);
+	free(fl);
+#endif
+}
+
+void surface::lipidBroadcast(void)
+{
+#ifdef PARALLEL
+	double *fl = (double *)malloc( sizeof(double) * nt * 2 * bilayerComp.nlipidTypes );
+
+	if( par_info.my_id == BASE_TASK )
+	{
+		for( int t = 0; t < nt; t++ )
+		{
+			for( int lx = 0; lx < bilayerComp.nlipidTypes; lx++ )
+			{	
+				fl[t*2*bilayerComp.nlipidTypes+lx]                         = theTriangles[t].composition.innerLeaflet[lx];
+				fl[t*2*bilayerComp.nlipidTypes+bilayerComp.nlipidTypes+lx] = theTriangles[t].composition.outerLeaflet[lx];
+			}
+		}	
+	}
+
+	ParallelBroadcast( fl, nt*2*bilayerComp.nlipidTypes );
+
+	for( int t = 0; t < nt; t++ )
+	{
+		for( int lx = 0; lx < bilayerComp.nlipidTypes; lx++ )
+		{	
+			theTriangles[t].composition.innerLeaflet[lx]=fl[t*2*bilayerComp.nlipidTypes+lx];
+			theTriangles[t].composition.outerLeaflet[lx]=fl[t*2*bilayerComp.nlipidTypes+bilayerComp.nlipidTypes+lx];
+		}
+	}
+	
+	free(fl);
+#endif
+}
