@@ -1795,13 +1795,16 @@ void surface::createAllAtom( parameterBlock *block )
 		}
 
 
-		double solvation_shift[3] = 
-			{
-				( nsolvent_x * solvate_PBC[0]- PBC_vec[0][0])/2, 
-				( nsolvent_y * solvate_PBC[1]- PBC_vec[1][1])/2, 
-				( nsolvent_z * solvate_PBC[2]- PBC_vec[2][2])/2
-			};	
-		
+//		double solvation_shift[3] = 
+//			{
+//				( nsolvent_x * solvate_PBC[0]- PBC_vec[0][0])/2, 
+//				( nsolvent_y * solvate_PBC[1]- PBC_vec[1][1])/2, 
+//				( nsolvent_z * solvate_PBC[2]- PBC_vec[2][2])/2
+//			};	
+	
+		printf("WATER PBC: %lf %lf %lf\n", nsolvent_x * solvate_PBC[0],
+						   nsolvent_y * solvate_PBC[1],	
+						   nsolvent_z * solvate_PBC[2] );	
 		sprintf(waterFileName, "solvate_%s.crd", block->jobName );
 
 		FILE *waterCRD = fopen(waterFileName, "w" );
@@ -1813,14 +1816,27 @@ void surface::createAllAtom( parameterBlock *block )
 		char solventSegName[256];
 		sprintf(solventSegName, "WAT");
 		int water_res = 1;
+		
+		double tiling_min[3] =
+		{ -solvate_PBC[0]/2, -solvate_PBC[1]/2, -solvate_PBC[2]/2 };
+		double tiling_max[3] =
+		{ (0.5 + nsolvent_x-1 ) * solvate_PBC[0], 
+		  (0.5 + nsolvent_y-1 ) * solvate_PBC[1], 
+		  (0.5 + nsolvent_z-1 ) * solvate_PBC[2] };
+	
+		double tile_center_shift[3] = { 
+				 - (tiling_min[0]+tiling_max[0])/2,
+				 - (tiling_min[1]+tiling_max[1])/2,
+				 - (tiling_min[2]+tiling_max[2])/2 };
+
 		for( int sx = 0; sx < nsolvent_x; sx++ )
 		for( int sy = 0; sy < nsolvent_y; sy++ )
 		for( int sz = 0; sz < nsolvent_z; sz++ )
 		{
 			double outer_shift[3] = { 
-				-PBC_vec[0][0]/2 - solvation_shift[0] + sx * solvate_PBC[0],
-				-PBC_vec[1][1]/2 - solvation_shift[1] + sy * solvate_PBC[1],
-				-PBC_vec[2][2]/2 - solvation_shift[2] + sz * solvate_PBC[2] };
+				tile_center_shift[0] + sx * solvate_PBC[0],
+				tile_center_shift[1] + sy * solvate_PBC[1],
+				tile_center_shift[2] + sz * solvate_PBC[2] };
 		
 			for( int r = 0; r < nsolventRes; r++ )
 			{	
@@ -1837,15 +1853,29 @@ void surface::createAllAtom( parameterBlock *block )
 				rcom[0] /= solvent_res_size[r];
 				rcom[1] /= solvent_res_size[r];
 				rcom[2] /= solvent_res_size[r];
-				
+			
+				double sub_shift[3] = { 0,0,0};
+				for( int c = 0; c < 3; c++ )
+				{
+					while( rcom[c] +sub_shift[c] < -solvate_PBC[c]/2 ) sub_shift[c] += solvate_PBC[c];				
+					while( rcom[c] +sub_shift[c] >  solvate_PBC[c]/2 ) sub_shift[c] -= solvate_PBC[c];				
+				}
+	
+				outer_shift[0] += sub_shift[0];
+				outer_shift[1] += sub_shift[1];
+				outer_shift[2] += sub_shift[2];
+
+
 				rcom[0] += outer_shift[0];
 				rcom[1] += outer_shift[1];
 				rcom[2] += outer_shift[2];
 
-				if( rcom[0] < -PBC_vec[0][0]/2 || rcom[0] >= PBC_vec[0][0]/2 ) continue;
-				if( rcom[1] < -PBC_vec[1][1]/2 || rcom[1] >= PBC_vec[1][1]/2 ) continue;
-				if( rcom[2] < -PBC_vec[2][2]/2 || rcom[2] >= PBC_vec[2][2]/2 ) continue;
-
+				if( ! block->perfect_solvent_tiling )
+				{
+					if( rcom[0] < -PBC_vec[0][0]/2 || rcom[0] >= PBC_vec[0][0]/2 ) continue;
+					if( rcom[1] < -PBC_vec[1][1]/2 || rcom[1] >= PBC_vec[1][1]/2 ) continue;
+					if( rcom[2] < -PBC_vec[2][2]/2 || rcom[2] >= PBC_vec[2][2]/2 ) continue;
+				}
 
 				int bx = rcom[0] * nx / PBC_vec[0][0];
 				int by = rcom[1] * ny / PBC_vec[1][1];

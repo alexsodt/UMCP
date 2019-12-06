@@ -23,7 +23,7 @@
 
 #define THRESH (1e-4)
 
-#define LOW_RES
+//#define LOW_RES
 #define MAX_INV_VALENCE 12
 
 #define USE_G0
