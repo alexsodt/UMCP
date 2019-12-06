@@ -500,6 +500,7 @@ double surface::rhoWorker( double * r, double *gr, double PBC_vec[3][3], int do_
 #if 1	
 	double massive_k = 1e5;
 	double min_thresh = 10.0;
+	double max_thresh = 25.0;
 	if( thickness_inner < min_thresh )
 	{
 		double dh = (thickness_inner-min_thresh);
@@ -515,6 +516,23 @@ double surface::rhoWorker( double * r, double *gr, double PBC_vec[3][3], int do_
 
 		if( do_grad )
 			*tDerOuter += 2 * massive_k * dh;
+	}
+	
+	if( thickness_inner > max_thresh )
+	{
+		double dh = (max_thresh-thickness_inner);
+		e += massive_k * (dh*dh);	
+		if( do_grad )
+			*tDerInner -= 2 * massive_k * dh;
+	}
+	
+	if( thickness_outer > max_thresh )
+	{
+		double dh = (max_thresh-thickness_outer);
+		e += massive_k * (dh*dh);	
+
+		if( do_grad )
+			*tDerOuter -= 2 * massive_k * dh;
 	}
 #endif
 	if( do_grad )

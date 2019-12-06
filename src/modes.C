@@ -316,7 +316,7 @@ int surface::origSphericalHarmonicModes( double *ro, int l_min, int l_max, doubl
 	return NQ;
 }
 
-int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_min, int l_max, double **gen_transform, double **output_qvals, double **scaling_factor )
+int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_min, int l_max, double q_max, double **gen_transform, double **output_qvals, double **scaling_factor )
 {
 	double *Amat = NULL; 
 	double *r0_pos = NULL;
@@ -325,7 +325,17 @@ int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_m
 	double Ly = PBC_vec[1][1]*ro[3*nv+1];
  
 	int NFRM = getFormulaAMAT( &Amat, ro, &r0_pos, &weights );
-	
+	int use_q = 0;
+	if( q_max > 0 )
+	{
+		use_q = 1;
+		int l_max_x = ceil(q_max * (Lx/2*M_PI));
+		int l_max_y = ceil(q_max * (Lx/2*M_PI));	
+		
+		if( l_max <= l_max_x ) l_max = l_max_x+1;
+		if( l_max <= l_max_y ) l_max = l_max_y+1;
+	}
+
 // Count the number of modes (NQ)
 	int NQ = 0;
 
@@ -339,11 +349,11 @@ int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_m
 		for( int ly = 0; ly < (l_max+1); ly++ )
 		for( int sc = 0; sc < 2; sc++ )
 		{
-			if( lx < l_min && ly < l_min )
+			if( !use_q && lx < l_min && ly < l_min )
 				continue;
-
-			if( mode_x >= 0 && lx != mode_x ) continue;
-			if( mode_y >= 0 && ly != mode_y ) continue;
+		
+			if( !use_q && mode_x >= 0 && lx != mode_x ) continue;
+			if( !use_q && mode_y >= 0 && ly != mode_y ) continue;
 	
 			int lx_mag = lx;
 			int ly_mag = ly;
@@ -351,6 +361,9 @@ int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_m
 			if( lx_mag == 0 && ly_mag == 0 )
 				continue;
 	
+			double q = sqrt( pow((2*M_PI*lx)/Lx,2) + pow((2*M_PI*ly)/Ly,2) );
+			if( use_q && q > q_max ) continue;
+
 			if( pass == 1 ) (*output_qvals)[NQ] = sqrt(lx*lx+ly*ly);
 		
 			NQ++;
@@ -366,20 +379,23 @@ int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_m
 	for( int ly = 0; ly < (l_max+1); ly++ )
 	for( int sc = 0; sc < 2; sc++ )
 	{
-		if( lx < l_min && ly < l_min )
+		if( !use_q && lx < l_min && ly < l_min )
 			continue;
-
-		int lx_mag = lx; 
-		int ly_mag = ly; 
+		
+		if( !use_q && mode_x >= 0 && lx != mode_x ) continue;
+		if( !use_q && mode_y >= 0 && ly != mode_y ) continue;
+	
+		int lx_mag = lx;
+		int ly_mag = ly;
 		
 		if( lx_mag == 0 && ly_mag == 0 )
 			continue;
-			
-		if( mode_x >= 0 && lx != mode_x ) continue;
-		if( mode_y >= 0 && ly != mode_y ) continue;
-
+		
 		double qx = 2 * M_PI * lx_mag / Lx;
 		double qy = 2 * M_PI * ly_mag / Ly;
+	
+		double q = sqrt( qx*qx+qy*qy );
+		if( use_q && q > q_max ) continue;
 
 		for( int j = 0; j < nv; j++ )
 		{		
@@ -453,13 +469,27 @@ int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_m
 }
 
 
-int surface::getSphericalHarmonicModes( double *ro, int l_min, int l_max, double **gen_transform, double **output_qvals, double **scaling_factor )
+int surface::getSphericalHarmonicModes( double *ro, int l_min, int l_max, double q_max, double **gen_transform, double **output_qvals, double **scaling_factor )
 {
 	double *Amat = NULL; 
 	double *r0_pos = NULL;
 	double *weights = NULL;
  
 	int NFRM = getFormulaAMAT( &Amat, ro, &r0_pos, &weights );
+	
+	double av_R = 0;
+	for( int j = 0; j < NFRM; j++ )
+	{
+		double *ro = r0_pos+3*j;
+		double r = sqrt(ro[0]*ro[0]+ro[1]*ro[1]+ro[2]*ro[2]);
+		av_R += r;
+	}
+	av_R /= nv;
+
+	if( q_max > 0 )	
+	{
+			
+	}
 	
 // Count the number of modes (NQ)
 	int NQ = 0;
@@ -483,14 +513,6 @@ int surface::getSphericalHarmonicModes( double *ro, int l_min, int l_max, double
 	double *t_g_t = (double *)malloc( sizeof(double) * NQ * 3 * nv );
 	memset( t_g_t, 0, sizeof(double) * NQ * 3 * nv );
 	
-	double av_R = 0;
-	for( int j = 0; j < NFRM; j++ )
-	{
-		double *ro = r0_pos+3*j;
-		double r = sqrt(ro[0]*ro[0]+ro[1]*ro[1]+ro[2]*ro[2]);
-		av_R += r;
-	}
-	av_R /= nv;
 
 		
 	int m_cntr = 0;

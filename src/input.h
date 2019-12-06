@@ -43,6 +43,7 @@ class parameterBlock
 	int mode_y;
 	int mode_min;
 	int mode_max;
+	double mode_q_max;
 	int monge;
 	int nsteps;
 	int nequil; // number of 

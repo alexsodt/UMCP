@@ -3742,6 +3742,7 @@ double surface::fenergy( int f, double *r, double *p_uv )
 		double c0 = theFormulas[frm].c0;
 		double c1 = -0.5*(a+d-sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d));
 		double c2 = -0.5*(a+d+sqrt(SAFETY+a*a+4*b*c-2*a*d+d*d));
+
 		
 //		printf("%d %d REG %lf %lf %lf c %le %le g: %.14le\n", f, p, R[0], R[1], R[2], c1, c2, g  );
 	

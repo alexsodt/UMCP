@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "library.h"
+#include "parallel.h"
 
 static int nlipid_space = 0;
 static int nlipids = 0;
@@ -18,6 +19,7 @@ const fixed_lipid library_fixed[] =
 {
 	// Chen/Rand 1997
 	// PO values copied from DO.
+	{ "ZERO",         0, 68.3,  "C21" },
 	{ "POPC", -1.0/87.3, 68.3,  "C21" },
 	{ "DOPE", -1.0/29.4, 63.4,  "C21" },
 	{ "POPE", -1.0/29.4, 58.8,  "C21" },

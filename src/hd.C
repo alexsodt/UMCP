@@ -483,18 +483,18 @@ int main( int argc, char **argv )
 		sRec->doing_planar_harmonics = 0;
 		sRec->output_qvals = NULL;	
 
-		if( block.mode_max >= 0 )
+		if( block.mode_max >= 0 || block.mode_q_max >= 0 )
 		{
 			sRec->do_gen_q=1;
 			if( block.sphere )
 			{	
 				sRec->doing_spherical_harmonics = 1;
-				sRec->NQ = useSurface->getSphericalHarmonicModes( sRec->r, block.mode_min, block.mode_max, &sRec->gen_transform, &sRec->output_qvals, &sRec->scaling_factor );
+				sRec->NQ = useSurface->getSphericalHarmonicModes( sRec->r, block.mode_min, block.mode_max, block.mode_q_max, &sRec->gen_transform, &sRec->output_qvals, &sRec->scaling_factor );
 			}
 			else
 			{
 				sRec->doing_planar_harmonics = 1;
-				sRec->NQ = useSurface->getPlanarHarmonicModes( sRec->r, -1, -1, block.mode_min, block.mode_max, &sRec->gen_transform, &sRec->output_qvals, &sRec->scaling_factor );
+				sRec->NQ = useSurface->getPlanarHarmonicModes( sRec->r, -1, -1, block.mode_min, block.mode_max, block.mode_q_max, &sRec->gen_transform, &sRec->output_qvals, &sRec->scaling_factor );
 			}
 		}
 		else if( block.mode_x >= 0 || block.mode_y >= 0 )
@@ -512,7 +512,7 @@ int main( int argc, char **argv )
 				int max_l = block.mode_x;
 				if( block.mode_y > max_l ) max_l = block.mode_y;
 	
-				sRec->NQ = useSurface->getPlanarHarmonicModes( sRec->r, block.mode_x, block.mode_y, 0, max_l, &sRec->gen_transform, &sRec->output_qvals, &sRec->scaling_factor );
+				sRec->NQ = useSurface->getPlanarHarmonicModes( sRec->r, block.mode_x, block.mode_y, 0, max_l, -1, &sRec->gen_transform, &sRec->output_qvals, &sRec->scaling_factor );
 			}
 		}
 	

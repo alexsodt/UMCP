@@ -61,6 +61,7 @@ void setDefaults( parameterBlock *block )
 	block->kg = 0;
 	block->mode_min = -1;
 	block->mode_max = -1;
+	block->q_max = -1;
 	block->T = 298;
 	block->mab_k_theta = 1;
 	block->mab_bond_length = 60;
@@ -272,7 +273,7 @@ int resolveParameters( parameterBlock *block )
 	if( block->mode_y != -1 && block->mode_x == -1 )
 		block->mode_x = 0;	
 
-	if( block->mode_x >= 0 || block->mode_y >= 0 || block->mode_max >= 0 )
+	if( block->mode_x >= 0 || block->mode_y >= 0 || block->mode_max >= 0 || block->mode_q_max >= 0 )
 	{	// doing simple mode moves, should converge rapidly.
 		if( block->nsteps == -1 )
 			block->nsteps = 1000;
@@ -349,7 +350,7 @@ int resolveParameters( parameterBlock *block )
 		exit(1);
 	}
 
-	if( (block->mode_max >= 0 || block->mode_x >= 0) && block->KA != 0 )
+	if( (block->mode_max >= 0 || block->mode_x >= 0 || block->mode_q_max >= 0 ) && block->KA != 0 )
 	{
 		printf("WARNING: Using modes but also applying a local KA.\n");
 		warning += 1;
@@ -769,6 +770,8 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->mode_min = atoi( word2 );
 		else if( !strcasecmp( word1, "mode_max" ) )
 			block->mode_max = atoi( word2 );
+		else if( !strcasecmp( word1, "mode_q_max" ) )
+			block->mode_q_max = atoi( word2 );
 		else if( !strcasecmp( word1, "mode_y" ) || !strcasecmp( word1, "mode_m" ) )
 			block->mode_y = atoi( word2 );
 		else if( !strcasecmp( word1, "mode_KA" ) )
