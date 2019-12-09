@@ -236,6 +236,7 @@ class parameterBlock
 	int create_all_atom;
 	int create_flip;
 	int do_rim;
+	int perfect_solvent_tiling;
 
 	double shift[3];
 

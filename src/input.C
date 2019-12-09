@@ -47,6 +47,7 @@ void setDefaults( parameterBlock *block )
 	block->create_all_atom = 0;	
 	block->create_flip = 0;
 	block->do_rim = 0;
+	block->perfect_solvent_tiling = 0;
 
 	block->mode_x = -1;
 	block->mode_y = -1;
@@ -1392,6 +1393,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				block->create_all_atom = 1;
 			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
 				block->create_all_atom = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
+		else if( !strcasecmp( word1, "perfect_solvent_tiling" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->perfect_solvent_tiling = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->perfect_solvent_tiling = 0;
 			else
 			{
 				printf("Could not interpret input line '%s'.\n", tbuf );
