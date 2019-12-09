@@ -208,19 +208,21 @@ The generic Langevin equation\footnote{The form of this equation was adapted fro
 is
 \begin{equation}
 \dot{A}_i = \sum_j \{ A_i, A_j \} \frac{\diff H}{\diff A_j} - \sum_j \lambda_{ij} \frac{\diff H}{\diff A_j} + \sum_j \frac{ \diff \lambda_{ij} }{\diff A_j} + \eta_i(t)
+\label{eq:biglangevin}
 \end{equation}
-where here $\{ \cdot, \cdot \}$ is the Poisson bracket, $\lambda_i$ is the friction coefficient for degree-of-freedom $A_i$, and $\eta(t)$ is the random noise process with
+where here $\{ \cdot, \cdot \}$ is the Poisson bracket, $\lambda_i$ is the friction coefficient for (here, momentum) degree-of-freedom $A_i$, and $\eta(t)$ is a random noise process with
 \begin{equation}
-\langle \eta_i(t) \eta_i(t') \rangle = 2 \lambda_i \delta(t-t')
+\langle \eta_i(t) \eta_i(t') \rangle = 2 \lambda_i \kT \delta(t-t')
 \end{equation}
 and zero mean.
-The units of the damping coefficients $\lambda_i$ are $\frac{\textrm{mass}}{\textrm{time}}$.
+The units of the damping coefficients $\lambda_i$ are $\frac{\textrm{mass}}{\textrm{time}}$ for coupling between momentum coordinates.
+Note: when applying a frictional drag to the momentum, the $\lambda$ value is denoted $\gamma$ below.
 For a simple Hamiltonian like $\frac{p^2}{2 m}$ the friction can be applied directly to the momentum trivially, i.e.:
 \begin{align}
 \dot{p} &= \frac{\diff H}{\diff q} - \lambda_p \frac{\diff H}{\diff p} + \eta_p(t) \\
 \dot{p} &= - \lambda_p \frac{p}{m} + \eta_p(t) 
 \end{align}
-However, for a more complicated kinetic energy the quantity $\dot{q}$ is a convenient intermediate, see Eq.~\ref{eq:qdotp}, with $\dot{q}$, itself computed from $p$, taking the place of $\frac{p}{m}$. 
+However, for a more complicated kinetic energy we use the relation between $p$ and $\dot{q}$, see Eq.~\ref{eq:qdotp}, with $\dot{q}$, itself computed from $p$, taking the place of $\frac{p}{m}$. 
 
 % normally computed as nv by nv matrix.
 
