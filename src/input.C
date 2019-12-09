@@ -61,7 +61,7 @@ void setDefaults( parameterBlock *block )
 	block->kg = 0;
 	block->mode_min = -1;
 	block->mode_max = -1;
-	block->q_max = -1;
+	block->mode_q_max = -1;
 	block->T = 298;
 	block->mab_k_theta = 1;
 	block->mab_bond_length = 60;
@@ -279,7 +279,7 @@ int resolveParameters( parameterBlock *block )
 			block->nsteps = 1000;
 	}
 
-	if( block->kinetics && (block->mode_x == -1 && block->mode_max == -1 ) )
+	if( block->kinetics && (block->mode_x == -1 && block->mode_max == -1 && block->mode_q_max < 0 ) )
 	{
 		printf("Kinetics with plain vertex moves not yet implemented.\n");
 		exit(1);
@@ -771,7 +771,7 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 		else if( !strcasecmp( word1, "mode_max" ) )
 			block->mode_max = atoi( word2 );
 		else if( !strcasecmp( word1, "mode_q_max" ) )
-			block->mode_q_max = atoi( word2 );
+			block->mode_q_max = atof( word2 );
 		else if( !strcasecmp( word1, "mode_y" ) || !strcasecmp( word1, "mode_m" ) )
 			block->mode_y = atoi( word2 );
 		else if( !strcasecmp( word1, "mode_KA" ) )
