@@ -49,6 +49,7 @@ void setDefaults( parameterBlock *block )
 	block->do_rim = 0;
 	block->perfect_solvent_tiling = 0;
 
+	block->mode_q_max = -1;
 	block->mode_x = -1;
 	block->mode_y = -1;
 	block->mode_KA = 0;
@@ -219,6 +220,8 @@ void setDefaults( parameterBlock *block )
 	block->addProteinPDB   = NULL;
 	block->addProteinPSF   = NULL;
 
+	block->neutral_surface = 15;
+	block->scale_solvent_approach = 1.0;
 	block->strainInner = 0;
 	block->strainOuter = 0;
 
@@ -1423,6 +1426,10 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}	
 		}
+		else if( !strcasecmp( word1, "neutral_surface") )
+			block->neutral_surface = atof(word2);
+		else if( !strcasecmp( word1, "scale_solvent_approach") )
+			block->scale_solvent_approach = atof(word2);
 		else if( !strcasecmp( word1, "strainOuter") )
 			block->strainOuter = atof(word2);
 		else if( !strcasecmp( word1, "strainInner") )

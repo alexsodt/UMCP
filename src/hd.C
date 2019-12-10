@@ -546,28 +546,29 @@ int main( int argc, char **argv )
 		sRec->Qdot0 = NULL;
 		sRec->Qdot0_trial = NULL;		
 
+		int nq_alloc = sRec->NQ+1;
 		if( sRec->do_gen_q )
 		{
-			sRec->n_real_q = sRec->NQ;
-			sRec->pp = (double *)malloc( sizeof(double) * sRec->NQ ); 
-			memset( sRec->pp, 0, sizeof(double) * sRec->NQ );
-			sRec->next_pp = (double *)malloc( sizeof(double) * sRec->NQ );
-			memset( sRec->next_pp, 0, sizeof(double) * sRec->NQ );
-			sRec->del_pp = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->QV = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->Qdot = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->Qdot0 = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->Qdot0_trial = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->nav_Q = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->av_Q = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->av_Q2 = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->av_Q_T = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->nav_Q_T = (double *)malloc( sizeof(double) * sRec->NQ );
-			memset( sRec->nav_Q, 0, sizeof(double) * sRec->NQ );
-			memset( sRec->av_Q, 0, sizeof(double) * sRec->NQ );
-			memset( sRec->av_Q2, 0, sizeof(double) * sRec->NQ );
-			memset( sRec->av_Q_T, 0, sizeof(double) * sRec->NQ );
-			memset( sRec->nav_Q_T, 0, sizeof(double) * sRec->NQ );
+			sRec->n_real_q = nq_alloc;
+			sRec->pp = (double *)malloc( sizeof(double) * nq_alloc ); 
+			memset( sRec->pp, 0, sizeof(double) * nq_alloc );
+			sRec->next_pp = (double *)malloc( sizeof(double) * nq_alloc );
+			memset( sRec->next_pp, 0, sizeof(double) * nq_alloc );
+			sRec->del_pp = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->QV = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->Qdot = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->Qdot0 = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->Qdot0_trial = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->nav_Q = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->av_Q = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->av_Q2 = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->av_Q_T = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->nav_Q_T = (double *)malloc( sizeof(double) * nq_alloc );
+			memset( sRec->nav_Q, 0, sizeof(double) * nq_alloc );
+			memset( sRec->av_Q, 0, sizeof(double) * nq_alloc );
+			memset( sRec->av_Q2, 0, sizeof(double) * nq_alloc );
+			memset( sRec->av_Q_T, 0, sizeof(double) * nq_alloc );
+			memset( sRec->nav_Q_T, 0, sizeof(double) * nq_alloc );
 		}
 		else
 		{
@@ -586,7 +587,7 @@ int main( int argc, char **argv )
 		sRec->qdot0 = (double *)malloc( sizeof(double) * (3*nv+3) );
 		sRec->qdot_temp = (double *)malloc( sizeof(double) * (3*nv+3) );
 	
-		memset( sRec->pp, 0, sizeof(double) * sRec->NQ );
+		memset( sRec->pp, 0, sizeof(double) * nq_alloc );
 		memset( sRec->qdot, 0, sizeof(double) * 3 * nv );	
 		memset( sRec->qdot0, 0, sizeof(double) * 3 * nv );	
 		memset( sRec->qdot_temp, 0, sizeof(double) * 3 * nv );	
