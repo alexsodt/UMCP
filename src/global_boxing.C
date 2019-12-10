@@ -3,7 +3,7 @@
 #include "global_boxing.h"
 #include <stdlib.h>
 #include <math.h>
-
+#include <stdio.h>
 //global_boxing *boxing = NULL;
 //int global_boxing_init = 0;
 
@@ -61,6 +61,7 @@ int global_boxing::getNearPts( double *r, int *plist, double rad_search )
 	if( by >= ny ) by -= ny;
 	int bz = nz * (tr[2] / PBC[2][2]);
 	if( bz >= nz ) bz -= nz;
+
 
 	double boxes_per_x_search =  rad_search/(PBC[0][0] / nx);
 	double boxes_per_y_search =  rad_search/(PBC[1][1] / ny);

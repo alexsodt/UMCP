@@ -10,7 +10,8 @@
 static double solvation_cutoff = 2.5;
 static double solvation_cutoff_MARTINI = 5.0;
 static double ion_cutoff = 5.0;
-static double PP = 25.0;
+static double PP = 15.0;
+//static double PP = 25.0;
 static int debug_on = 0;
 static int activate_martini = 0;
 const char *charmm_header =
@@ -56,6 +57,8 @@ void EndSegment( FILE *charmmFile, char *cur_filename, char *cur_segment, char *
 void surface::createAllAtom( parameterBlock *block )
 {
 	double *rsurf = (double *)malloc( sizeof(double) * 3 * (1 + nv) );
+
+	PP = block->neutral_surface;
 	
 	get(rsurf);
 	rsurf[3*nv+0] = 1.0;
@@ -232,6 +235,7 @@ void surface::createAllAtom( parameterBlock *block )
 		solvation_cutoff = solvation_cutoff_MARTINI;
 	}
 
+	solvation_cutoff *= block->scale_solvent_approach;
 
 	for( int pass = 0; pass < 3; pass++ )
 	{
@@ -1718,6 +1722,9 @@ void surface::createAllAtom( parameterBlock *block )
 		theBoxes[b].np += 1;
 	}
 	
+	total_charge = total_protein_charge + total_lipid_charge[0] + total_lipid_charge[1];
+
+	
 	/* Solvate */
 
 	int wrote_water_psf = 0;
@@ -1974,32 +1981,32 @@ void surface::createAllAtom( parameterBlock *block )
 		fclose(waterCRD);
 
 		free(water_file);
-		
-		fprintf(charmmFile, 
-		"\n"
-		"open read card unit 10 name \"%s\"\n"
-		"read sequence coor card unit 10\n"
-		"generate %s setup warn first none last none noangle nodihedral\n"
-		"open read unit 10 card name \"%s\"\n"
-		"read coor unit 10 card resid\n"						
-		"\n", waterFileName, solventSegName, waterFileName );
-
+	
+			fprintf(charmmFile, 
+			"\n"
+			"open read card unit 10 name \"%s\"\n"
+			"read sequence coor card unit 10\n"
+			"generate %s setup warn first none last none noangle nodihedral\n"
+			"open read unit 10 card name \"%s\"\n"
+			"read coor unit 10 card\n"						
+			"\n", waterFileName, solventSegName, waterFileName );
 	
 		sprintf(waterPSFName, "%s.psf", solventSegName );
 
+	
 		fprintf(charmmFile, 
 		"open write unit 10 card name \"%s.psf\"\n"
 		"write psf  unit 10 card\n"
-		"delete atom sele atom * * * end\n"
 		, solventSegName );
+		
+		if( block->addSalt ) // a bit of a hack here. If we are not adding salt we can leave the waters at the beginning of the PSF and save an enormous amount of time.
+		fprintf(charmmFile, "delete atom sele atom * * * end\n" );
 
 		wrote_water_psf = 1;
 	
 		free(solvent_res_link);
 		free(solvent_res_size);
 	}
-
-	total_charge = total_protein_charge + total_lipid_charge[0] + total_lipid_charge[1];
 
 	int wrote_salt = 0;
 
@@ -2181,7 +2188,7 @@ void surface::createAllAtom( parameterBlock *block )
 	{
 		fprintf(charmmFile, "open unit 10 card read name \"%s\"\n", pairs[p].PSFfileName );
 
-		if( p == 0 )
+		if( p == 0 && block->addSalt )
 			fprintf(charmmFile, "read psf card unit 10\n" );	
 		else
 			fprintf(charmmFile, "read psf card append unit 10\n" );	
@@ -2194,7 +2201,7 @@ void surface::createAllAtom( parameterBlock *block )
 		
 	}
 
-	if( wrote_water_psf  )
+	if( wrote_water_psf  && block->addSalt )
 	{
 		fprintf(charmmFile, "open unit 10 card read name \"%s\"\n", waterPSFName );
 		fprintf(charmmFile, "read psf card append unit 10\n" );	

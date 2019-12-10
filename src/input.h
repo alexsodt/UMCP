@@ -233,6 +233,8 @@ class parameterBlock
 	char *altPatchPSF;
 	char *patchPSF;
 	char *patchPDB;
+	double neutral_surface;
+	double scale_solvent_approach;
 	int create_all_atom;
 	int create_flip;
 	int do_rim;
