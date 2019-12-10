@@ -18,8 +18,8 @@
 
 extern double kc;
 static double default_particle_area = 65;
-double lipid_DC = 1e10; //Angstrom^2/s
-double solution_DC = 1e10; //Angstrom^2/s
+extern double lipid_DC; //Angstrom^2/s
+extern double solution_DC; //Angstrom^2/s
 
 // For doing Newtonian/Langevin dynamics:
 static double default_mass = 20000;
