@@ -75,7 +75,7 @@ void PartialGenVertices( double *total_vec, int do_sum, int surface_id );
 void FullSyncGenQ( double *total_vec, int surface_id );
 
 void SparseCartMatVecIncrScale( double *vec_out, double *vec_in, double *Mat, double scale, int nv, int *sparse_use, int nv_use, double *alphas, int surface_id );
-void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double scale, double *alphas, int surface_id );
-void GenQMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double scale );
+void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double *, double scale, double *alphas, int surface_id );
+void GenQMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double *, double scale );
 
 #endif

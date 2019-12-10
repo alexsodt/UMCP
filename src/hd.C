@@ -987,6 +987,9 @@ int main( int argc, char **argv )
 
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 	{
+		double area,area0;
+		sRec->theSurface->area(sRec->r, -1, &area, &area0 );
+		printf("area: %le\n", area );
 		sRec->gamma = (double *)malloc( sizeof(double) * sRec->NQ );
 		sRec->gamma_inv = (double *)malloc( sizeof(double) * sRec->NQ );
 		for( int i = 0; i < sRec->NQ; i++ )	
@@ -1001,11 +1004,19 @@ int main( int argc, char **argv )
 				double q = sRec->output_qvals[i];
 
 				double time_const = kc * q*q*q  / (4 * eta);
-				double tau =  AKMA_TIME * 1.0 / time_const;
-//				double inv_mass = sRec->EFFM->diagonal_element[i]; 
-		
+				double tau = AKMA_TIME * 1.0 / time_const;
+				double inv_mass = sRec->EFFM->diagonal_element[i]; 
+				double frc_k = 0.5 * kc * area * q * q * q * q;	
+				printf("Tau: %le (s)\n", tau/AKMA_TIME );
+
+				double gammabar = frc_k * tau * inv_mass;
+
 				// mass matrix is included later on
-				sRec->gamma[i] = (1.0/tau);
+//				sRec->gamma[i] = (1.0/tau)*(1.0/inv_mass);
+//				sRec->gamma_inv[i] = tau; // gamma bar/inv
+
+				sRec->gamma[i] = (gammabar) * (1.0/inv_mass);
+				sRec->gamma_inv[i] = 1.0 / gammabar;
 			}
 		}
 	}
@@ -1569,7 +1580,7 @@ int main( int argc, char **argv )
 						double *noise_vec = (double *)malloc( sizeof(double) * sRec->NQ  );
 
 						for( int Q = 0; Q < sRec->NQ; Q++ )
-							noise_vec[Q] = gsl_ran_gaussian(rng_x, sqrt(2*sRec->gamma_inv[Q]*temperature*AKMA_TIME*time_step));
+							noise_vec[Q] = sRec->gamma_inv[Q] * gsl_ran_gaussian(rng_x, sqrt(2*sRec->gamma[Q]*temperature*AKMA_TIME*time_step)) / (AKMA_TIME * time_step);
 
 						for( int Q = 0; Q < sRec->NQ; Q++ )
 							sRec->next_pp[Q] += noise_vec[Q];
@@ -1590,26 +1601,21 @@ int main( int argc, char **argv )
 					ParallelBroadcast(sRec->next_pp,sRec->NQ );
 #endif
 
-					if( do_bd_membrane )
+
+					if( sRec->do_gen_q )
 					{
+						for( int Q = 0; Q < sRec->NQ; Q++ )
+							sRec->next_pp[Q] += sRec->del_pp[Q];
 					}
 					else
 					{
 						// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t+eps/2)
-						if( sRec->do_gen_q )
+						for( int v1 = 0; v1 < sRec->theSurface->nv; v1++ )
 						{
-							for( int Q = 0; Q < sRec->NQ; Q++ )
-								sRec->next_pp[Q] += sRec->del_pp[Q];
-						}
-						else
-						{
-							for( int v1 = 0; v1 < sRec->theSurface->nv; v1++ )
-							{
-								sRec->next_pp[3*v1+0] += -sRec->g[3*v1+0] * AKMA_TIME * time_step/2;
-								sRec->next_pp[3*v1+1] += -sRec->g[3*v1+1] * AKMA_TIME * time_step/2;
-								sRec->next_pp[3*v1+2] += -sRec->g[3*v1+2] * AKMA_TIME * time_step/2;
-							}	
-						}
+							sRec->next_pp[3*v1+0] += -sRec->g[3*v1+0] * AKMA_TIME * time_step/2;
+							sRec->next_pp[3*v1+1] += -sRec->g[3*v1+1] * AKMA_TIME * time_step/2;
+							sRec->next_pp[3*v1+2] += -sRec->g[3*v1+2] * AKMA_TIME * time_step/2;
+						}	
 					}
 				}
 				memcpy( sRec->pp, sRec->next_pp, sizeof(double) * sRec->NQ );

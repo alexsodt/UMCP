@@ -985,7 +985,12 @@ void SparseCartMatVecIncrScale( double *vec_out, double *vec_in, double *Mat, do
 	free(vout);
 }
 
-void GenQMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double scale )
+/*
+	sparse matrix/vector multiply.
+
+*/
+
+void GenQMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double *scalev, double scale )
 {
 	double *mcopy = (double *)malloc( sizeof(double) * Mat->nsource );
 	double *vout  = (double *)malloc( sizeof(double) * Mat->nneed);
@@ -995,6 +1000,12 @@ void GenQMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, do
 	Mat->mult( vout, mcopy, 1 );
 	for( int v = 0; v < Mat->nneed; v++ )
 		vout[v] *= scale;
+	if( scalev )
+	{
+	for( int v = 0; v < Mat->nneed; v++ )
+		vout[v] *= scalev[v];
+	}
+
 	Mat->expand_target_vector( vec_out, vout,1 );
 	
 	free(mcopy);
@@ -1014,7 +1025,7 @@ void PartialSyncGenQ( double *pp )
 #endif
 }
 
-void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double scale, double *alphas, int surface_id )
+void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix *Mat, double *scalev, double scale, double *alphas, int surface_id )
 {
 #ifdef PARALLEL
 	FullSyncVertices( vec_in, surface_id );
@@ -1036,10 +1047,19 @@ void AltSparseCartMatVecIncrScale( double *vec_out, double *vec_in, SparseMatrix
 	Mat->mult( vout+2, mcopy+2, 3 );
 	
 	
-	for( int c = 0; c < 3; c++ )
-	for( int v = 0; v < Mat->nneed; v++ )
-		vout[v*3+c] *= scale / (alphas[c]*alphas[c]);
-
+	if( scalev )
+	{
+		int ic = 0;	
+		for( int c = 0; c < 3; c++ )
+		for( int v = 0; v < Mat->nneed; v++, ic++)
+			vout[v*3+c] *= scalev[ic] * scale / (alphas[c]*alphas[c]);
+	}
+	else
+	{
+		for( int c = 0; c < 3; c++ )
+		for( int v = 0; v < Mat->nneed; v++ )
+			vout[v*3+c] *= scale / (alphas[c]*alphas[c]);
+	}
 	Mat->expand_target_vector( vec_out, vout, 3 );
 	Mat->expand_target_vector( vec_out+1, vout+1, 3 );
 	Mat->expand_target_vector( vec_out+2, vout+2, 3 );
