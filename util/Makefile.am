@@ -17,7 +17,7 @@ vpath %.h  $(SRC_DIR)
 vpath %.cu $(SRC_DIR)
 
 
-getPoreInfo_dbg_SOURCES = getPoreInfo.C util.C
+getPoreInfo_dbg_SOURCES = getPoreInfo.C util.C pdb.C dcd.C
 
 getPoreInfo_dbg_LDFLAGS	  = $(AM_LDADD) -lstdc++
 
