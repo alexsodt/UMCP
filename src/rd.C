@@ -48,7 +48,7 @@ void RD::init( Simulation * theSimulation, double time_step_in, parameterBlock *
 			registerSite( theSimulation->allComplexes[p], p, s );
 	}
 
-	double max_binding_radius = 0;
+	max_binding_radius = 0;
 
 	double max_diff_c = 0;
 
@@ -837,6 +837,7 @@ void RD::unbox_reactants( void )
 int RD::check_RD_blocked( Simulation *theSimulation, int p, int s)
 {
 	double *alphas = theSimulation->alpha;
+	
 	int near = boxing->getNearPts(theSimulation->allComplexes[p]->rall+3*s, nearlist, max_binding_radius );
 
 
