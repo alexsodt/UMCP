@@ -3,45 +3,109 @@
 #include <math.h>
 #include <string.h>
 #include "util.h"
+#include "dcd.h"
+#include "pdb.h"
 
 int main( int argc, char **argv )
 {
 	if( argc != 2 )
 	{
-		printf("Syntax: getPoreInfo file.rho\n");
+		printf("Syntax: getPoreInfo file.rho|file.pdb\n");
 		exit(1);
 	}
 
-	FILE *rhoFile = fopen(argv[1], "r");
-	char *buffer = (char *)malloc( sizeof(char) * 100000 );
-	if( !rhoFile )
-	{
-		printf("Cannot open density file '%s'.\n", argv[1] );
-		exit(1);
-	}
-
+	double *rho;
+	double *rho_xy;
+	double *rho_z;
 	double La,Lb,Lc;
 	int nx, ny, nz;
 	
-	fscanf(rhoFile, "%lf %lf %lf\n", &La, &Lb, &Lc );
-	fscanf(rhoFile, "%d %d %d\n", &nx, &ny, &nz );
+	char *buffer = (char *)malloc( sizeof(char) * 100000 );
 
-	double *rho = (double *)malloc( sizeof(double) * nx * ny * nz );
-	double *rho_xy = (double *)malloc( sizeof(double) * nx * ny * nz );
-	double *rho_z = (double *)malloc( sizeof(double) * nz );
+	if( !strcasecmp( argv[1]+strlen(argv[1])-3, "rho" ) )
+	{
+		FILE *rhoFile = fopen(argv[1], "r");
+		if( !rhoFile )
+		{
+			printf("Cannot open density file '%s'.\n", argv[1] );
+			exit(1);
+		}
+
+	
+		fscanf(rhoFile, "%lf %lf %lf\n", &La, &Lb, &Lc );
+		fscanf(rhoFile, "%d %d %d\n", &nx, &ny, &nz );
+
+		rho = (double *)malloc( sizeof(double) * nx * ny * nz );
+	
+		for( int ix = 0; ix < nx; ix++ )
+		for( int iy = 0; iy < ny; iy++ )
+		{
+			getLine( rhoFile, buffer );
+	
+			readNDoubles( buffer, rho+ix*ny*nz+iy*nz, nz );
+		}
+		fclose(rhoFile);
+	}
+	else if( !strcasecmp( argv[1]+strlen(argv[1])-3, "pdb" ) )
+	{
+		FILE *theFile = fopen(argv[1],"r");
+		loadPSFfromPDB(theFile);
+		rewind(theFile);
+		int nat = curNAtoms();
+
+		struct atom_rec *at = (struct atom_rec *)malloc( sizeof(struct atom_rec) * nat );
+		
+		loadPDB( theFile, at, nat );
+
+
+		double alpha,beta,gamma;
+		PBCD( &La, &Lb, &Lc, &alpha, &beta, &gamma );
+
+		if( La < 0 )
+		{
+			printf("This requires the PBC cell set in the PDB.\n");
+			exit(1);
+		}
+		
+		nx = ceil(La/3);
+		ny = ceil(Lb/3);
+		nz = ceil(Lc/3);
+		
+		rho = (double *)malloc( sizeof(double) * nx * ny * nz );
+
+		for( int a = 0; a < curNAtoms(); a++ )
+		{
+			if( strcasecmp( at[a].atname, "C21" ) ) continue;
+			double f[3] = { at[a].x / La, at[a].y / Lb, at[a].z / Lc };
+			for( int c = 0; c < 3; c++ )
+			{
+				while( f[c] < 0 ) f[c] += 1;
+				while( f[c] >= 1 ) f[c] -= 1;
+			}
+
+			int bx = nx * f[0];
+			int by = ny * f[1];
+			int bz = nz * f[2];
+			if( bx >= nx ) bx -= nx;
+			if( by >= ny ) by -= ny;
+			if( bz >= nz ) bz -= nz;
+
+			rho[bx*ny*nz+by*nz+bz] += 1;
+		}
+		fclose(theFile);
+	}
+		
+	rho_xy = (double *)malloc( sizeof(double) * nx * ny );
+	rho_z = (double *)malloc( sizeof(double) * nz );
 
 	for( int ix = 0; ix < nx; ix++ )
 	for( int iy = 0; iy < ny; iy++ )
 	{
-		getLine( rhoFile, buffer );
-
-		readNDoubles( buffer, rho+ix*ny*nz+iy*nz, nz );
-
 		rho_xy[ix*ny+iy] = 0;
 		for( int iz = 0; iz < nz; iz++ )
 			 rho_xy[ix*ny+iy] += rho[ix*ny*nz+iy*nz+iz];
 	}
-	
+
 	for( int iz = 0; iz < nz; iz++ )
 	{
 		for( int ix = 0; ix < nx; ix++ )
@@ -128,7 +192,6 @@ int main( int argc, char **argv )
 
 	double thickness = fabs((lz[1]+lz[0])/2-(lz[3]+lz[2])/2);
 
-	fclose(rhoFile);
 	double best_chi2 = 1e10;
 	double wrapto = 0;
 	int nbins = nz;
@@ -188,6 +251,7 @@ int main( int argc, char **argv )
 		av_val += rho_xy[ix*ny+iy];
 	}		
 
+
 	com[0] = (min_x+0.5) * La / nx;
 	com[1] = (min_y+0.5) * Lb / ny;
 	ncom[0] += 1;
@@ -245,9 +309,9 @@ int main( int argc, char **argv )
 				if( del[1] < -ny/2 ) del[1] += ny;
 				if( del[1] >  ny/2 ) del[1] -= ny;
 
-				com[0] += del[0]*La/nx;
-				com[1] += del[1]*Lb/ny;
-	
+				com[0] += (min_x + del[0])*La/nx;
+				com[1] += (min_y + del[1])*Lb/ny;
+
 				ncom[0] += 1;
 				ncom[1] += 1;
 			}

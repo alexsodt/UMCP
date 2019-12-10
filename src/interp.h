@@ -486,7 +486,7 @@ struct surface
 	void dKE_dx_and2( force_set *theForceSet,SparseMatrix *effM, double *vp, double *unit_f_vec, int f, double u, double v, double *dKEdx, double *d2KEdx2 );
 	void getEffectiveMass( force_set * theForceSet, double *effective_mass );
 	void getSparseEffectiveMass( force_set * theForceSet, int *use_map, int *nuse, SparseMatrix **, double *gen_transform=NULL, int NQ=-1, double *mass_scaling=NULL);
-	void getSparseRoot( force_set * theForceSet, SparseMatrix **theMatrix );
+	void getSparseRoot( force_set * theForceSet, SparseMatrix **theMatrix, double *gen_transform=NULL, int NQ=-1 );
 	void approxSparseEffectiveMass( force_set * theForceSet, int *use_map, int *nuse, SparseMatrix **, double *gen_transform=NULL, int NQ=-1, double *mass_scaling=NULL);
 	void applyForceAtPoint( int f, double u, double v, double *dp, double *force_vector, force_set *theForceSet );
 	void velocityAtPoint( int f, double u, double v, double *vp, double *velocity_out );
@@ -513,7 +513,7 @@ struct surface
 	void set_g0_from_f(int f);
 	void stashf(void);
 	void unstashf(void);
-	void local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomplex, double dt, double beta, int swap_only=0);
+	void local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomplex, double dt, double beta, double DC, double PBC[3][3], int swap_only=0, int *tracer=NULL);
 	void measureLipidCurvature( double *r, int pre_equil /* don't do running average */ ); // part of lipid redistribution
 
 

@@ -63,7 +63,7 @@ void setDefaults( parameterBlock *block )
 	block->kg = 0;
 	block->mode_min = -1;
 	block->mode_max = -1;
-	block->q_max = -1;
+	block->mode_q_max = -1;
 	block->T = 298;
 	block->mab_k_theta = 1;
 	block->mab_bond_length = 60;
@@ -97,6 +97,7 @@ void setDefaults( parameterBlock *block )
 	block->collect_hk = 0;
 	block->nruns = 1;
 	block->time_step = 1e-9;
+	block->debug_diffusion = 0;
 	block->kinetics = 0;
 	block->kinetics_do_phase = 0;
 	block->diffc = 1e10; // angstroms^2/s
@@ -283,7 +284,7 @@ int resolveParameters( parameterBlock *block )
 			block->nsteps = 1000;
 	}
 
-	if( block->kinetics && (block->mode_x == -1 && block->mode_max == -1 ) )
+	if( block->kinetics && (block->mode_x == -1 && block->mode_max == -1 && block->mode_q_max < 0 ) )
 	{
 		printf("Kinetics with plain vertex moves not yet implemented.\n");
 		exit(1);
@@ -684,6 +685,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->write_alpha_period = atoi( word2 );
 		else if( !strcasecmp( word1, "nruns" ) )
 			block->nruns = atoi( word2 );
+		else if( !strcasecmp( word1, "debug_diffusion" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->debug_diffusion = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->debug_diffusion = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
 		else if( !strcasecmp( word1, "lipid_mc_swap_only" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
@@ -775,7 +788,7 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 		else if( !strcasecmp( word1, "mode_max" ) )
 			block->mode_max = atoi( word2 );
 		else if( !strcasecmp( word1, "mode_q_max" ) )
-			block->mode_q_max = atoi( word2 );
+			block->mode_q_max = atof( word2 );
 		else if( !strcasecmp( word1, "mode_y" ) || !strcasecmp( word1, "mode_m" ) )
 			block->mode_y = atoi( word2 );
 		else if( !strcasecmp( word1, "mode_KA" ) )
@@ -910,6 +923,22 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
 			{
 				block->do_bd_particles = 0;
+			}
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}
+		}
+		else if( !strcasecmp( word1, "do_bd_membrane" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+			{
+				block->do_bd_membrane = 1;
+			}
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+			{
+				block->do_bd_membrane = 0;
 			}
 			else
 			{

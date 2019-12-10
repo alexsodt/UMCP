@@ -36,6 +36,12 @@
 \IfFileExists{misc.options}{\input{misc.options}}{}
 \end{multicols}
 
+\optionHeader{All-atom/coarse-grained molecular construction options}
+\optionRuler
+\begin{multicols}{3}
+\IfFileExists{construction.options}{\input{construction.options}}{}
+\end{multicols}
+
 \newoutputstream{streamSetup}
 \openoutputfile{setup.options}{streamSetup}
 \newoutputstream{streamDynamics}
@@ -44,10 +50,14 @@
 \openoutputfile{rxn.options}{streamRxn}
 \newoutputstream{streamMisc}
 \openoutputfile{misc.options}{streamMisc}
+\newoutputstream{streamConstruction}
+\openoutputfile{construction.options}{streamConstruction}
 
 % BEGIN options
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newsubsection{System construction options}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{optionSummary}{mesh}{planar.mesh}{Setup}
 Specifies the file name of the mesh to use for the simulation.
@@ -60,8 +70,9 @@ Syntax:
 \code{add <complex\_name> nbound <nbound> <inside/outside>}
 \end{optionSummary}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newsubsection{Dynamics options}
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{optionSummary}{do\_ld}{off}{Dynamics}
 Activates the Langevin dynamical thermostat to propagate both surfaces and particles.
 \end{optionSummary}
@@ -92,7 +103,15 @@ Each outer loop of dynamics loops over this \code{ninner} time steps.
 The total number of time steps is nouter $\times$ ninner.
 \end{optionSummary}
 
+\begin{optionSummary}{lipid\_mc\_period}{10000}{Dynamics}
+Number of ``inner'' steps of dynamics.
+Each outer loop of dynamics loops over this \code{ninner} time steps.
+The total number of time steps is nouter $\times$ ninner.
+\end{optionSummary}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newsubsection{Reaction diffusion options}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{optionSummary}{do\_rd}{off}{Rxn}
 Activates reaction/diffusion methodology.
@@ -103,11 +122,32 @@ Currently the format is:\par
 \code{reactant\_name1 site\_type1 reactant\_name2 site\_type2 k\_on(vol/s) k\_off(/s) binding\_radius(Angs) productName(or generic instructions)}
 \end{optionSummary}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \newsubsection{Miscellaneous options}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{optionSummary}{disable\_mesh}{off}{Misc}
 Disables all propagation of mesh coordinates.
 \end{optionSummary}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newsubsection{All-atom/coarse-grain molecular construction options}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{optionSummary}{create\_all\_atom}{no}{Construction}
+Following any requested dynamics, creates an all-atom (or coarse-grained) molecular structure of the system.
+This option requires a number of other options.
+\end{optionSummary}
+
+\begin{optionSummary}{do\_rim}{no}{Construction}
+Creates a ``hemi-fusion'' diaphragm style rim when rendering an all-atom structure.
+The rim must be centered at $\{x=0,y=0,z=0\}$.
+\end{optionSummary}
+
+\begin{optionSummary}{patchPDB}{none}{Construction}
+Specifies the PDB to use for the bilayer during molecular construction.
+\end{optionSummary}
+
 
 % these must be at the end of the file
 \closeoutputstream{streamSetup}

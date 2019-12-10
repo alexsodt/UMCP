@@ -111,13 +111,14 @@ void surface::grad( double *r, double *gr, double *puv, double *pg )
 
 		double face_area = 0;
 		double energy_density = 0;
-		
+	
+		// computes the total area of the inner (atot_i) and outer leaflets.	
 #ifdef LOCAL_LIPID_ENERGY	
 		double atot_o=0, atot_i=0;
 		for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 		{
-			atot_o += bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x];
-			atot_i += bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x];
+			atot_o +=  theTriangles[t].composition.outerLeaflet[x];
+			atot_i +=  theTriangles[t].composition.innerLeaflet[x];
 		}
 #endif
 	
@@ -189,25 +190,25 @@ void surface::grad( double *r, double *gr, double *puv, double *pg )
 			double c0 = theFormulas[frm].c0;
 //		printf("e1: %lf e2: %lf\n", e1, e2 );
 
-#ifdef LOCAL_LIPID_ENERGY
+#ifdef LOCAL_LIPID_ENERGY	// Local lipid energy: each lipid looks at the curvature around it locally: E ~ sum_i (c-c^i_0)^2 * a_lipid, as opposed to E = (c-sum{c^i_0})^2
 			double en = 0;
 			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 			{
-				double f_o = bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x] / atot_o;
-				double f_i = bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x] / atot_i;
+				double f_o =  theTriangles[t].composition.outerLeaflet[x] / atot_o;
+				double f_i =  theTriangles[t].composition.innerLeaflet[x] / atot_i;
 
 				double dc_o = ( e1+e2 - bilayerComp.c0[x]);
 				double dc_i = (-e1-e2 - bilayerComp.c0[x]);
 
-#ifdef FIXED_A
-				energy_density += 0.5 * kc * dc_o*dc_o * theTriangles[t].composition.outerLeaflet[x] * 0.5;
-				energy_density += 0.5 * kc * dc_i*dc_i * theTriangles[t].composition.innerLeaflet[x] * 0.5;
+#ifdef FIXED_A			// area of the lipid is composition * weight (with a factor of 0.5 because this is a leaflet not bilayer kc)
+				energy_density += 0.5 * kc * dc_o*dc_o * theTriangles[t].composition.outerLeaflet[x] * 0.5 * theFormulas[frm].weight;
+				energy_density += 0.5 * kc * dc_i*dc_i * theTriangles[t].composition.innerLeaflet[x] * 0.5 * theFormulas[frm].weight;
 #else
 				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
 				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
 #endif
 			}
-#else
+#else			// NOT local lipid energy, standard form here:
 			double en = 0.5 * kc * (e1 + e2 - c0 ) * (e1+e2 - c0);
 #endif
 
@@ -306,15 +307,15 @@ void surface::grad( double *r, double *gr, double *puv, double *pg )
 		double en = 0;
 		for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 		{
-			double f_o = bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x] / atot_o;
-			double f_i = bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x] / atot_i;
+			double f_o =  theTriangles[t].composition.outerLeaflet[x] / atot_o;
+			double f_i =  theTriangles[t].composition.innerLeaflet[x] / atot_i;
 
 			double dc_o = ( e1+e2 - bilayerComp.c0[x]);
 			double dc_i = (-e1-e2 - bilayerComp.c0[x]);
 
 #ifdef FIXED_A
-			en += 0.5 * kc * dc_o*dc_o * theTriangles[t].composition.outerLeaflet[x] * 0.5;
-			en += 0.5 * kc * dc_i*dc_i * theTriangles[t].composition.innerLeaflet[x] * 0.5;
+			e += 0.5 * kc * dc_o*dc_o * theTriangles[t].composition.outerLeaflet[x] * 0.5*theFormulas[frm].weight;
+			e += 0.5 * kc * dc_i*dc_i * theTriangles[t].composition.innerLeaflet[x] * 0.5*theFormulas[frm].weight;
 #else
 			en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
 			en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
@@ -405,8 +406,8 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 #ifdef LOCAL_LIPID_ENERGY
 			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 			{
-				double f_o = bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x] / atot_o;
-				double f_i = bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x] / atot_i;
+				double f_o =  theTriangles[t].composition.outerLeaflet[x] / atot_o;
+				double f_i =  theTriangles[t].composition.innerLeaflet[x] / atot_i;
 
 				double dc_o = ( e1+e2 - bilayerComp.c0[x]);
 				double dc_i = (-e1-e2 - bilayerComp.c0[x]);
@@ -414,20 +415,20 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
 				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
 #ifdef FIXED_A				
-				d_e_d_c1 += kc * dc_o * 0.5 * theTriangles[t].composition.outerLeaflet[x];
-				d_e_d_c1 -= kc * dc_i * 0.5 * theTriangles[t].composition.innerLeaflet[x];
+				d_e_d_c1 += kc * dc_o * 0.5 * theTriangles[t].composition.outerLeaflet[x] * theFormulas[frm].weight;
+				d_e_d_c1 -= kc * dc_i * 0.5 * theTriangles[t].composition.innerLeaflet[x] * theFormulas[frm].weight;
 
-				d_e_d_c2 += kc * dc_o * 0.5 * theTriangles[t].composition.outerLeaflet[x];
-				d_e_d_c2 -= kc * dc_i * 0.5 * theTriangles[t].composition.innerLeaflet[x];
+				d_e_d_c2 += kc * dc_o * 0.5 * theTriangles[t].composition.outerLeaflet[x] * theFormulas[frm].weight;
+				d_e_d_c2 -= kc * dc_i * 0.5 * theTriangles[t].composition.innerLeaflet[x] * theFormulas[frm].weight;
 #else
 				d_e_d_g += 0.5  * kc * dc_o * dc_o * f_o * 0.5 * dudv  * theFormulas[frm].weight;
 				d_e_d_g += 0.5  * kc * dc_i * dc_i * f_i * 0.5 * dudv  * theFormulas[frm].weight;
 
-				d_e_d_c1 += kc * dc_o * f_o * 0.5 * dudv * dAf;
-				d_e_d_c1 -= kc * dc_i * f_i * 0.5 * dudv * dAf;
+				d_e_d_c1 += kc * dc_o * f_o * 0.5 * dudv * dA;
+				d_e_d_c1 -= kc * dc_i * f_i * 0.5 * dudv * dA;
 
-				d_e_d_c2 += kc * dc_o * f_o * 0.5 * dudv * dAf;
-				d_e_d_c2 -= kc * dc_i * f_i * 0.5 * dudv * dAf;
+				d_e_d_c2 += kc * dc_o * f_o * 0.5 * dudv * dA;
+				d_e_d_c2 -= kc * dc_i * f_i * 0.5 * dudv * dA;
 #endif
 			
 			}
@@ -443,7 +444,7 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 #endif
 			d_e_d_c1 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
 			d_e_d_c2 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
-#else
+#else			// NOT Local lipid energy here:
 			d_e_d_g  += (0.5*kc * (e1+e2-c0)*(e1+e2-c0)) * dudv * theFormulas[frm].weight;
 			d_e_d_c1  += (kc * (e1+e2-c0)) *  dudv * dAf;
 			d_e_d_c2  += (kc * (e1+e2-c0)) *  dudv * dAf;
@@ -456,7 +457,8 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 #endif
 			d_e_d_c1 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
 			d_e_d_c2 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
-#endif
+#endif			// end not local lipid energy.
+
 			d_e_d_c1 += kg * e2 * dudv * dAf;
 			d_e_d_c2 += kg * e1 * dudv * dAf;
 			
@@ -6500,8 +6502,8 @@ void surface::igrad( double *r, double *gr )
 		double atot_o=0, atot_i=0;
 		for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 		{
-			atot_o += bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x];
-			atot_i += bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x];
+			atot_o +=  theTriangles[t].composition.outerLeaflet[x];
+			atot_i +=  theTriangles[t].composition.innerLeaflet[x];
 		}
 #endif
 		for( int p = 0; p < nf_irr_pts; p++ )
@@ -6588,8 +6590,8 @@ void surface::igrad( double *r, double *gr )
 			double en = 0;
 			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 			{
-				double f_o = bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x] / atot_o;
-				double f_i = bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x] / atot_i;
+				double f_o =  theTriangles[t].composition.outerLeaflet[x] / atot_o;
+				double f_i =  theTriangles[t].composition.innerLeaflet[x] / atot_i;
 
 				double dc_o = ( e1+e2 - bilayerComp.c0[x]);
 				double dc_i = (-e1-e2 - bilayerComp.c0[x]);
@@ -6769,15 +6771,15 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 #ifdef LOCAL_LIPID_ENERGY
 			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 			{
-				double f_o = bilayerComp.APL[x] * theTriangles[t].composition.outerLeaflet[x] / atot_o;
-				double f_i = bilayerComp.APL[x] * theTriangles[t].composition.innerLeaflet[x] / atot_i;
+				double f_o = theTriangles[t].composition.outerLeaflet[x] / atot_o;
+				double f_i = theTriangles[t].composition.innerLeaflet[x] / atot_i;
 
 				double dc_o = ( e1+e2 - bilayerComp.c0[x]);
 				double dc_i = (-e1-e2 - bilayerComp.c0[x]);
 
 				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
 				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
-				
+/*				
 #ifndef FIXED_AREA
 				d_e_d_g += 0.5  * kc * dc_o * dc_o * f_o * 0.5 * dudv  * theIrregularFormulas[frm].weight;
 				d_e_d_g += 0.5  * kc * dc_i * dc_i * f_i * 0.5 * dudv  * theIrregularFormulas[frm].weight;
@@ -6787,6 +6789,23 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 
 				d_e_d_c2 += kc * dc_o * f_o * 0.5 * dAf;
 				d_e_d_c2 -= kc * dc_i * f_i * 0.5 * dAf;
+*/
+#ifdef FIXED_A				
+				d_e_d_c1 += kc * dc_o * 0.5 * theTriangles[t].composition.outerLeaflet[x] * theIrregularFormulas[frm].weight;
+				d_e_d_c1 -= kc * dc_i * 0.5 * theTriangles[t].composition.innerLeaflet[x] * theIrregularFormulas[frm].weight;
+
+				d_e_d_c2 += kc * dc_o * 0.5 * theTriangles[t].composition.outerLeaflet[x] * theIrregularFormulas[frm].weight;
+				d_e_d_c2 -= kc * dc_i * 0.5 * theTriangles[t].composition.innerLeaflet[x] * theIrregularFormulas[frm].weight;
+#else
+				d_e_d_g += 0.5  * kc * dc_o * dc_o * f_o * 0.5 * dudv  * theIrregularFormulas[frm].weight;
+				d_e_d_g += 0.5  * kc * dc_i * dc_i * f_i * 0.5 * dudv  * theIrregularFormulas[frm].weight;
+
+				d_e_d_c1 += kc * dc_o * f_o * 0.5 * dudv * dA;
+				d_e_d_c1 -= kc * dc_i * f_i * 0.5 * dudv * dA;
+
+				d_e_d_c2 += kc * dc_o * f_o * 0.5 * dudv * dA;
+				d_e_d_c2 -= kc * dc_i * f_i * 0.5 * dudv * dA;
+#endif
 			}
 			
 			// NOT SURE ABOUT THIS YET: !!!!
@@ -6799,7 +6818,7 @@ double d_nrmz_d_rux=0,d_nrmz_d_ruy=0,d_nrmz_d_ruz=0,d_nrmz_d_rvx=0,d_nrmz_d_rvy=
 #endif
 			d_e_d_c1 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
 			d_e_d_c2 += -p_face_area *  dAf *  kc * (e1+e2-c0) / face_area;
-#else
+#else // end, local lipid energy
 #ifndef FIXED_A
 			d_e_d_g  += (0.5 * kc * (e1+e2-c0)* (e1+e2-c0)) * dudv * theIrregularFormulas[frm].weight;
 #endif

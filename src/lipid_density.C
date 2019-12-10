@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "mutil.h"
 #include "interp.h"
 #include "parallel.h"
 const double F_CUTOFF = 0.5;
@@ -119,7 +120,7 @@ void surface::unstashf( void )
 
 
 
-void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomplex, double dt, double beta, int swap_only)
+void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomplex, double dt, double beta, double DC, double PBC[3][3], int swap_only, int *tracer)
 {
 	// move lipids between adjacent faces using montecarlo moves.
 	// for now ignore the complexes.
@@ -171,102 +172,77 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 					}
 	
 					int from_1 = rand() % bilayerComp.nlipidTypes;
-					int from_2 = from_1;
-				
-					if( swap_only )
-						from_2 = rand() % bilayerComp.nlipidTypes; 
 	
 					for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 					{
-						E0 =  faceEnergy( f1, r, NULL, 0 );
-						E0 += faceEnergy( f2, r, NULL, 0 );
-	
-						// move lipid material between triangles.
-		
 						double nL1 = comp1[from_1];
-						double nL2 = comp2[from_2];
-			
-//						double dL = 2*((double)rand() / (double)RAND_MAX - 0.5 ) * (theTriangles[t1].composition.A0) * nL_move_average;
-						double dL = bilayerComp.APL[from_1] * (rand() %2 == 0 ? 1 : -1);
-						double dL2 = -dL;
+						int n_here = lround(nL1/bilayerComp.APL[from_1]);
 
-						if( swap_only )
-							dL2 = bilayerComp.APL[from_2] * (dL/bilayerComp.APL[from_1]);
-			
-						comp1[from_1] -= dL;
-						comp2[from_1] += dL;
-						if( swap_only )
+						int l_select_1 = -1;
+
+						if( nL1 > 0 ) l_select_1 = rand() % n_here;
+
+						// how many should move? 	
+						// compute distance between triangle centers.
+						double r1[3];
+						double r2[3],nrmjunk[3];
+						evaluateRNRM( f1, 1.0/3.0, 1.0/3.0, r1, nrmjunk, r );
+						evaluateRNRM( f2, 1.0/3.0, 1.0/3.0, r2, nrmjunk, r );
+						double dr[3] = { r2[0]-r1[0],r2[1]-r1[1],r2[2]-r1[2] };
+						double put[3]={0,0,0};
+						MinImage3D( dr, PBC_vec, put, r+3*nv );
+						double del_r = normalize(dr);
+
+						double dist = sqrt( DC * dt );
+						double n_move = del_r / dist;
+
+						while( n_move > 0 )
 						{
-							comp1[from_2] += dL2;
-							comp2[from_2] -= dL2;
-						}
-						double sum1 =0,sum2=0;
+							double pr = rand() / (double)RAND_MAX;
 
-						for( int y = 0; y < bilayerComp.nlipidTypes; y++ ) sum1 += comp1[y];
-						for( int y = 0; y < bilayerComp.nlipidTypes; y++ ) sum2 += comp2[y];
+							if( pr < n_move ) break;
 
-						if( comp1[from_1] < 0 || comp2[from_1] < 0 || 
-						    comp2[from_2] < 0 || comp1[from_2] < 0 || sum1<1e-3 || sum2 < 1e-3)
-						{
-							comp1[from_1] += dL;
-							comp2[from_1] -= dL;
+							int from_2 = from_1;
+				
+							if( swap_only )
+								from_2 = rand() % bilayerComp.nlipidTypes; 
+
+							E0 =  faceEnergy( f1, r, NULL, 0 );
+							E0 += faceEnergy( f2, r, NULL, 0 );
+		
+							// move lipid material between triangles.
+			
+							double nL2 = comp2[from_2];
+				
+	//						double dL = 2*((double)rand() / (double)RAND_MAX - 0.5 ) * (theTriangles[t1].composition.A0) * nL_move_average;
+							double dL = bilayerComp.APL[from_1] * (rand() %2 == 0 ? 1 : -1);
+							double dL2 = -dL;
+	
+							if( swap_only )
+								dL2 = bilayerComp.APL[from_2] * (dL/bilayerComp.APL[from_1]);
+			
+	
+							int l_select_2 = -1;
+							if( nL2 > 0 ) l_select_2 = rand() % lround(nL2/bilayerComp.APL[from_2]);
+	
+							int move_tracer_1 = (theTriangles[t1].composition.tracer && from_1 == 0 && l_select_1 == 0 ); 
+							int move_tracer_2 = (theTriangles[t2].composition.tracer && from_2 == 0 && l_select_2 == 0 ); 
+		
+							comp1[from_1] -= dL;
+							comp2[from_1] += dL;
 							if( swap_only )
 							{
-								comp1[from_2] -= dL2;
-								comp2[from_2] += dL2;
+								comp1[from_2] += dL2;
+								comp2[from_2] -= dL2;
 							}
-						}	
-						else
-						{
-							set_g0_from_f(f1);				
-							set_g0_from_f(f2);				
-			
-							double E1 =  faceEnergy( f1, r, NULL, 0 );
-							E1 += faceEnergy( f2, r, NULL, 0 );
-#if 0 
-							if( !strcasecmp( bilayerComp.names[x], "DOPE") && leaf == 1)	
+							double sum1 =0,sum2=0;
+	
+							for( int y = 0; y < bilayerComp.nlipidTypes; y++ ) sum1 += comp1[y];
+							for( int y = 0; y < bilayerComp.nlipidTypes; y++ ) sum2 += comp2[y];
+	
+							if( comp1[from_1] < 0 || comp2[from_1] < 0 || 
+							    comp2[from_2] < 0 || comp1[from_2] < 0 || sum1<1e-3 || sum2 < 1e-3)
 							{
-								double k;
-								double c0_1 = c( f1, 1.0/3.0, 1.0/3.0, r, &k );
-								double c0_2 = c( f2, 1.0/3.0, 1.0/3.0, r, &k );
-								printf("Moving %lf lipid area %s with c0 %lf from curvature %le to %le dE: %le\n", dL, bilayerComp.names[x], bilayerComp.c0[x],
-								c0_1, c0_2, E1-E0 );
-
-#if 0
-								if( E1 < E0 && c0_2 > c0_1 && dL > 0)
-								{
-									double E1 =  faceEnergy( f1, r, NULL, 0 );
-									E1 += faceEnergy( f2, r, NULL, 0 );
-									comp1[x] += dL;
-									comp2[x] -= dL;
-									set_g0_from_f(f1);				
-									set_g0_from_f(f2);				
-									double E0 =  faceEnergy( f1, r, NULL, 0 );
-									E0 += faceEnergy( f2, r, NULL, 0 );
-									printf("Confirm: dE: %le\n", E1-E0 );
-									exit(1);
-								}
-#endif
-							}
-
-#endif
-							double p = exp(-beta*(E1-E0));
-			
-							double rn = ((double)rand())/(double)RAND_MAX;
-			
-							double rat1 = theTriangles[t1].composition.A_inst / theTriangles[t1].composition.A0;
-							double rat2 = theTriangles[t2].composition.A_inst / theTriangles[t2].composition.A0;
-			
-							if( rn < p && rat1 > 0.25 && rat2 > 0.25 )
-							{
-//								printf("Moving %le (out of %le %le) %s from %d to %d.\n", dL, comp1[x], comp2[x], bilayerComp.names[x], t1, t2 );
-								nacc++;
-							}
-							else
-							{
-								nrej++;
-						
-
 								comp1[from_1] += dL;
 								comp2[from_1] -= dL;
 								if( swap_only )
@@ -274,10 +250,88 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 									comp1[from_2] -= dL2;
 									comp2[from_2] += dL2;
 								}
-							
+							}	
+							else
+							{
 								set_g0_from_f(f1);				
 								set_g0_from_f(f2);				
+				
+								double E1 =  faceEnergy( f1, r, NULL, 0 );
+								E1 += faceEnergy( f2, r, NULL, 0 );
+	#if 0 
+								if( !strcasecmp( bilayerComp.names[x], "DOPE") && leaf == 1)	
+								{
+									double k;
+									double c0_1 = c( f1, 1.0/3.0, 1.0/3.0, r, &k );
+									double c0_2 = c( f2, 1.0/3.0, 1.0/3.0, r, &k );
+									printf("Moving %lf lipid area %s with c0 %lf from curvature %le to %le dE: %le\n", dL, bilayerComp.names[x], bilayerComp.c0[x],
+									c0_1, c0_2, E1-E0 );
+	
+	#if 0
+									if( E1 < E0 && c0_2 > c0_1 && dL > 0)
+									{
+										double E1 =  faceEnergy( f1, r, NULL, 0 );
+										E1 += faceEnergy( f2, r, NULL, 0 );
+										comp1[x] += dL;
+										comp2[x] -= dL;
+										set_g0_from_f(f1);				
+										set_g0_from_f(f2);				
+										double E0 =  faceEnergy( f1, r, NULL, 0 );
+										E0 += faceEnergy( f2, r, NULL, 0 );
+										printf("Confirm: dE: %le\n", E1-E0 );
+										exit(1);
+									}
+	#endif
+								}
+	
+	#endif
+								double p = exp(-beta*(E1-E0));
+				
+								double rn = ((double)rand())/(double)RAND_MAX;
+				
+								double rat1 = theTriangles[t1].composition.A_inst / theTriangles[t1].composition.A0;
+								double rat2 = theTriangles[t2].composition.A_inst / theTriangles[t2].composition.A0;
+				
+								if( rn < p && rat1 > 0.25 && rat2 > 0.25 )
+								{
+	//								printf("Moving %le (out of %le %le) %s from %d to %d.\n", dL, comp1[x], comp2[x], bilayerComp.names[x], t1, t2 );
+									nacc++;
+									if( move_tracer_1 )
+									{
+										theTriangles[t1].composition.tracer = 0;
+										theTriangles[t2].composition.tracer = 1;
+										
+										if( tracer ) *tracer = t2;
+									}
+									if( move_tracer_2 )
+									{
+										theTriangles[t2].composition.tracer = 0;
+										theTriangles[t1].composition.tracer = 1;
+	
+										if( tracer ) *tracer = t1;
+									}
+									
+			
+								}
+								else
+								{
+									nrej++;
+							
+	
+									comp1[from_1] += dL;
+									comp2[from_1] -= dL;
+									if( swap_only )
+									{
+										comp1[from_2] -= dL2;
+										comp2[from_2] += dL2;
+									}
+								
+									set_g0_from_f(f1);				
+									set_g0_from_f(f2);				
+								}
 							}
+				
+							n_move -= 1;
 						}
 					}
 				}

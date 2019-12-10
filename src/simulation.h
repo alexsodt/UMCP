@@ -38,6 +38,8 @@ typedef struct surface_record
 	double *pp;
 	double *qdot;
 	double *qdot0;
+	double *gamma;
+	double *gamma_inv;
 	int nc;
 	int gather_flip;
 

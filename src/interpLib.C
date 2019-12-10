@@ -23,7 +23,7 @@
 
 #define THRESH (1e-4)
 
-//#define LOW_RES
+#define LOW_RES
 #define MAX_INV_VALENCE 12
 
 #define USE_G0
@@ -3575,20 +3575,20 @@ double surface::ifenergy( int f, double *r, double *p_uv )
 			double atot_o=0, atot_i=0;
 			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 			{
-				atot_o += bilayerComp.APL[x] * theTriangles[tri].composition.outerLeaflet[x];
-				atot_i += bilayerComp.APL[x] * theTriangles[tri].composition.innerLeaflet[x];
+				atot_o +=  theTriangles[tri].composition.outerLeaflet[x];
+				atot_i +=  theTriangles[tri].composition.innerLeaflet[x];
 			}
 			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 			{
-				double f_o = bilayerComp.APL[x] * theTriangles[tri].composition.outerLeaflet[x] / atot_o;
-				double f_i = bilayerComp.APL[x] * theTriangles[tri].composition.innerLeaflet[x] / atot_i;
+				double f_o = theTriangles[tri].composition.outerLeaflet[x] / atot_o;
+				double f_i = theTriangles[tri].composition.innerLeaflet[x] / atot_i;
 
 				double dc_o = ( c1+c2 - bilayerComp.c0[x]);
 				double dc_i = (-c1-c2 - bilayerComp.c0[x]);
 
 #ifdef FIXED_A
-				lec += 0.5 * kc * dc_o*dc_o * theTriangles[tri].composition.outerLeaflet[x] * 0.5;
-				lec += 0.5 * kc * dc_i*dc_i * theTriangles[tri].composition.innerLeaflet[x] * 0.5;
+				lec += 0.5 * kc * dc_o*dc_o * theTriangles[tri].composition.outerLeaflet[x] * 0.5 * theIrregularFormulas[frm].weight;
+				lec += 0.5 * kc * dc_i*dc_i * theTriangles[tri].composition.innerLeaflet[x] * 0.5 * theIrregularFormulas[frm].weight;
 #else
 				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
 				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
@@ -3804,13 +3804,13 @@ double surface::fenergy( int f, double *r, double *p_uv )
 			double atot_o=0, atot_i=0;
 			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 			{
-				atot_o += bilayerComp.APL[x] * theTriangles[tri].composition.outerLeaflet[x];
-				atot_i += bilayerComp.APL[x] * theTriangles[tri].composition.innerLeaflet[x];
+				atot_o +=  theTriangles[tri].composition.outerLeaflet[x];
+				atot_i +=  theTriangles[tri].composition.innerLeaflet[x];
 			}
 			for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 			{
-				double f_o = bilayerComp.APL[x] * theTriangles[tri].composition.outerLeaflet[x] / atot_o;
-				double f_i = bilayerComp.APL[x] * theTriangles[tri].composition.innerLeaflet[x] / atot_i;
+				double f_o = theTriangles[tri].composition.outerLeaflet[x] / atot_o;
+				double f_i = theTriangles[tri].composition.innerLeaflet[x] / atot_i;
 
 				double dc_o = ( c1+c2 - bilayerComp.c0[x]);
 				double dc_i = (-c1-c2 - bilayerComp.c0[x]);
@@ -3822,11 +3822,11 @@ double surface::fenergy( int f, double *r, double *p_uv )
 //				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
 //				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
 #ifdef FIXED_A
-				lec += 0.5 * kc * dc_o*dc_o * theTriangles[tri].composition.outerLeaflet[x] * 0.5;
-				lec += 0.5 * kc * dc_i*dc_i * theTriangles[tri].composition.innerLeaflet[x] * 0.5;
+				lec += 0.5 * kc * dc_o*dc_o * theTriangles[tri].composition.outerLeaflet[x] * 0.5 * theFormulas[frm].weight;
+				lec += 0.5 * kc * dc_i*dc_i * theTriangles[tri].composition.innerLeaflet[x] * 0.5 *theFormulas[frm].weight;
 #else
-				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5 * dA;
-				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5 * dA;
+				en += 0.5 * kc * dc_o*dc_o * f_o * 0.5;
+				en += 0.5 * kc * dc_i*dc_i * f_i * 0.5;
 #endif
 			}
 			VC += lec;

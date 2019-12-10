@@ -318,13 +318,17 @@ int surface::origSphericalHarmonicModes( double *ro, int l_min, int l_max, doubl
 
 int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_min, int l_max, double q_max, double **gen_transform, double **output_qvals, double **scaling_factor )
 {
-	double *Amat = NULL; 
-	double *r0_pos = NULL;
+//	double *Amat = NULL; 
+//	double *r0_pos = NULL;
 	double *weights = NULL;
 	double Lx = PBC_vec[0][0]*ro[3*nv+0];
 	double Ly = PBC_vec[1][1]*ro[3*nv+1];
  
-	int NFRM = getFormulaAMAT( &Amat, ro, &r0_pos, &weights );
+//	int NFRM = getFormulaAMAT( &Amat, ro, &r0_pos, &weights );
+	
+	double *Amat = (double *)malloc( sizeof(double) * (nv) * (nv) );
+	double *r0_pos = (double *)malloc( sizeof(double) * 3 * nv );
+	getAMAT( Amat, ro, r0_pos );
 	int use_q = 0;
 	if( q_max > 0 )
 	{
@@ -364,7 +368,7 @@ int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_m
 			double q = sqrt( pow((2*M_PI*lx)/Lx,2) + pow((2*M_PI*ly)/Ly,2) );
 			if( use_q && q > q_max ) continue;
 
-			if( pass == 1 ) (*output_qvals)[NQ] = sqrt(lx*lx+ly*ly);
+			if( pass == 1 ) (*output_qvals)[NQ] = q;
 		
 			NQ++;
 		}
@@ -413,7 +417,8 @@ int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_m
 		
 		vec++;
 	}
-	
+
+/*	
 	double *outer_Amat = (double *)malloc( sizeof(double) * nv * nv );
 	memset( outer_Amat, 0, sizeof(double) * nv * nv );
 
@@ -425,12 +430,12 @@ int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_m
 	// Amat[nv,Q]
 	// Amat^T[Q,nv] -> OA[nv,nv]
 	dgemm( &notrans, &trans, &nv, &nv, &NFRM, &one, Amat, &nv, Amat, &nv, &zero, outer_Amat, &nv );  
-	
+*/	
 	char uplo = 'U';
 	int nrhs = 3*NQ;
 	int N = nv;
 	int info=0;
-	dposv( &uplo, &N, &nrhs, outer_Amat, &N, t_g_t, &N, &info );
+	dposv( &uplo, &N, &nrhs, Amat, &N, t_g_t, &N, &info );
 
 	(*gen_transform) = (double *)malloc( sizeof(double) * NQ * 3 * nv );
 
@@ -443,24 +448,13 @@ int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_m
 		}
 	}
 
-	// normalize them.
 	
 	(*scaling_factor) = (double *)malloc( sizeof(double) * NQ );
 
 	for( int v = 0; v < NQ; v++ )
-	{
-		double r2 = 0;
+		(*scaling_factor)[v] = 1.0;
 
-		for( int x = 0; x < 3*nv; x++ )
-			r2 += (*gen_transform)[v*3*nv+x] * (*gen_transform)[v*3*nv+x];
-		double r = sqrt(r2);
-		(*scaling_factor)[v] = 1.0/r;
-		for( int x = 0; x < 3*nv; x++ )
-			(*gen_transform)[v*3*nv+x] *= (*scaling_factor)[v];
-		 
-	}
-
-	free(outer_Amat);
+//	free(outer_Amat);
 	free(Amat);
 	free(t_g_t);
 	free(r0_pos);
@@ -2702,126 +2696,99 @@ void surface::approxSparseEffectiveMass( force_set * theForceSet, int *use_map, 
 
 // this is the square-root mass matrix, not its inverse.
 //
-void surface::getSparseRoot( force_set * theForceSet, SparseMatrix **theMatrix )
+void surface::getSparseRoot( force_set * theForceSet, SparseMatrix **theMatrix, double *gen_transform, int ngen )
 {
+	
 	SparseMatrix *mass_matrix = new SparseMatrix;
-	mass_matrix->init( nv ); 
 
-	for( int x = 0; x < theForceSet->npts; x++ )
+	if( !gen_transform )
 	{
-		for( int c1 = 0; c1 < theForceSet->frc_ncoef[x]; c1++ )
-		for( int c2 = 0; c2 < theForceSet->frc_ncoef[x]; c2++ )
-		{
-			(mass_matrix)->coupleParameters( theForceSet->frc_coef_list[x*maxv+c1], theForceSet->frc_coef_list[x*maxv+c2], theForceSet->frc_coef[x*maxv+c1] * theForceSet->frc_coef[x*maxv+c2] * theForceSet->mass[x] );
-		}
-	}	
+		mass_matrix->init( nv ); 
 
-	*theMatrix = new SparseMatrix;
-	(*theMatrix)->init( nv );
+		for( int x = 0; x < theForceSet->npts; x++ )
+		{
+			for( int c1 = 0; c1 < theForceSet->frc_ncoef[x]; c1++ )
+			for( int c2 = 0; c2 < theForceSet->frc_ncoef[x]; c2++ )
+			{
+				(mass_matrix)->coupleParameters( theForceSet->frc_coef_list[x*maxv+c1], theForceSet->frc_coef_list[x*maxv+c2], theForceSet->frc_coef[x*maxv+c1] * theForceSet->frc_coef[x*maxv+c2] * theForceSet->mass[x] );
+			}
+		}	
+	}
+	else
+	{
+		double *effective_mass = (double *)malloc( sizeof(double)*nv*nv);
+		memset( effective_mass, 0, sizeof(double) * nv * nv );
+	
+		for( int x = 0; x < theForceSet->npts; x++ )
+		{
+			for( int c1 = 0; c1 < theForceSet->frc_ncoef[x]; c1++ )
+			for( int c2 = 0; c2 < theForceSet->frc_ncoef[x]; c2++ )
+				effective_mass[theForceSet->frc_coef_list[x*maxv+c1]*nv+theForceSet->frc_coef_list[x*maxv+c2]] += theForceSet->frc_coef[x*maxv+c1] * theForceSet->frc_coef[x*maxv+c2] * theForceSet->mass[x];
+		}	
+		
+		int NQ = nv;
+	
+	
+		double *eff_m_sub = (double *)malloc( sizeof(double) * ngen * (3*nv) );
+		memset( eff_m_sub, 0, sizeof(double) * ngen * (3*nv) );
+
+		// first, gen_transform times x.
+
+		char transn = 'N';
+		char transy = 'T';
+		double one = 1.0;
+		double zero = 0.0;
+		int lda=3*nv;
+		int ldb=nv;
+		int ldc=3*nv;
+
+		double *gen_xyz = (double *)malloc( sizeof(double) * ngen * nv*3 );	
+		for( int x = 0; x < ngen; x++ )
+		{	
+			for( int v = 0; v < nv; v++ )
+			{
+				gen_xyz[x*nv*3+v] = gen_transform[x*3*nv+3*v+0];
+				gen_xyz[x*nv*3+nv+v] = gen_transform[x*3*nv+3*v+1];
+				gen_xyz[x*nv*3+2*nv+v] = gen_transform[x*3*nv+3*v+2];
+			}
+		}
+
+
+		// EMS_{Ik} = GT_{Ij} EM_{jk}
+		dgemm( &transn, &transn, &nv, &ngen, &nv, &one, effective_mass, &ldb,  gen_xyz+0*nv, &lda, &zero, eff_m_sub+0*nv, &ldc );  
+		dgemm( &transn, &transn, &nv, &ngen, &nv, &one, effective_mass, &ldb,  gen_xyz+1*nv, &lda, &zero, eff_m_sub+1*nv, &ldc );  
+		dgemm( &transn, &transn, &nv, &ngen, &nv, &one, effective_mass, &ldb,  gen_xyz+2*nv, &lda, &zero, eff_m_sub+2*nv, &ldc );  
+
+
+		int lencoor =  3* nv;
+
+		if( ngen > nv )
+			effective_mass = (double *)realloc( effective_mass, sizeof(double) * ngen * ngen );
+		
+		memset( effective_mass, 0, sizeof(double)*ngen*ngen );
+
+		// EM_{IJ} = EMS_{jk}
+		dgemm( &transy, &transn, &ngen, &ngen, &lencoor, &one, gen_xyz, &lda,  eff_m_sub, &ldc, &zero, effective_mass, &ngen );  
+
+		free(gen_xyz);
+		free(eff_m_sub);
+
+		NQ = ngen;
+		
+		mass_matrix->init( NQ ); 
+	
+		for( int c1 = 0; c1 < NQ; c1++ )
+		for( int c2 = c1+1; c2 < NQ; c2++ )
+			effective_mass[c1*NQ+c2] = effective_mass[c2*NQ+c1];	
+	
+		for( int i = 0; i < NQ; i++ )
+		for( int j = 0; j < NQ; j++ )
+			mass_matrix->coupleParameters(i,j,effective_mass[i*NQ+j] );
+
+		free(effective_mass);
+	}
 
 	mass_matrix->SquareRoot( theMatrix );
-
-
-//#define TEST
-#ifdef TEST
-
-
-//#define SIMPLE_TEST
-#ifdef SIMPLE_TEST
-	SparseMatrix *test = new SparseMatrix;
-	test->init(4);
-	test->coupleParameters(0,0,30.0);
-	test->coupleParameters(0,1,0.1);
-	test->coupleParameters(0,2,0.2);
-	test->coupleParameters(0,3,0.05);
-	test->coupleParameters(1,0,0.1);
-	test->coupleParameters(1,1,1.1);
-	test->coupleParameters(1,2,0.1);
-	test->coupleParameters(1,3,0.0);
-	test->coupleParameters(2,0,0.2);
-	test->coupleParameters(2,1,0.1);
-	test->coupleParameters(2,2,1.2);
-	test->coupleParameters(2,3,0.4);
-	test->coupleParameters(3,0,0.05);
-	test->coupleParameters(3,1,0.0);
-	test->coupleParameters(3,2,0.4);
-	test->coupleParameters(3,3,1.0);
-
-	SparseMatrix *output = new SparseMatrix;
-	output->init(4);
-	test->SquareRoot(&output); 
-	
-	double outp[16];
-	memset(outp,0,sizeof(double)*16);
-	for( int t = 0; t < 4; t++ )
-	{
-		for( int b = 0; b < (output->nnz[t]); b++ )
-			outp[t*4+output->nzl[t][b]] = output->nzv[t][b];
-	} 
-
-	for( int x = 0; x < 4; x++ ){
-	for( int y = 0; y < 4; y++ )
-	{
-		printf(" %le", outp[x*4+y] ); 
-	} printf("\n");
-	}
-	exit(1);
-#endif
-	// printout
-	double *Aout = (double *)malloc( sizeof(double) * nv * nv );
-	memset( Aout, 0, sizeof(double)*nv*nv);
-
-
-	for( int t = 0; t < nv; t++ )
-	{
-		for( int b = 0; b < (mass_matrix->nnz[t]); b++ )
-			Aout[t*nv+mass_matrix->nzl[t][b]] = mass_matrix->nzv[t][b];
-	} 
-	printf("A = {");
-	for( int t = 0; t < nv; t++ )
-	{
-		printf("{");
-		for( int t2 = 0; t2 < nv; t2++ )
-		{
-			printf(" %lf", Aout[t*nv+t2] );
-			if( t2 == nv -1 && t == nv-1)
-				printf("}\n");
-			else if ( t2 == nv -1 )
-				printf("},\n");
-			else
-				printf(",");
-		}
-	}
-	printf("};");
-	
-	SparseMatrix *temp = *theMatrix; 
-
-	memset( Aout, 0, sizeof(double)*nv*nv);
-	for( int t = 0; t < nv; t++ )
-	{
-		for( int b = 0; b < (temp->nnz[t]); b++ )
-			Aout[t*nv+temp->nzl[t][b]] = temp->nzv[t][b];
-	} 
-	printf("\n");
-	printf("B = {");
-	for( int t = 0; t < nv; t++ )
-	{
-		printf("{");
-		for( int t2 = 0; t2 < nv; t2++ )
-		{
-			printf(" %lf", Aout[t*nv+t2] );
-			if( t2 == nv -1 && t == nv-1)
-				printf("}\n");
-			else if ( t2 == nv -1 )
-				printf("},\n");
-			else
-				printf(",");
-		}
-	}
-	printf("};");
-	exit(1);
-#endif
-	
 
 	(*theMatrix)->setNeedSource();
 	(*theMatrix)->compress();
@@ -2829,5 +2796,4 @@ void surface::getSparseRoot( force_set * theForceSet, SparseMatrix **theMatrix )
 	mass_matrix->freeMem();
 	delete mass_matrix;
 }
-
 
