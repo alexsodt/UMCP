@@ -1,5 +1,7 @@
 #ifndef __mutilh__
 #define __mutilh__
+#include <stdio.h>
+
 double dot( double *a, double *b );
 double cross( double *dr1, double *dr2, double *cp );
 double normalize( double *dr );

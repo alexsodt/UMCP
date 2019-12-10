@@ -48,7 +48,7 @@ void RD::init( Simulation * theSimulation, double time_step_in, parameterBlock *
 			registerSite( theSimulation->allComplexes[p], p, s );
 	}
 
-	double max_binding_radius = 0;
+	max_binding_radius = 0;
 
 	double max_diff_c = 0;
 

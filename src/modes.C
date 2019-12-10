@@ -318,13 +318,17 @@ int surface::origSphericalHarmonicModes( double *ro, int l_min, int l_max, doubl
 
 int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_min, int l_max, double q_max, double **gen_transform, double **output_qvals, double **scaling_factor )
 {
-	double *Amat = NULL; 
-	double *r0_pos = NULL;
+//	double *Amat = NULL; 
+//	double *r0_pos = NULL;
 	double *weights = NULL;
 	double Lx = PBC_vec[0][0]*ro[3*nv+0];
 	double Ly = PBC_vec[1][1]*ro[3*nv+1];
  
-	int NFRM = getFormulaAMAT( &Amat, ro, &r0_pos, &weights );
+//	int NFRM = getFormulaAMAT( &Amat, ro, &r0_pos, &weights );
+	
+	double *Amat = (double *)malloc( sizeof(double) * (nv) * (nv) );
+	double *r0_pos = (double *)malloc( sizeof(double) * 3 * nv );
+	getAMAT( Amat, ro, r0_pos );
 	int use_q = 0;
 	if( q_max > 0 )
 	{
@@ -413,7 +417,8 @@ int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_m
 		
 		vec++;
 	}
-	
+
+/*	
 	double *outer_Amat = (double *)malloc( sizeof(double) * nv * nv );
 	memset( outer_Amat, 0, sizeof(double) * nv * nv );
 
@@ -425,12 +430,12 @@ int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_m
 	// Amat[nv,Q]
 	// Amat^T[Q,nv] -> OA[nv,nv]
 	dgemm( &notrans, &trans, &nv, &nv, &NFRM, &one, Amat, &nv, Amat, &nv, &zero, outer_Amat, &nv );  
-	
+*/	
 	char uplo = 'U';
 	int nrhs = 3*NQ;
 	int N = nv;
 	int info=0;
-	dposv( &uplo, &N, &nrhs, outer_Amat, &N, t_g_t, &N, &info );
+	dposv( &uplo, &N, &nrhs, Amat, &N, t_g_t, &N, &info );
 
 	(*gen_transform) = (double *)malloc( sizeof(double) * NQ * 3 * nv );
 
@@ -443,24 +448,13 @@ int surface::getPlanarHarmonicModes( double *ro, int mode_x, int mode_y, int l_m
 		}
 	}
 
-	// normalize them.
 	
 	(*scaling_factor) = (double *)malloc( sizeof(double) * NQ );
 
 	for( int v = 0; v < NQ; v++ )
-	{
-		double r2 = 0;
+		(*scaling_factor)[v] = 1.0;
 
-		for( int x = 0; x < 3*nv; x++ )
-			r2 += (*gen_transform)[v*3*nv+x] * (*gen_transform)[v*3*nv+x];
-		double r = sqrt(r2);
-		(*scaling_factor)[v] = 1.0/r;
-		for( int x = 0; x < 3*nv; x++ )
-			(*gen_transform)[v*3*nv+x] *= (*scaling_factor)[v];
-		 
-	}
-
-	free(outer_Amat);
+//	free(outer_Amat);
 	free(Amat);
 	free(t_g_t);
 	free(r0_pos);

@@ -7,6 +7,7 @@ struct localLipidComposition
 	double A_inst;
 	double *innerLeaflet;
 	double *outerLeaflet;
+	int    tracer; // identity of a lipid tracer particle to track diffusion.
 };
 
 struct bilayerComposition

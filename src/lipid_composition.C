@@ -328,6 +328,8 @@ void surface::readLipidComposition( FILE *inputFile )
 	}		
 	printf("--------------\n");
 	
+	for( int t = 0; t < nt; t++ )
+		theTriangles[t].composition.tracer = 0;
 }
 
 void surface::getVPassData( double **verts, int *nvert, int **tris, int ** eft_tris, int *ntri, int **edges, int *nedges_in, int edge_dim )

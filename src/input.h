@@ -74,6 +74,7 @@ class parameterBlock
 	double del;
 
 	// kinetic MC	
+	int debug_diffusion;
 	int kinetics;
 	int kinetic_corr_period;
 	int kinetics_do_phase;

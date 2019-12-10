@@ -15,7 +15,7 @@ The modified equations are
 m \dot{\vek{v}} = -\frac{\vek{v}}{\mu} + \vek{f} + \vek{\tilde{f}}
 \end{equation}
 With a constant applied force, the velocity is $f \mu$.
-The factor $mu$, the ratio of the ``drift velocity'' to an applied constant force, is called the mobility. 
+The factor $mu$, the ratio of this velocity (termed the drift velocity) to an applied constant force, is called the mobility. 
 It is the inverse of the friction coefficient $\gamma$ (equivalently, the momentum $\lambda$ in Eq.~\ref{eq:biglangevin}).
 %or often with a friction coefficient $\gamma$ replacing the mobility $\mu$:
 %\begin{equation}
@@ -60,7 +60,7 @@ Here the equation of motion is
 \begin{equation}
 \dot{\vek{r}} = \frac{D}{\kT} \vek{f} + \sqrt{2 D} \eta(t)
 \end{equation}
-where $\eta(t)$ is a random ``process'' defined by
+where $\eta(t)$ is a random process defined by
 \begin{equation}
 \langle \eta(t) \eta(t')\rangle = \delta(t-t')
 \end{equation} 
@@ -68,44 +68,54 @@ that is produced {\it in silico} by a sequence of uncorrelated random numbers wi
 
 Because the momentum is dissipated in less than a time step in Brownian dynamics, it is not a relevant quantity for propagation.
 Instead, the random forces applied over the time step, perturbed by the constant force, lead to a shift in the particle coordinates that is uncorrelated with previous steps (with the exception of the influence of the force).
-This behavior is typically called ``diffusion''.
-The distribution of particle steps is 
+The result is diffusive dynamics.
 
 For a basic particle simulation, this is handled simply; the particle has a diffusion constant $D$ and its coordinates are only coupled to other particles by the potential energy.
 In a continuum membrane simulation, the particles of the membrane are interconnected through the generalized coordinates: the mesh control points.
 The Langevin equations must be transformed to be compatible with eliminating the momentum.
 From:
 \begin{align}
-\dot{p}_i &= \frac{\diff H}{\diff q_i} - \dot{p}_i \gamma_i + \eta_i(t) \nonumber \\
-\dot{q}_i &= \sum_j M_{ij}^{-1} p_j
+\dot{p}_i &= -\frac{\partial H}{\partial q_i} -p_i \bar{\gamma}_i + \sqrt{2 \gamma_i \kT} \eta_i(t) \nonumber \\
+\dot{q}_j &= \sum_j M_{ji}^{-1} p_i
 \end{align}
 to
 \begin{equation}
-\dot{q}_i = -\gamma_i M_{ij}^{-1} \frac{\diff H}{\diff q_j} + \sqrt{2 \gamma_i \kT} \sum_{ij}\left(M^{-1/2}\right)_{ij} R_j(t)
+\dot{q}_j = -M_{ji}^{-1} \bar{\gamma}_i^{-1} \frac{\partial H}{\partial q_i} + M_{ji}^{-1}\bar{\gamma_i}^{-1}\sqrt{2 \gamma_i \kT}\eta_i(t)
 \label{eq:dotqmassed}
 \end{equation}
-where $R_j(t)$ are independent random processes made correlated by the action of the matrix multiply.
+where $\eta_i(t)$ are independent random processes, and $\bar{\gamma}$ is the per-mass coupling constant with units time$^{-1}$.
 The surface mass matrix appears in Eq.~\ref{eq:dotqmassed}. 
 
 
 
 \subsubsection{Brownian dynamics with collective variables}
 
-%Consider a membrane undulation of a Helfrich bilayer.
-%The energy of a particular mode
-%\begin{equation}
-%h(x,y) = h_q \sin(x q_x + y q_y )
-%\end{equation}
-%is
-%\begin{equation}
-%E = \frac{1}{4} h_q^2 A q^4
-%\end{equation}
-%The restoring force on $h_q$ is thus $\frac{1}{2} h_q A q^3$.
+
+A variable with a quadratic potential, under Brownian dynamics, has simple kinetics:
+\begin{equation}
+\dot{q} = -\gamma^{-1} k q + \sqrt{ 2 \gamma^{-1} \kT } \eta
+\end{equation}
+Ignoring the random force that has no systematic effect yields:
+\begin{equation}
+q(t) \approx q_0 \exp{-\gamma^{-1} k t}
+\end{equation}
+
+Consider a membrane undulation of a Helfrich bilayer.
+The energy of a particular mode
+\begin{equation}
+h(x,y) = h_q \sin(x q_x + y q_y )
+\end{equation}
+is
+\begin{equation}
+E = \frac{1}{4} h_q^2 A q^4
+\end{equation}
+The restoring force on $h_q$ is thus $\frac{1}{2} h_q A q^3$.
+
 To set the relaxation time of the mode to a particular value of $\tau$, for example
 \begin{equation}
-\tau_m = \frac{k_c q^3}{4 \eta},
+\tau_m = \frac{4 \eta}{k_c q^3},
 \end{equation}
-requires specifying $\gamma$ such that the expected relaxation time $\frac{m}{\gamma}$ matches.
+requires specifying $\gamma_i$ such that the expected relaxation time $m^{-1} \gamma^{-1} k$ matches $\tau^{-1}$.
 This is only possible when the mass matrix $M_{ij}$ of the modes is diagonal, that is, when the modes are uncoupled and so can have independently set timescales.
 
 

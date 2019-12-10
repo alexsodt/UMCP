@@ -96,6 +96,7 @@ void setDefaults( parameterBlock *block )
 	block->collect_hk = 0;
 	block->nruns = 1;
 	block->time_step = 1e-9;
+	block->debug_diffusion = 0;
 	block->kinetics = 0;
 	block->kinetics_do_phase = 0;
 	block->diffc = 1e10; // angstroms^2/s
@@ -681,6 +682,18 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->write_alpha_period = atoi( word2 );
 		else if( !strcasecmp( word1, "nruns" ) )
 			block->nruns = atoi( word2 );
+		else if( !strcasecmp( word1, "debug_diffusion" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->debug_diffusion = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->debug_diffusion = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
 		else if( !strcasecmp( word1, "lipid_mc_swap_only" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
