@@ -495,6 +495,11 @@ int main( int argc, char **argv )
 			{
 				sRec->doing_planar_harmonics = 1;
 				sRec->NQ = useSurface->getPlanarHarmonicModes( sRec->r, -1, -1, block.mode_min, block.mode_max, block.mode_q_max, &sRec->gen_transform, &sRec->output_qvals, &sRec->scaling_factor );
+				if( sRec->NQ == 0 )
+				{
+					printf("Failed to use any modes is q_max set high enough?\n");
+					exit(1);
+				}
 			}
 		}
 		else if( block.mode_x >= 0 || block.mode_y >= 0 )
@@ -731,7 +736,7 @@ int main( int argc, char **argv )
 		
 			useSurface->getSparseEffectiveMass( sRec->theForceSet, sparse_use, &n_vuse, &sRec->EFFM, sRec->gen_transform, NQ, mass_scaling );	
 			if( do_bd_membrane )
-				useSurface->getSparseRoot( sRec->theForceSet, &sRec->MMat ); 
+				useSurface->getSparseRoot( sRec->theForceSet, &sRec->MMat, sRec->gen_transform, NQ ); 
 	
 			free(sparse_use);
 		}
@@ -868,11 +873,11 @@ int main( int argc, char **argv )
 		if( sRec->do_gen_q )
 		{
 			memset( sRec->Qdot0, 0, sizeof(double) * sRec->NQ );
-			GenQMatVecIncrScale( sRec->Qdot0, sRec->pp, sRec->EFFM, 1.0  );
+			GenQMatVecIncrScale( sRec->Qdot0, sRec->pp, sRec->EFFM, NULL, 1.0  );
 			MatVec( sRec->gen_transform, sRec->Qdot0, sRec->qdot0, sRec->NQ, 3*sRec->theSurface->nv ); 
 		}
 		else
-			AltSparseCartMatVecIncrScale( sRec->qdot0, sRec->pp, sRec->EFFM, 1.0, theSimulation->alpha, sRec->id );
+			AltSparseCartMatVecIncrScale( sRec->qdot0, sRec->pp, sRec->EFFM, NULL, 1.0, theSimulation->alpha, sRec->id );
 		
 		memcpy( sRec->qdot, sRec->qdot0, sizeof(double) * 3 * sRec->theSurface->nv );
 		memset( sRec->qdot_temp, 0, sizeof(double) * 3 * sRec->theSurface->nv );
@@ -890,7 +895,7 @@ int main( int argc, char **argv )
 	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
 	{
 		if( ! sRec->do_gen_q )
-			AltSparseCartMatVecIncrScale( sRec->qdot, sRec->qdot_temp, sRec->EFFM, 1.0, theSimulation->alpha, sRec->id );
+			AltSparseCartMatVecIncrScale( sRec->qdot, sRec->qdot_temp, sRec->EFFM, NULL, 1.0, theSimulation->alpha, sRec->id );
 		sRec->theSurface->grad( sRec->r, sRec->g );
 	}
 
@@ -966,9 +971,6 @@ int main( int argc, char **argv )
 		alphaFile = fopen(fileName,"w");
 	}
 
-#ifndef OLD_LANGEVIN
-	double *noise_vec = (double *)malloc( sizeof(double) * 3 * nv );
-#endif
 
 	srand(use_seed);
 	my_gsl_reseed( use_seed );
@@ -977,6 +979,31 @@ int main( int argc, char **argv )
 	struct timeval tnow;
 
 	int rd_triggered = 0;
+
+	for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+	{
+		sRec->gamma = (double *)malloc( sizeof(double) * sRec->NQ );
+		sRec->gamma_inv = (double *)malloc( sizeof(double) * sRec->NQ );
+		for( int i = 0; i < sRec->NQ; i++ )	
+		{
+			sRec->gamma[i] = gamma_langevin;
+			sRec->gamma_inv[i] = 1.0 / sRec->gamma[i];
+		}
+		if( block.kinetics && do_bd_membrane )
+		{
+			for( int i = 0; i < sRec->NQ; i++ )
+			{
+				double q = sRec->output_qvals[i];
+
+				double time_const = kc * q*q*q  / (4 * eta);
+				double tau =  AKMA_TIME * 1.0 / time_const;
+//				double inv_mass = sRec->EFFM->diagonal_element[i]; 
+		
+				// mass matrix is included later on
+				sRec->gamma[i] = (1.0/tau);
+			}
+		}
+	}
 	
 	while( !done )
 	{
@@ -1425,17 +1452,17 @@ int main( int argc, char **argv )
 				memcpy( sRec->next_pp, sRec->pp, sizeof(double) * sRec->NQ );
 				if( !block.disable_mesh )
 				{
-					if( do_bd_membrane || do_ld || (switched) )
+					if( !do_bd_membrane && (do_ld || (switched)) )
 					{
 						if( sRec->do_gen_q )
-							GenQMatVecIncrScale( sRec->next_pp, sRec->pp, sRec->EFFM, -gamma_langevin*AKMA_TIME*time_step );
+							GenQMatVecIncrScale( sRec->next_pp, sRec->pp, sRec->EFFM, sRec->gamma, -AKMA_TIME*time_step );
 						else
 						{
 #ifdef OLD_LANGEVIN
-							AltSparseCartMatVecIncrScale( sRec->next_pp, sRec->pp, sRec->EFFM, -gamma_langevin*AKMA_TIME*time_step, theSimulation->alpha, sRec->id );
+							AltSparseCartMatVecIncrScale( sRec->next_pp, sRec->pp, sRec->EFFM, sRec->gamma, -AKMA_TIME*time_step, theSimulation->alpha, sRec->id );
 #else
 							for( int xv = 0; xv < 3*sRec->theSurface->nv; xv++ ) // here, gamma_langevin has units per time.
-								sRec->next_pp[xv] -= gamma_langevin*AKMA_TIME * time_step * sRec->next_pp[xv];
+								sRec->next_pp[xv] -= sRec->gamma[xv]*AKMA_TIME * time_step * sRec->next_pp[xv];
 #endif
 						}
 						
@@ -1446,19 +1473,30 @@ int main( int argc, char **argv )
 
 				if( !block.disable_mesh )
 				{
-
 					if( sRec->do_gen_q )
 					{
 						memset(sRec->del_pp,0,sizeof(double)*sRec->NQ);
-						
-						for( int Q = 0; Q < sRec->NQ; Q++ )
-						for( int v1 = 0; v1 <sRec->theSurface->nv; v1++ )
-						{
-							sRec->del_pp[Q] += sRec->gen_transform[Q*3*nv+v1*3+0] * -sRec->g[3*v1+0] * AKMA_TIME * time_step/2;
-							sRec->del_pp[Q] += sRec->gen_transform[Q*3*nv+v1*3+1] * -sRec->g[3*v1+1] * AKMA_TIME * time_step/2;
-							sRec->del_pp[Q] += sRec->gen_transform[Q*3*nv+v1*3+2] * -sRec->g[3*v1+2] * AKMA_TIME * time_step/2;
-						}
 
+						if( do_bd_membrane )
+						{
+							for( int Q = 0; Q < sRec->NQ; Q++ )
+							for( int v1 = 0; v1 <sRec->theSurface->nv; v1++ )
+							{
+								sRec->del_pp[Q] += sRec->gen_transform[Q*3*nv+v1*3+0] * -sRec->g[3*v1+0] * sRec->gamma_inv[Q]/2;
+								sRec->del_pp[Q] += sRec->gen_transform[Q*3*nv+v1*3+1] * -sRec->g[3*v1+1] * sRec->gamma_inv[Q]/2;
+								sRec->del_pp[Q] += sRec->gen_transform[Q*3*nv+v1*3+2] * -sRec->g[3*v1+2] * sRec->gamma_inv[Q]/2;
+							}
+						}	
+						else
+						{	
+							for( int Q = 0; Q < sRec->NQ; Q++ )
+							for( int v1 = 0; v1 <sRec->theSurface->nv; v1++ )
+							{
+								sRec->del_pp[Q] += sRec->gen_transform[Q*3*nv+v1*3+0] * -sRec->g[3*v1+0] * AKMA_TIME * time_step/2;
+								sRec->del_pp[Q] += sRec->gen_transform[Q*3*nv+v1*3+1] * -sRec->g[3*v1+1] * AKMA_TIME * time_step/2;
+								sRec->del_pp[Q] += sRec->gen_transform[Q*3*nv+v1*3+2] * -sRec->g[3*v1+2] * AKMA_TIME * time_step/2;
+							}
+						}
 #ifdef PARALLEL
 						ParallelSum( sRec->del_pp, sRec->NQ );
 						ParallelBroadcast( sRec->del_pp, sRec->NQ );
@@ -1481,9 +1519,9 @@ int main( int argc, char **argv )
 				
 
 				if( sRec->do_gen_q )
-					GenQMatVecIncrScale( sRec->Qdot0_trial, sRec->pp, sRec->EFFM, 1.0 );
+					GenQMatVecIncrScale( sRec->Qdot0_trial, sRec->pp, sRec->EFFM, NULL,  1.0 );
 				else
-					AltSparseCartMatVecIncrScale( sRec->Qdot0_trial, sRec->pp, sRec->EFFM, 1.0, theSimulation->alpha, sRec->id );
+					AltSparseCartMatVecIncrScale( sRec->Qdot0_trial, sRec->pp, sRec->EFFM, NULL, 1.0, theSimulation->alpha, sRec->id );
 					
 				for( int Q = 0; Q < sRec->NQ; Q++ )
 				{
@@ -1521,46 +1559,52 @@ int main( int argc, char **argv )
 			{
 				if( !block.disable_mesh )
 				{
-					if( do_bd_membrane || do_ld )
+					if( do_bd_membrane )
 					{
-#ifdef OLD_LANGEVIN
+						double *noise_vec = (double *)malloc( sizeof(double) * sRec->NQ  );
+
 						for( int Q = 0; Q < sRec->NQ; Q++ )
-							sRec->next_pp[Q] += gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
-#else
-						if( sRec->do_gen_q )
-						{
-							for( int Q = 0; Q < sRec->NQ; Q++ )
-								sRec->next_pp[Q] += gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
-						}
-						else
-						{
+							noise_vec[Q] = gsl_ran_gaussian(rng_x, sqrt(2*sRec->gamma_inv[Q]*temperature*AKMA_TIME*time_step));
 
-							for( int Q = 0; Q < 3*sRec->theSurface->nv; Q++ )
-								noise_vec[Q] = gsl_ran_gaussian(rng_x, sqrt(2*gamma_langevin*temperature*AKMA_TIME*time_step));
+						for( int Q = 0; Q < sRec->NQ; Q++ )
+							sRec->next_pp[Q] += noise_vec[Q];
 
-							AltSparseCartMatVecIncrScale( sRec->next_pp, noise_vec, sRec->MMat, 1.0, theSimulation->alpha, sRec->id  );
-							
-						}
-#endif
-#ifdef PARALLEL
-						ParallelBroadcast(sRec->next_pp,sRec->NQ );
-#endif
+//						if( sRec->do_gen_q )							
+//							GenQMatVecIncrScale( sRec->next_pp, noise_vec, sRec->MMat, NULL,  1.0 );
+//						else
+//							AltSparseCartMatVecIncrScale( sRec->next_pp, noise_vec, sRec->MMat, NULL, 1.0, theSimulation->alpha, sRec->id  );
+						free(noise_vec);
 					}
-
-					// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t+eps/2)
-					if( sRec->do_gen_q )
+					else if( do_ld )
 					{
 						for( int Q = 0; Q < sRec->NQ; Q++ )
-							sRec->next_pp[Q] += sRec->del_pp[Q];
+							sRec->next_pp[Q] += gsl_ran_gaussian(rng_x, sqrt(2*sRec->gamma[Q]*temperature*AKMA_TIME*time_step));
+					}
+					
+#ifdef PARALLEL
+					ParallelBroadcast(sRec->next_pp,sRec->NQ );
+#endif
+
+					if( do_bd_membrane )
+					{
 					}
 					else
 					{
-						for( int v1 = 0; v1 < sRec->theSurface->nv; v1++ )
+						// LEAPFROG: increment p by 1/2 eps, we have q(t), p(t+eps/2)
+						if( sRec->do_gen_q )
 						{
-							sRec->next_pp[3*v1+0] += -sRec->g[3*v1+0] * AKMA_TIME * time_step/2;
-							sRec->next_pp[3*v1+1] += -sRec->g[3*v1+1] * AKMA_TIME * time_step/2;
-							sRec->next_pp[3*v1+2] += -sRec->g[3*v1+2] * AKMA_TIME * time_step/2;
-						}	
+							for( int Q = 0; Q < sRec->NQ; Q++ )
+								sRec->next_pp[Q] += sRec->del_pp[Q];
+						}
+						else
+						{
+							for( int v1 = 0; v1 < sRec->theSurface->nv; v1++ )
+							{
+								sRec->next_pp[3*v1+0] += -sRec->g[3*v1+0] * AKMA_TIME * time_step/2;
+								sRec->next_pp[3*v1+1] += -sRec->g[3*v1+1] * AKMA_TIME * time_step/2;
+								sRec->next_pp[3*v1+2] += -sRec->g[3*v1+2] * AKMA_TIME * time_step/2;
+							}	
+						}
 					}
 				}
 				memcpy( sRec->pp, sRec->next_pp, sizeof(double) * sRec->NQ );
@@ -1569,16 +1613,16 @@ int main( int argc, char **argv )
 				if( sRec->do_gen_q )
 				{	
 					memset( sRec->Qdot0, 0, sizeof(double) * sRec->NQ );
-					GenQMatVecIncrScale( sRec->Qdot0, sRec->pp, sRec->EFFM, 1.0 );
+					GenQMatVecIncrScale( sRec->Qdot0, sRec->pp, sRec->EFFM, NULL,  1.0 );
 					MatVec( sRec->gen_transform, sRec->Qdot0, sRec->qdot0, sRec->NQ, 3*sRec->theSurface->nv ); 
 				}
 				else
-					AltSparseCartMatVecIncrScale( sRec->qdot0, sRec->pp, sRec->EFFM, 1.0, theSimulation->alpha, sRec->id );
+					AltSparseCartMatVecIncrScale( sRec->qdot0, sRec->pp, sRec->EFFM, NULL, 1.0, theSimulation->alpha, sRec->id );
 
 				memcpy( sRec->qdot, sRec->qdot0, sizeof(double) * 3 * sRec->theSurface->nv );
 
 				if( !sRec->do_gen_q )
-					AltSparseCartMatVecIncrScale( sRec->qdot, sRec->qdot_temp, sRec->EFFM, 1.0, theSimulation->alpha, sRec->id  );
+					AltSparseCartMatVecIncrScale( sRec->qdot, sRec->qdot_temp, sRec->EFFM, NULL, 1.0, theSimulation->alpha, sRec->id  );
 
 				// LEAPFROG: increment q by eps, we have q(t+eps), p(t+eps/2)
 
@@ -1591,9 +1635,11 @@ int main( int argc, char **argv )
 
 				if( sRec->do_gen_q )
 				{
-
+					if( t == 0 ) printf("GENQ t %le (s) ", cur_t );
 					for( int Q = 0; Q < sRec->NQ; Q++ )
 					{
+						if( t == 0 )
+						printf(" %le", sRec->QV[Q] );
 						sRec->QV[Q] += sRec->Qdot0[Q] * AKMA_TIME * time_step;
 						if( o >= nequil )
 						{
@@ -1602,6 +1648,8 @@ int main( int argc, char **argv )
 							sRec->nav_Q[Q] += 1;
 						}
 					}
+					if( t == 0 )
+						printf("\n");
 				}
 #ifdef PARALLEL
 				if( sRec->do_gen_q )
@@ -1680,6 +1728,12 @@ int main( int argc, char **argv )
 			{
 				// Update SANS B-histogram.
 				theSimulation->sample_B_hist( B_hist, &A2dz2_sampled, SANS_SAMPLE_NRM, 100000, sans_max_r, nsans_bins, block.shape_correction );  
+			}
+
+			if( do_bd_membrane )
+			{
+				for( surface_record *sRec = theSimulation->allSurfaces; sRec; sRec = sRec->next )
+					memset( sRec->pp, 0, sizeof(double) * sRec->NQ );
 			}
 
 		}
@@ -1876,9 +1930,6 @@ int main( int argc, char **argv )
 
 	}
 
-#ifndef OLD_LANGEVIN
-	free(noise_vec);
-#endif
 	}
 
 #ifdef PARALLEL

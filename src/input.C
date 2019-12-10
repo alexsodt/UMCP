@@ -914,6 +914,22 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}
 		}
+		else if( !strcasecmp( word1, "do_bd_membrane" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+			{
+				block->do_bd_membrane = 1;
+			}
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+			{
+				block->do_bd_membrane = 0;
+			}
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}
+		}
 		else if( !strcasecmp( word1, "do_ld" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
