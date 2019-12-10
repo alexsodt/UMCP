@@ -99,7 +99,7 @@ void setDefaults( parameterBlock *block )
 	block->time_step = 1e-9;
 	block->kinetics = 0;
 	block->kinetics_do_phase = 0;
-	block->diffc = 1e9; // angstroms^2/s
+	block->diffc = 1e10; // angstroms^2/s
 	block->aqueous_diffc = 1e10; // angstroms^2/s
 	block->kinetic_corr_period = 10; 
 
@@ -1638,7 +1638,7 @@ void printParamBlock( parameterBlock *block )
 	printf("\tKA:        %lf kcal/mol/A^2\n", block->KA );
 	printf("\tkc:        %lf kcal/mol\n", block->kc );
 	printf("Random seed: %d\n", block->random_seed );
-	printf("Timestep:    %le seconds.\n", block->time_step );
+	printf("DC:    %le Angstrom^2/s\n", block->diffc );
 
 	if( block->do_ld )
 	{

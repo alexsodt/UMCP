@@ -59,6 +59,8 @@ extern double kg;
 extern double KA;
 extern double KA4;
 extern double VR;
+extern double lipid_DC;
+extern double solution_DC;
 
 double mode_KA = 0; // a ``global'' KA to use when doing modes, because with "z" movements individual elements cannot relax -- this is artificial. 
 double dist_nrm = 0;
@@ -123,6 +125,8 @@ int main( int argc, char **argv )
 	kg = block.kg;
 	KA = block.KA;
 	mode_KA = block.mode_KA;
+	lipid_DC = block.diffc;
+	solution_DC = block.aqueous_diffc;
 	int nsteps = block.nsteps;
 	int nequil = block.nequil;
 	int do_srd = block.do_srd;
@@ -142,7 +146,8 @@ int main( int argc, char **argv )
 
 	printf("eta_SI: %le eta: %le (kcal/angstrom/seconds)\n", eta_SI, eta );
 //1.3e-13;
-	double dt = block.time_step;
+	double dt = 1e-3*(2*sqrt(65/M_PI))*(2*sqrt(65/M_PI))/(4*lipid_DC);//block.time_step;
+	printf("timestep: %le (s)\n",dt);
 
 	fitCoupling = block.fitCoupling;
 
