@@ -7,6 +7,7 @@
 #include "p_p.h"
 #include "parallel.h"
 #include "fitRho.h"
+#include "globals.h"
 
 extern int enable_elastic_interior;
 static int min_ncomplex = 0;
@@ -15,6 +16,8 @@ static int min_nsurfaceparams = 0;
 static int do_freeze_membrane = 0;
 static pcomplex **min_complexes;
 extern double VA,VC;
+double VV = 0;
+extern double water_KV;
 Simulation *min_simulation = NULL;
 static double cur_rho_thickness[2] = { 15.0, 15.0 };
 
@@ -40,6 +43,7 @@ double surface_f( double *p )
 	ParallelSyncComplexes( min_complexes, min_ncomplex );
 #endif
 
+	VV = 0;
 	VA = 0;
 	VC = 0;
 	double v = 0;
@@ -69,6 +73,7 @@ double surface_f( double *p )
 		for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
 			v += sRec->theSurface->rhoEnergy( p+sRec->temp_min_offset, min_simulation->PBC_vec, thick_inner, thick_outer );
 	}	
+
 	for( int cx = 0; cx < par_info.nc; cx++ )
 	{
 		int c = par_info.complexes[cx];
@@ -80,6 +85,33 @@ double surface_f( double *p )
 	
 	ParallelSum(&v,1);
 
+	// AFTER PARALLEL SUM:
+
+	if( water_KV > 0 )
+	{
+		for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
+		{
+			double Vi,Vo;
+			sRec->theSurface->new_volume( &Vi, &Vo, sRec->r, min_simulation->alpha, NULL );
+			double strain_i = (Vi-sRec->V0_i)/sRec->V0_i;
+			double strain_o = (Vo-sRec->V0_o)/sRec->V0_o;
+			double vi = 0.5 * water_KV * sRec->V0_i * strain_i * strain_i;
+			double vo = 0.5 * water_KV * sRec->V0_o * strain_o * strain_o;
+//			printf("en vol %le %le en: %le %le\n", Vi,Vo,vi,vo );
+
+			if( global_block->restrain_volume_outside )
+			{
+				VV += vo;
+				v += vo;
+			}
+			if( global_block->restrain_volume_inside )
+			{
+				v += vi;
+				VV += vi;
+			}	
+//			printf("vol: %le vol_v: %le\n",  Vi, 0.5 * water_KV * sRec->V0 * pow( (Vi-sRec->V0)/sRec->V0, 2 ) );
+		}
+	}
 
 #ifdef PARALLEL
 	MPI_Bcast( &v, 1, MPI_DOUBLE, BASE_TASK, MPI_COMM_WORLD );
@@ -313,7 +345,55 @@ double surface_fdf( double *p, double *g)
 	for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
 		v += sRec->theSurface->energy( p+sRec->temp_min_offset, NULL );
 	ParallelSum( &v, 1 );
+	
 	ParallelSum( g, min_nparams );
+
+	if( water_KV > 0 )
+	{
+		for( surface_record *sRec = min_simulation->allSurfaces; sRec; sRec = sRec->next )
+		{
+			double * dvol = (double *)malloc( sizeof(double) * 3 * sRec->theSurface->nv );
+			memset( dvol, 0, sizeof(double) * 3 * sRec->theSurface->nv );
+			double Vi,Vo;
+			sRec->theSurface->new_volume( &Vi, &Vo, sRec->r, min_simulation->alpha, dvol );
+				
+			double strain_i = (Vi-sRec->V0_i)/sRec->V0_i;
+			double strain_o = (Vo-sRec->V0_o)/sRec->V0_o;
+
+			double vi = 0.5 * water_KV * sRec->V0_i * strain_i * strain_i;
+			double vo = 0.5 * water_KV * sRec->V0_o * strain_o * strain_o;
+			if( global_block->restrain_volume_inside )
+			for( int p = 0; p < sRec->theSurface->nv; p++ )
+			{
+				g[sRec->temp_min_offset+3*p+0] += water_KV * strain_i * dvol[3*p+0] ;		
+				g[sRec->temp_min_offset+3*p+1] += water_KV * strain_i * dvol[3*p+1] ;		
+				g[sRec->temp_min_offset+3*p+2] += water_KV * strain_i * dvol[3*p+2] ;		
+			}
+
+			
+			if( global_block->restrain_volume_outside )
+			for( int p = 0; p < sRec->theSurface->nv; p++ )
+			{
+				g[sRec->temp_min_offset+3*p+0] -= water_KV * strain_o * dvol[3*p+0] ;		
+				g[sRec->temp_min_offset+3*p+1] -= water_KV * strain_o * dvol[3*p+1] ;		
+				g[sRec->temp_min_offset+3*p+2] -= water_KV * strain_o * dvol[3*p+2] ;		
+			}
+//			printf("grad vol %le %le en: %le %le\n", Vi,Vo,vi,vo );
+
+			free(dvol);
+
+			if( global_block->restrain_volume_inside )
+			{
+				VV += vi;
+				v += vi;
+			}
+			if( global_block->restrain_volume_outside )
+			{
+				VV += vo;
+				v += vo;
+			}
+		}
+	}
 
 #if 0 	
 	MPI_Barrier(MPI_COMM_WORLD);
@@ -327,6 +407,10 @@ double surface_fdf( double *p, double *g)
 
 	MPI_Barrier(MPI_COMM_WORLD);
 	exit(1);
+#endif
+
+#ifdef PARALLEL
+	MPI_Bcast( &v, 1, MPI_DOUBLE, BASE_TASK, MPI_COMM_WORLD );
 #endif
 	return v;
 
@@ -360,11 +444,18 @@ void full_fd_test( double *p )
 
 			tp[p] -= deps * (im == 0 ? 1 : -1);	
 		}
-		
-		printf("parm %d fd_der %.14le g %.14le del %.14le\n", p, (de_pm[0]-de_pm[1])/(2*deps), g[p],  (de_pm[0]-de_pm[1])/(2*deps) - g[p] );
+	
+		double fr_error = fabs(((de_pm[0]-de_pm[1])/(2*deps) - g[p])/((de_pm[0]-de_pm[1])/(2*deps)));	
+	
+		if( fabs( (de_pm[0]-de_pm[1])/(2*deps) - g[p]) > 1e-5 && fr_error > 1e-5 )
+			printf("parm %d fd_der %.14le g %.14le del %.14le BAD\n", p, (de_pm[0]-de_pm[1])/(2*deps), g[p],  (de_pm[0]-de_pm[1])/(2*deps) - g[p] );
+		else if( fabs( (de_pm[0]-de_pm[1])/(2*deps)) > 1e-10 )	
+			printf("parm %d fd_der %.14le g %.14le del %.14le OK\n", p, (de_pm[0]-de_pm[1])/(2*deps), g[p],  (de_pm[0]-de_pm[1])/(2*deps) - g[p] );
 	}
 	free(tp);
 	free(g);
+
+//	exit(1);
 }
 
 void fd_test( double *p )
@@ -493,7 +584,7 @@ void Simulation::minimize( int freeze_membrane  )
 	int use_m = nsteps;
 	if( use_m > num_params )
 		use_m = num_params;
-	
+	printf("Here we go.\n");	
 	double e_init = surface_f(p);
 //	full_fd_test(p);
 	printf("Entering minimize with e_init: %le\n", e_init );
@@ -523,7 +614,9 @@ void Simulation::minimize( int freeze_membrane  )
 	rms /= num_params;
 	rms = sqrt(rms);
 
-	printf("Minimize: VG: %.14le VV: %.14le VA: %lf VC: %lf grad rms %le\n", v, e, VA, VC, rms );
+	fd_test(p);
+
+	printf("Minimize: VG: %.14le VV: %.14le VA: %lf VC: %lf VV: %lf grad rms %le\n", v, e, VA, VC, VV, rms );
 
 	enable_elastic_interior = prev_enable;
 

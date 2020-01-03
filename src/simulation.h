@@ -57,6 +57,9 @@ typedef struct surface_record
 	int doing_planar_harmonics;
 	double *output_qvals;
 
+	double V0_i; // target volume inside surface.
+	double V0_o; // target volume outside surface
+
 	double *next_pp;
 	double *del_pp;
 	int n_real_q;

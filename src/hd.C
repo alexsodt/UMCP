@@ -54,6 +54,7 @@ int debug_trigger = 0; // wait until all particles have been put in the sim befo
 #define DIRECT_FT // defined to compute the fourier transform "directly"
 //#define TFILE // defined to write  a trajectory
 
+extern double water_KV;
 extern double kc;
 extern double kg;
 extern double KA;
@@ -121,6 +122,7 @@ int main( int argc, char **argv )
 	int collect_hk = block.collect_hk;	
 	int doPlanarTopology = block.planar_topology; // true means the system is planar.	
 	int doMonge = block.monge;
+	water_KV = block.kv;
 	kc = block.kc;
 	kg = block.kg;
 	KA = block.KA;
@@ -271,12 +273,20 @@ int main( int argc, char **argv )
 		useSurface->readLipidComposition(inputFile);
 		if( inputFile) fclose(inputFile);
 		useSurface->setg0(sRec->r);
-	
+		
+		double Vi,Vo;
+		double alphas[3]={1,1,1};
+		useSurface->new_volume( &Vi, &Vo, sRec->r, alphas, NULL ); // to test gradient. 
+		sRec->V0_i = Vi;
+		sRec->V0_o = Vo;
+
 		double area0;
 		double cur_area;
 		useSurface->area(r, -1, &cur_area, &area0 );
 		printf("Surface %d area: %le area0: %le\n", sRec->id, cur_area, area0 );
 	}
+
+	global_block = &block; //yikes
 
 	if( block.fitRho )
 		theSimulation->setupDensity( block.fitRho );
@@ -556,29 +566,30 @@ int main( int argc, char **argv )
 		sRec->Qdot0 = NULL;
 		sRec->Qdot0_trial = NULL;		
 
+		int nq_alloc = sRec->NQ+1;
 		if( sRec->do_gen_q )
 		{
-			sRec->n_real_q = sRec->NQ;
-			sRec->pp = (double *)malloc( sizeof(double) * sRec->NQ ); 
-			memset( sRec->pp, 0, sizeof(double) * sRec->NQ );
-			sRec->next_pp = (double *)malloc( sizeof(double) * sRec->NQ );
-			memset( sRec->next_pp, 0, sizeof(double) * sRec->NQ );
-			sRec->del_pp = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->QV = (double *)malloc( sizeof(double) * sRec->NQ );
+			sRec->n_real_q = nq_alloc;
+			sRec->pp = (double *)malloc( sizeof(double) * nq_alloc ); 
+			memset( sRec->pp, 0, sizeof(double) * nq_alloc );
+			sRec->next_pp = (double *)malloc( sizeof(double) * nq_alloc );
+			memset( sRec->next_pp, 0, sizeof(double) * nq_alloc );
+			sRec->del_pp = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->QV = (double *)malloc( sizeof(double) * nq_alloc );
 			memset( sRec->QV, 0, sizeof(double) * sRec->NQ );
-			sRec->Qdot = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->Qdot0 = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->Qdot0_trial = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->nav_Q = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->av_Q = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->av_Q2 = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->av_Q_T = (double *)malloc( sizeof(double) * sRec->NQ );
-			sRec->nav_Q_T = (double *)malloc( sizeof(double) * sRec->NQ );
-			memset( sRec->nav_Q, 0, sizeof(double) * sRec->NQ );
-			memset( sRec->av_Q, 0, sizeof(double) * sRec->NQ );
-			memset( sRec->av_Q2, 0, sizeof(double) * sRec->NQ );
-			memset( sRec->av_Q_T, 0, sizeof(double) * sRec->NQ );
-			memset( sRec->nav_Q_T, 0, sizeof(double) * sRec->NQ );
+			sRec->Qdot = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->Qdot0 = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->Qdot0_trial = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->nav_Q = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->av_Q = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->av_Q2 = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->av_Q_T = (double *)malloc( sizeof(double) * nq_alloc );
+			sRec->nav_Q_T = (double *)malloc( sizeof(double) * nq_alloc );
+			memset( sRec->nav_Q, 0, sizeof(double) * nq_alloc );
+			memset( sRec->av_Q, 0, sizeof(double) * nq_alloc );
+			memset( sRec->av_Q2, 0, sizeof(double) * nq_alloc );
+			memset( sRec->av_Q_T, 0, sizeof(double) * nq_alloc );
+			memset( sRec->nav_Q_T, 0, sizeof(double) * nq_alloc );
 		}
 		else
 		{
@@ -597,7 +608,7 @@ int main( int argc, char **argv )
 		sRec->qdot0 = (double *)malloc( sizeof(double) * (3*nv+3) );
 		sRec->qdot_temp = (double *)malloc( sizeof(double) * (3*nv+3) );
 	
-		memset( sRec->pp, 0, sizeof(double) * sRec->NQ );
+		memset( sRec->pp, 0, sizeof(double) * nq_alloc );
 		memset( sRec->qdot, 0, sizeof(double) * 3 * nv );	
 		memset( sRec->qdot0, 0, sizeof(double) * 3 * nv );	
 		memset( sRec->qdot_temp, 0, sizeof(double) * 3 * nv );	

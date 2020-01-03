@@ -348,6 +348,7 @@ struct surface
 	void getHeight3( double *h, double *r, int nx, int ny );
 	void dft( double *fh, double *fq, int x, int ny, double Lx, double Ly );
 	double volume( double *r);
+	void new_volume( double *vol_inside, double *vol_outside, double *r, double *alphas, double *dvol );
 	double dvolume( double *r, double *g, double scale = 1.0);
 	void generateVolumePlan(void);
 	void randomPointOnSurface( int *face, double *u, double *v );

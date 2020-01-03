@@ -46,6 +46,9 @@ static int success = 0;
 static int *psf_dihedrals;
 static int npsf_dihedrals;
 
+static int npsf_bonds;
+static int *psf_bonds;
+
 static int *psf_carbons;
 static int npsf_carbons;
 
@@ -62,6 +65,16 @@ static int *bondOrder = NULL;
 static double FracINV[9];
 static double SMUSE[9];
 static double SM_aligned[9];
+
+int getNBonds( void )
+{
+	return npsf_bonds;
+}
+
+void getBonds( int * bonds )
+{
+	memcpy( bonds, psf_bonds, sizeof(int) * npsf_bonds * 2 );
+}
 
 double getXTLABC( double SMOUT[9] )
 {
@@ -903,6 +916,9 @@ void loadPSF( FILE *theFile )
 		
 		if( !strncasecmp( unitName, "NBOND", 5 ) )
 		{
+			npsf_bonds = nunits;
+			psf_bonds = (int *)malloc( sizeof(int) * 2 * npsf_bonds );
+			npsf_bonds = 0;
 			// dihedrals.
 			while( !feof(theFile) )
 			{
@@ -927,6 +943,9 @@ void loadPSF( FILE *theFile )
 					int at_1 = units[2*p+0];
 					int at_2 = units[2*p+1];
 
+					psf_bonds[npsf_bonds*2+0] = at_1;
+					psf_bonds[npsf_bonds*2+1] = at_2;
+					npsf_bonds++;
 					if( link[at_1] >= 0 ) // && at_name[at_2][0] == 'H' )
 					{
 						for( int x = 1; x < 5; x++ )
@@ -1040,7 +1059,7 @@ void loadPSF( FILE *theFile )
 		int at4 = psf_dihedrals[4*x+3]-1;
 
 		if( at_name[at1][0] == 'C' && at_name[at2][0] == 'C' && at_name[at3][0] == 'C' && at_name[at4][0] == 'C' &&
-			bondOrder[at2] == 3 && bondOrder[at3] == 3 ) // a double bond
+			bondOrder[at2] == 3 && bondOrder[at3] == 3 ) // possibly a double bond, probably at least pi-conjugated?
 		{
 			if( nDoubleBonds == doubleBondSpace )
 			{
@@ -1755,6 +1774,190 @@ void cacheDCDHeader( FILE *theFile1 )
 void uncacheDCDHeader( FILE *theFile1 )
 {
 	fwrite( cached_header, 1, cached_pt, theFile1 );
+}
+
+
+int bond_recurse(int *my_bonds, int * my_bond_ids, int *nbonds, int *bond_offset, int cur_atom, int *back_edges, int *nback, int *marked, int *marked_bond, 
+	int depth,
+	int **cycle, int trigger_search, int trigger_marked, int *cycle_length )
+{
+	marked[cur_atom] = 1;
+
+	for( int bx = 0; bx < nbonds[cur_atom]; bx++ )
+	{
+		int b_id = my_bond_ids[bond_offset[cur_atom]+bx];
+		int a2 = my_bonds[bond_offset[cur_atom]+bx];
+		
+		if( b_id == trigger_marked && a2 == trigger_search )	
+		{
+			*cycle = (int *)malloc( sizeof(int) * (depth+1) );
+			(*cycle)[depth] = cur_atom;
+			*cycle_length = depth+1;
+			return 1;
+		}
+
+		if( marked_bond[b_id] ) continue;
+
+		if( marked[a2] && trigger_search < 0 )
+		{
+			marked_bond[b_id] = 2;
+			back_edges[*nback] = b_id;
+			(*nback)++;
+
+			continue;	
+		}
+
+		marked_bond[b_id] = 1;
+
+		if( bond_recurse( my_bonds, my_bond_ids, nbonds, bond_offset, a2, back_edges, nback, marked, marked_bond, depth+1,
+			cycle, trigger_search, trigger_marked, cycle_length ) )
+		{
+			(*cycle)[depth] = cur_atom;
+
+			return 1;
+		}
+	}
+
+	return 0;
+} 
+
+
+void fetchCycleBasis( int ***basis_out, int **basis_length, int *nbasis )
+{
+	// gets a list of cycles from the bond list.
+		
+	int *marked_bond = (int *)malloc( sizeof(int) * npsf_bonds );
+	memset( marked_bond, 0, sizeof(int) * npsf_bonds );
+	int *marked = (int *)malloc( sizeof(int) * psf_natoms );
+	memset( marked, 0, sizeof(int) * psf_natoms );
+	int *nbonds = (int *)malloc( sizeof(int) * psf_natoms );
+	memset( nbonds, 0, sizeof(int) * psf_natoms );
+	int *bond_offset = (int *)malloc( sizeof(int) * psf_natoms );
+	
+	for( int b = 0; b < npsf_bonds; b++ )
+	{
+		int b1 = psf_bonds[2*b+0];
+		int b2 = psf_bonds[2*b+1];
+		if( !strcasecmp( res_name[b1], "TIP3") ) 
+			continue;
+		nbonds[b1] += 1;
+		nbonds[b2] += 1;
+	}	
+	
+	int cur_offset = 0;
+	for( int b = 0; b < psf_natoms; b++ )
+	{
+		bond_offset[b] = cur_offset;
+		cur_offset += nbonds[b];
+	}		
+	
+	int *my_bonds = (int *)malloc( sizeof(int) * cur_offset );
+	int *my_bond_ids = (int *)malloc( sizeof(int) * cur_offset );
+
+	memset( nbonds, 0, sizeof(int) * psf_natoms );
+	for( int b = 0; b < npsf_bonds; b++ )
+	{
+		int b1 = psf_bonds[2*b+0];
+		int b2 = psf_bonds[2*b+1];
+
+		if( !strcasecmp( res_name[b1], "TIP3") ) 
+			continue;
+
+		my_bonds[bond_offset[b1]+nbonds[b1]] = b2;
+		my_bond_ids[bond_offset[b1]+nbonds[b1]] = b;
+		nbonds[b1]+=1;
+		my_bonds[bond_offset[b2]+nbonds[b2]] = b1;
+		my_bond_ids[bond_offset[b2]+nbonds[b2]] = b;
+		nbonds[b2]+=1;
+	}	
+
+	int *back_edges = (int *)malloc( sizeof(int) * 2 * npsf_bonds );
+	int nback = 0;
+
+	int done = 0;
+	
+	int cur_atom_head = 0;
+
+	while( !done )
+	{
+		bond_recurse( my_bonds, my_bond_ids, nbonds, bond_offset, cur_atom_head, back_edges, &nback, marked, marked_bond, 0, NULL, -1, -1, NULL );
+
+		while( cur_atom_head < psf_natoms )
+		{
+			if( !marked[cur_atom_head] )
+				break;
+			cur_atom_head++;
+		}
+
+		if( cur_atom_head == psf_natoms )
+			done = 1;
+	}
+
+	printf("nback: %d\n", nback );
+
+	// fetch back cycles
+
+	int nbasis_space = 10;
+	int **basis = (int **)malloc( sizeof(int*) * nbasis_space );
+	int *basis_len = (int *)malloc( sizeof(int) * nbasis_space );	
+	*nbasis= 0;
+
+	for( int m = 0; m < nback; m++ )
+	{
+		memset( marked, 0, sizeof(int) * psf_natoms );
+
+		for( int b = 0; b < npsf_bonds; b++ )	
+		{
+			if( marked_bond[b] == 1 )
+				marked_bond[b] = 0;
+		} 
+
+		int b_id = back_edges[m];
+		int a1 = psf_bonds[2*b_id+0]; 
+		int a2 = psf_bonds[2*b_id+1]; 
+
+		int *cycle = NULL;
+		int cycle_length;
+		bond_recurse( my_bonds, my_bond_ids, nbonds, bond_offset, a1, back_edges, &nback, marked, marked_bond, 0,
+			&cycle, a1, b_id, &cycle_length );
+	
+		if( *nbasis == nbasis_space )
+		{
+			nbasis_space *= 2;
+			basis = (int **)realloc( basis, sizeof(int*) * nbasis_space );
+			basis_len = (int *)realloc( basis_len, sizeof(int) * nbasis_space );	
+		}
+
+		basis[*nbasis] = (int *)malloc( sizeof(int) * cycle_length );
+		memcpy( basis[*nbasis], cycle, sizeof(int) * cycle_length );
+		basis_len[*nbasis] = cycle_length;
+		(*nbasis)++;
+
+//
+//		printf("cycle_length: %d\n", cycle_length );
+//		for( int i = 0; i < cycle_length; i++ )
+//			printf(" %d", cycle[i] );
+//		printf("\n");
+		while( cur_atom_head < psf_natoms )
+		{
+			if( !marked[cur_atom_head] )
+				break;
+			cur_atom_head++;
+		}
+
+		if( cur_atom_head == psf_natoms )
+			done = 1;
+	}
+
+//	printf("nback: %d\n", nback );
+
+	*basis_out = basis;
+	*basis_length = basis_len;
+
+	free(marked);
+	free(nbonds);
+	free(bond_offset);
+	free(my_bonds);
 }
 
 /*

@@ -837,6 +837,7 @@ void RD::unbox_reactants( void )
 int RD::check_RD_blocked( Simulation *theSimulation, int p, int s)
 {
 	double *alphas = theSimulation->alpha;
+	
 	int near = boxing->getNearPts(theSimulation->allComplexes[p]->rall+3*s, nearlist, max_binding_radius );
 
 

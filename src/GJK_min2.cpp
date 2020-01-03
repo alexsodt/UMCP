@@ -73,4 +73,34 @@ bool linear_collision_worker(double* r1, int nv1, double* pt1, double *pt2, doub
 	return gjk_algorithm( r1, nv1, pts, 2 );
 }
 
+/*
+ * box_GJK works by making a cy
+ *
+ * */
+
+bool box_GJK(double* r1, int nv1, double* pt1, double *pt2,  double radial_fudge) {
+
+	// this is run through minimum distance. I should write a cylindrical worker but for now I'll just use a few spheres.
+
+	double dr[3] = { pt2[0] - pt1[0], pt2[1] - pt1[1], pt2[2] - pt1[2] };
+	
+	double l = normalize(dr);
+
+	int n = ceil(2*l / radial_fudge);
+	if( n < 2 ) n = 2;
+
+	for( int i = 0; i < n; i++ )
+	{
+		double pt[3] = { 
+			pt1[0] + l * i / (n-1) * dr[0],
+			pt1[1] + l * i / (n-1) * dr[1],
+			pt1[2] + l * i / (n-1) * dr[2] };
+		if( minimum_distance( r1, nv1, pt, radial_fudge, 0 ) )
+			return true;	
+	}
+
+	return false;
+}
+
+
 

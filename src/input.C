@@ -48,9 +48,11 @@ void setDefaults( parameterBlock *block )
 	block->record_curvature = 0;
 	block->create_all_atom = 0;	
 	block->create_flip = 0;
+	block->create_pore = 0;
 	block->do_rim = 0;
 	block->perfect_solvent_tiling = 0;
 
+	block->mode_q_max = -1;
 	block->mode_x = -1;
 	block->mode_y = -1;
 	block->mode_KA = 0;
@@ -60,6 +62,7 @@ void setDefaults( parameterBlock *block )
 	block->minimizeResetG = 0;
 
 	block->KA = -1;
+	block->kv = 0;
 	block->kc = 14;
 	block->kg = 0;
 	block->mode_min = -1;
@@ -69,6 +72,8 @@ void setDefaults( parameterBlock *block )
 	block->mab_k_theta = 1;
 	block->mab_bond_length = 60;
 	block->mab_d_theta = 10; // 10 degrees.
+	block->restrain_volume_inside = 0;
+	block->restrain_volume_outside = 0;
 
 	block->shift[0] = 0;
 	block->shift[1] = 0;
@@ -221,6 +226,8 @@ void setDefaults( parameterBlock *block )
 	block->addProteinPDB   = NULL;
 	block->addProteinPSF   = NULL;
 
+	block->neutral_surface = 15;
+	block->scale_solvent_approach = 1.0;
 	block->strainInner = 0;
 	block->strainOuter = 0;
 
@@ -689,6 +696,30 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->write_alpha_period = atoi( word2 );
 		else if( !strcasecmp( word1, "nruns" ) )
 			block->nruns = atoi( word2 );
+		else if( !strcasecmp( word1, "restrain_volume_outside" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->restrain_volume_outside = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->restrain_volume_outside = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
+		else if( !strcasecmp( word1, "restrain_volume_inside" ) )
+		{
+			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
+				block->restrain_volume_inside = 1;
+			else if( !strcasecmp( word2, "FALSE" ) || !strcasecmp( word2, "no") || !strcasecmp( word2, "off" ) )
+				block->restrain_volume_inside = 0;
+			else
+			{
+				printf("Could not interpret input line '%s'.\n", tbuf );
+				ERROR = 1;
+			}	
+		}
 		else if( !strcasecmp( word1, "debug_diffusion" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
@@ -813,6 +844,8 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			block->KA = atof( word2 );
 		else if( !strcasecmp( word1, "kc" ) )
 			block->kc = atof( word2 );
+		else if( !strcasecmp( word1, "kv" ) )
+			block->kv = atof( word2 );
 		else if( !strcasecmp( word1, "kg" ) )
 			block->kg = atof( word2 );
 		else if( !strcasecmp( word1, "perturb_center" ) )
@@ -1423,6 +1456,8 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}	
 		}
+		else if( !strcasecmp( word1, "create_pore" ) )
+			block->create_pore = atof( word2 );
 		else if( !strcasecmp( word1, "create_all_atom" ) )
 		{
 			if( !strcasecmp( word2, "TRUE" ) || !strcasecmp( word2, "yes") || !strcasecmp( word2, "on" ) )
@@ -1459,6 +1494,10 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				ERROR = 1;
 			}	
 		}
+		else if( !strcasecmp( word1, "neutral_surface") )
+			block->neutral_surface = atof(word2);
+		else if( !strcasecmp( word1, "scale_solvent_approach") )
+			block->scale_solvent_approach = atof(word2);
 		else if( !strcasecmp( word1, "strainOuter") )
 			block->strainOuter = atof(word2);
 		else if( !strcasecmp( word1, "strainInner") )

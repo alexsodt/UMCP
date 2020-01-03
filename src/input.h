@@ -37,6 +37,8 @@ class parameterBlock
 	char *dcdName;
 	char *structureName;
 
+	int restrain_volume_inside;
+	int restrain_volume_outside;
 	int timestep_analysis;
 	int mass_scaling;
 	int disable_mesh;
@@ -125,6 +127,7 @@ class parameterBlock
 	double T;
 	double mode_KA;
 	double KA;
+	double kv;
 	double kc;
 	double kg;
 	double radius1;
@@ -139,6 +142,9 @@ class parameterBlock
 	double concentration;
 	int    mean_field;
 	int correlated;
+
+	int do_vol_inside;
+	int do_vol_outside;
 
 	double k_off;
 	double k_on;
@@ -235,8 +241,11 @@ class parameterBlock
 	char *altPatchPSF;
 	char *patchPSF;
 	char *patchPDB;
+	double neutral_surface;
+	double scale_solvent_approach;
 	int create_all_atom;
 	int create_flip;
+	double create_pore;
 	int do_rim;
 	int perfect_solvent_tiling;
 

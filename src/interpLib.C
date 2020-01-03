@@ -23,7 +23,7 @@
 
 #define THRESH (1e-4)
 
-#define LOW_RES
+//#define LOW_RES
 #define MAX_INV_VALENCE 12
 
 #define USE_G0
@@ -69,8 +69,8 @@ double phase2 = 0;
 #ifdef LOW_RES
 #define G_Q_P_1
 #else
-#define G_Q_P_3
-//#define G_Q_P_15
+//#define G_Q_P_3
+#define G_Q_P_15
 #endif
 //#define G_Q_P_3
 //#define G_Q_P_4
@@ -304,7 +304,7 @@ void surface::generateVolumePlan( void )
 		free(a_copy);
 	}
 
-	int ni = 12;
+	int ni = 2;
 	
 	nfaces = 0;
 
@@ -999,6 +999,11 @@ double surface::volume( double *r)
 	if( !theVolumeFormulas )
 		generateVolumePlan();
 
+	double vol_inside = 0;
+	double vol_outside = 0;
+	double alphas[3]={1,1,1};
+	new_volume( &vol_inside, &vol_outside, r, alphas, NULL );
+	
 	double vol = 0;	
 
 	double rav = 0;
