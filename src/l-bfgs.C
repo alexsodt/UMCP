@@ -3,7 +3,7 @@
 #include <string.h>
 #include <math.h>
 
-#define DEBUG_PRINT
+//#define DEBUG_PRINT
 static int limit_max_coord_move = 0;
 static double max_move = -1;
 
@@ -259,7 +259,7 @@ void do_linesearch( double *search_step )
 			cur_x[j] -= alpha_high * search_step[j];	
 	
 #ifdef DEBUG_PRINT
-		printf("Linesearch: %le\n alpha %lf\n", f_high, alpha_high);
+		printf("first step. Linesearch: %le\n alpha %lf\n", f_high, alpha_high);
 #endif
 		return;
 	}	
@@ -343,7 +343,7 @@ void do_linesearch( double *search_step )
 	}
 
 #ifdef DEBUG_PRINT
-	printf("bracket: %lf %lf %lf, %lf %lf %lf\n", f_low, f_mid, f_high, alpha_low, alpha_mid, alpha_high );	
+	printf("bracket: %le %le %le, %le %le %le\n", f_low, f_mid, f_high, alpha_low, alpha_mid, alpha_high );	
 #endif
 //	printf("Linesearch: %le\n alpha %lf\n", f_mid, alpha_mid);
 

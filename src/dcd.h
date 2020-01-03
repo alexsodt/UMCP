@@ -50,6 +50,8 @@ typedef struct
 	int *atoms;
 } cycle;
 
-int fetchPSFCycles( cycle **outCycles );
+void fetchCycleBasis( int ***basis, int **basis_length, int *nbasis );
+int getNBonds( void );
+void getBonds( int * bonds );
 
 #endif

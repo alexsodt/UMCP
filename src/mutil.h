@@ -2,6 +2,7 @@
 #define __mutilh__
 #include <stdio.h>
 
+void giftwrap( double *pts_in, int *ptsOrdered, int npts, int *nconvex, int expand=0);
 double dot( double *a, double *b );
 double cross( double *dr1, double *dr2, double *cp );
 double normalize( double *dr );
@@ -24,4 +25,8 @@ double Mul22( double *A, double *B, double *out );
 void CartMatVecIncrScale( double *vec_out, double *vec_in, double *Mat, double scale, int nv, double *alphas  );
 void MatVec( double *a, double *b, double *c, int m, int n);
 int nearInteriorPointOnTriangle( double *test_pt, double *vert1, double *vert2, double *vert3, double *output);
+int line_segment_triangle_intersection( double *r1, double *r2, double *v1, double *v2, double *v3, double fudge=0 );
+double segmentSegmentDist( double *r1A, double *r1B, double *r2A, double *r2B, double *t1_out, double *t2_out);
+double dihe( double *r1, double *r2, double *r3, double *r4 ); 
+
 #endif

@@ -54,6 +54,7 @@ int debug_trigger = 0; // wait until all particles have been put in the sim befo
 #define DIRECT_FT // defined to compute the fourier transform "directly"
 //#define TFILE // defined to write  a trajectory
 
+extern double water_KV;
 extern double kc;
 extern double kg;
 extern double KA;
@@ -121,6 +122,7 @@ int main( int argc, char **argv )
 	int collect_hk = block.collect_hk;	
 	int doPlanarTopology = block.planar_topology; // true means the system is planar.	
 	int doMonge = block.monge;
+	water_KV = block.kv;
 	kc = block.kc;
 	kg = block.kg;
 	KA = block.KA;
@@ -271,12 +273,20 @@ int main( int argc, char **argv )
 		useSurface->readLipidComposition(inputFile);
 		if( inputFile) fclose(inputFile);
 		useSurface->setg0(sRec->r);
-	
+		
+		double Vi,Vo;
+		double alphas[3]={1,1,1};
+		useSurface->new_volume( &Vi, &Vo, sRec->r, alphas, NULL ); // to test gradient. 
+		sRec->V0_i = Vi;
+		sRec->V0_o = Vo;
+
 		double area0;
 		double cur_area;
 		useSurface->area(r, -1, &cur_area, &area0 );
 		printf("Surface %d area: %le area0: %le\n", sRec->id, cur_area, area0 );
 	}
+
+	global_block = &block; //yikes
 
 	if( block.fitRho )
 		theSimulation->setupDensity( block.fitRho );

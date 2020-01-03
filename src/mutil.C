@@ -6,7 +6,6 @@
 #include "mutil.h"
 #include <math.h>
 #include "lapack_we_use.h"
-void giftwrap( double *pts_in, double *pts_out, int npts, int *nptsout );
 double Power( double a, double b) { return pow(a,b); }
 double Sqrt( double a) { return sqrt(a); }
 double dot( double *a, double *b )
@@ -43,6 +42,63 @@ double normalize( double *dr )
 	}
 
 	return lr;
+}
+
+int line_segment_triangle_intersection( double *r1, double *r2, double *v1, double *v2, double *v3, double fudge )
+{
+	double plane_normal[3];
+
+	double dr1[3] = { v1[0]-v2[0],v1[1]-v2[1],v1[2]-v2[2] };
+	double dr2[3] = { v3[0]-v2[0],v3[1]-v2[1],v3[2]-v2[2] };
+	double dr3[3] = { v3[0]-v1[0],v3[1]-v1[1],v3[2]-v1[2] };
+
+	cross(dr1,dr2,plane_normal);
+	
+	double k = plane_normal[0] * v2[0] + plane_normal[1] * v2[1] + plane_normal[2] * v2[2];
+
+	// solve	r1 + t (r2-r1) . plane_normal == k
+
+	double dr[3] = {r2[0]-r1[0], r2[1]-r1[1],r2[2]-r1[2]};
+	
+	double dp_dr = dr[0] * plane_normal[0] + dr[1] * plane_normal[1] + dr[2] * plane_normal[2];
+	double dp_1 = r1[0] * plane_normal[0] + r1[1] * plane_normal[1] + r1[2] * plane_normal[2];
+
+	double t = (k - dp_1)/(dp_dr);
+
+	if( t < -fudge || t > 1+fudge ) 
+		return 0;
+
+	double p_proj[3] = {
+			r1[0] + t * dr[0],
+			r1[1] + t * dr[1],
+			r1[2] + t * dr[2] };
+
+	double cross_vec1[3];
+	double cross_vec2[3];
+	double cross_vec3[3];
+	
+	// v1 - v2
+	cross( dr1, plane_normal, cross_vec1 ); 
+	// v3 - v2
+	cross( dr2, plane_normal, cross_vec2 ); 
+	// v3 - v1
+	cross( dr3, plane_normal, cross_vec3 ); 
+
+	double vec1A[3] = { p_proj[0] - v2[0], p_proj[1] - v2[1], p_proj[2] - v2[2] };
+	double dp_1A = vec1A[0] * cross_vec1[0] + vec1A[1] * cross_vec1[1] + vec1A[2] * cross_vec1[2];	 
+	double dp_1B =  dr2[0] * cross_vec1[0] + dr2[1] * cross_vec1[1] + dr2[2] * cross_vec1[2];	 
+	double vec2A[3] = { p_proj[0] - v2[0], p_proj[1] - v2[1], p_proj[2] - v2[2] };
+	double dp_2A = vec2A[0] * cross_vec2[0] + vec2A[1] * cross_vec2[1] + vec2A[2] * cross_vec2[2];	 
+	double dp_2B = dr1[0] * cross_vec2[0] + dr1[1] * cross_vec2[1] + dr1[2] * cross_vec2[2];	 
+	double vec3A[3] = { p_proj[0] - v1[0], p_proj[1] - v1[1], p_proj[2] - v1[2] };
+	double dp_3A = vec3A[0] * cross_vec3[0] + vec3A[1] * cross_vec3[1] + vec3A[2] * cross_vec3[2];	 
+	double dp_3B = -dr1[0] * cross_vec3[0] - dr1[1] * cross_vec3[1] - dr1[2] * cross_vec3[2];	 
+
+	if( dp_1A * dp_1B >= 0 && dp_2A * dp_2B >= 0 && dp_3A * dp_3B >= 0 )
+	{
+		return 1;
+	}
+	return 0;
 }
 
 double triangle_area( double *pt1, double *pt2, double *pt3 )
@@ -782,3 +838,94 @@ int nearInteriorPointOnTriangle( double *test_pt, double *vert1, double *vert2, 
 	return 1;
 }
 
+double segmentSegmentDist( double *r1A, double *r1B, double *r2A, double *r2B, double *t1_out, double *t2_out)
+{
+	double r1Ax = r1A[0];	
+	double r1Ay = r1A[1];	
+	double r1Az = r1A[2];	
+	
+	double r1Bx = r1B[0];	
+	double r1By = r1B[1];	
+	double r1Bz = r1B[2];	
+	
+	double r2Ax = r2A[0];	
+	double r2Ay = r2A[1];	
+	double r2Az = r2A[2];	
+	
+	double r2Bx = r2B[0];	
+	double r2By = r2B[1];	
+	double r2Bz = r2B[2];	
+
+	double t1 = -(((2*r1Ax*(r2Ax - r2Bx) - 2*r2Ax*(r2Ax - r2Bx) + 2*r1Ay*(r2Ay - r2By) - 
+          2*r2Ay*(r2Ay - r2By) + 2*r1Az*(r2Az - r2Bz) - 2*r2Az*(r2Az - r2Bz))*
+        (-2*(r1Ax - r1Bx)*r2Ax - 2*(r1Ay - r1By)*r2Ay - 2*(r1Az - r1Bz)*r2Az + 
+          2*(r1Ax - r1Bx)*r2Bx + 2*(r1Ay - r1By)*r2By + 2*(r1Az - r1Bz)*r2Bz) - 
+       (-2*r1Ax*(r1Ax - r1Bx) - 2*r1Ay*(r1Ay - r1By) - 2*r1Az*(r1Az - r1Bz) + 
+          2*(r1Ax - r1Bx)*r2Ax + 2*(r1Ay - r1By)*r2Ay + 2*(r1Az - r1Bz)*r2Az)*
+        (2*r2Ax*(r2Ax - r2Bx) - 2*(r2Ax - r2Bx)*r2Bx + 2*r2Ay*(r2Ay - r2By) - 
+          2*(r2Ay - r2By)*r2By + 2*r2Az*(r2Az - r2Bz) - 2*(r2Az - r2Bz)*r2Bz))/
+     ((-2*r1Ax*(r2Ax - r2Bx) + 2*r1Bx*(r2Ax - r2Bx) - 2*r1Ay*(r2Ay - r2By) + 
+          2*r1By*(r2Ay - r2By) - 2*r1Az*(r2Az - r2Bz) + 2*r1Bz*(r2Az - r2Bz))*
+        (-2*(r1Ax - r1Bx)*r2Ax - 2*(r1Ay - r1By)*r2Ay - 2*(r1Az - r1Bz)*r2Az + 
+          2*(r1Ax - r1Bx)*r2Bx + 2*(r1Ay - r1By)*r2By + 2*(r1Az - r1Bz)*r2Bz) - 
+       (2*r1Ax*(r1Ax - r1Bx) - 2*(r1Ax - r1Bx)*r1Bx + 2*r1Ay*(r1Ay - r1By) - 
+          2*(r1Ay - r1By)*r1By + 2*r1Az*(r1Az - r1Bz) - 2*(r1Az - r1Bz)*r1Bz)*
+        (2*r2Ax*(r2Ax - r2Bx) - 2*(r2Ax - r2Bx)*r2Bx + 2*r2Ay*(r2Ay - r2By) - 
+          2*(r2Ay - r2By)*r2By + 2*r2Az*(r2Az - r2Bz) - 2*(r2Az - r2Bz)*r2Bz)));
+
+	double expr1 = Power(r2Ax,2) + Power(r2Ay,2) + Power(r2Az,2) - 2*r2Ax*r2Bx + Power(r2Bx,2) - 
+   2*r2Ay*r2By + Power(r2By,2) - 2*r2Az*r2Bz + Power(r2Bz,2);
+
+	double t2 = -((r1Ax*r2Ax)/expr1) + Power(r2Ax,2)/expr1 - (r1Ay*r2Ay)/expr1 + Power(r2Ay,2)/expr1 - 
+   (r1Az*r2Az)/expr1 + Power(r2Az,2)/expr1 + (r1Ax*r2Bx)/expr1 - (r2Ax*r2Bx)/expr1 + 
+   (r1Ay*r2By)/expr1 - (r2Ay*r2By)/expr1 + (r1Az*r2Bz)/expr1 - (r2Az*r2Bz)/expr1 + 
+   (r1Ax*r2Ax*t1)/expr1 - (r1Bx*r2Ax*t1)/expr1 + (r1Ay*r2Ay*t1)/expr1 - 
+   (r1By*r2Ay*t1)/expr1 + (r1Az*r2Az*t1)/expr1 - (r1Bz*r2Az*t1)/expr1 - 
+   (r1Ax*r2Bx*t1)/expr1 + (r1Bx*r2Bx*t1)/expr1 - (r1Ay*r2By*t1)/expr1 + 
+   (r1By*r2By*t1)/expr1 - (r1Az*r2Bz*t1)/expr1 + (r1Bz*r2Bz*t1)/expr1;
+
+	double p1[3] = { 
+		r1Ax + t1 * (r1Bx-r1Ax),
+		r1Ay + t1 * (r1By-r1Ay),
+		r1Az + t1 * (r1Bz-r1Az) };
+	double p2[3] = { 
+		r2Ax + t1 * (r2Bx-r2Ax),
+		r2Ay + t1 * (r2By-r2Ay),
+		r2Az + t1 * (r2Bz-r2Az) };
+	double dr[3] = { p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2] };
+
+	*t1_out = t1;
+	*t2_out = t2;
+
+	return normalize(dr);
+}
+
+
+double dihe( double *r1, double *r2, double *r3, double *r4 ) 
+{
+        double b1[3] = {r2[0] - r1[0], r2[1] -r1[1], r2[2] - r1[2] };
+        double b2[3] = {r3[0] - r2[0], r3[1] - r2[1], r3[2] - r2[2] };
+        double b3[3] = {r4[0] - r3[0], r4[1] - r3[1], r4[2] - r3[2] };
+
+        double lb2 = sqrt(b2[0]*b2[0]+b2[1]*b2[1]+b2[2]*b2[2]);
+        double b2xb3[3] = {  b2[1] * b3[2] - b2[2] * b3[1],
+                           -(b2[0] * b3[2] - b2[2] * b3[0]),
+                             b2[0] * b3[1] - b2[1] * b3[0] };
+        double b1xb2[3] = {  b1[1] * b2[2] - b1[2] * b2[1],
+                           -(b1[0] * b2[2] - b1[2] * b2[0]),
+                             b1[0] * b2[1] - b1[1] * b2[0] };
+
+        double b1db2xb3 = b1[0] * b2xb3[0] + b1[1] * b2xb3[1] + b1[2] * b2xb3[2];
+        double xx = b1xb2[0] * b2xb3[0] + b1xb2[1] * b2xb3[1] + b1xb2[2] * b2xb3[2];
+
+        double arg1= lb2 * b1db2xb3;
+        double arg2 = xx; 
+
+        if( fabs( arg1 ) < 1e-10 )
+                arg1 = 1e-10;
+        if( fabs( arg2 ) < 1e-10 )
+                arg2 = 1e-10;   
+ 
+              double phi = atan2( arg1, arg2 );
+                      return phi;
+}
