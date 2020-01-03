@@ -26,7 +26,7 @@ amoeba_SRCS  = amoeba_code/amotry.C amoeba_code/amoeba.C amoeba_code/nrutil.C
 
 rd_SRCS = fpr_subroutines/Faddeeva.cpp fpr_subroutines/passocF.cpp fpr_subroutines/pirr_pfree_ratio_psF.cpp fpr_subroutines/2D.cpp fpr_subroutines/DDmatrixcreate.cpp fpr_subroutines/DDpsur.cpp fpr_subroutines/TBLnorm.cpp fpr_subroutines/TBLpirr.cpp fpr_subroutines/TBLsur.cpp fpr_subroutines/fpir.cpp fpr_subroutines/fsur.cpp fpr_subroutines/integrator.cpp fpr_subroutines/fnorm.cpp rd.C fpr_subroutines/sizelookup.cpp fpr_subroutines/DDpirr_pfree_ratio_ps.cpp fpr_subroutines/pirr.cpp fpr_subroutines/pnorm.cpp
 
-interp_SRCS = interpLib.C grad.C pboxing.C irr_kernel.C uv_map.C gauss.C modes.C write_structures.C min_distance.cpp GJK.cpp gjk_gudrun.cpp GJK_min2.cpp functions.cpp NearestSimplexR2.cpp NearestSimplexR.cpp  subdivide3.C fast_mm.C random_global.C height.C  gsl_random_globals.C sparse.C global_boxing.C lipid_density.C tachyon.C  lipid_composition.C vpass.C get_regions.C input.C l-bfgs.C srd.C compilation_time.C meshCollisionLib.C sans.C spline.C globals.C createAllAtom.C init.C fitRho.C 3d_interp.C M_matrix.C 
+interp_SRCS = interpLib.C grad.C pboxing.C irr_kernel.C uv_map.C gauss.C modes.C write_structures.C min_distance.cpp GJK.cpp gjk_gudrun.cpp GJK_min2.cpp functions.cpp NearestSimplexR2.cpp NearestSimplexR.cpp  subdivide3.C fast_mm.C random_global.C height.C  gsl_random_globals.C sparse.C global_boxing.C lipid_density.C tachyon.C  lipid_composition.C vpass.C get_regions.C input.C l-bfgs.C srd.C compilation_time.C meshCollisionLib.C sans.C spline.C globals.C createAllAtom.C init.C fitRho.C 3d_interp.C M_matrix.C volume.C giftwrap.C 
 
 sim_SRCS = simulation.C gather.C pcomplex.C p_p.C minimize.C dynamics.C npt.C parallel.C restart.C
 
