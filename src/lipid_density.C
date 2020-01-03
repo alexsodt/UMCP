@@ -135,6 +135,8 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 	int nacc = 0;
 	int nrej = 0;
 
+	double lipids_moved = 0;
+
 	if( par_info.my_id == BASE_TASK )
 	{
 		//for( int fx = 0; fx < par_info.nf; fx++ )
@@ -194,13 +196,13 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 						double del_r = normalize(dr);
 
 						double dist = sqrt( DC * dt );
-						double n_move = del_r / dist;
+						double n_move = dist / del_r;
 
 						while( n_move > 0 )
 						{
 							double pr = rand() / (double)RAND_MAX;
 
-							if( pr < n_move ) break;
+							if( pr > n_move ) break;
 
 							int from_2 = from_1;
 				
@@ -311,7 +313,7 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 										if( tracer ) *tracer = t1;
 									}
 									
-			
+									lipids_moved += 1;
 								}
 								else
 								{
@@ -338,6 +340,7 @@ void surface::local_lipidMCMove( double *r, pcomplex **allComplexes, int ncomple
 			}
 		}
 	}
+//	printf("Lipids moved: %lf\n", lipids_moved );
 /*
 	for( int t1 = 0; t1 < nt; t1++ )
 	{
