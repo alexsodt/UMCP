@@ -3157,10 +3157,11 @@ void surface::setg0( double *r, double reset_factor )
 			double area_per_lipid_av = 65.0;
 			
 			theTriangles[t].composition.A0 = A;
-
+			
 			while( !done )
 			{
-				double rn = rand() / (double)RAND_MAX;
+				double rn_i = rand() / (double)RAND_MAX;
+				double rn_o = rand() / (double)RAND_MAX;
 				
 				int idone=0,odone=0;	
 	
@@ -3173,13 +3174,13 @@ void surface::setg0( double *r, double reset_factor )
 
 				for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 				{
-					if( rn < fr_i[x] && ! idone )
+					if( rn_i < fr_i[x] && ! idone )
 					{
 						theTriangles[t].composition.innerLeaflet[x] += bilayerComp.APL[x];
 						idone = 1;
 						a_i += bilayerComp.APL[x];
 					}
-					if( rn < fr_o[x] && ! odone )
+					if( rn_o < fr_o[x] && ! odone )
 					{
 						theTriangles[t].composition.outerLeaflet[x] += bilayerComp.APL[x];
 						odone = 1;
@@ -3322,7 +3323,6 @@ void surface::setg0( double *r, double reset_factor )
 
 			while( !done )
 			{
-				double rn = rand() / (double)RAND_MAX;
 				
 				int idone=0,odone=0;	
 	
@@ -3335,13 +3335,16 @@ void surface::setg0( double *r, double reset_factor )
 
 				for( int x = 0; x < bilayerComp.nlipidTypes; x++ )
 				{
-					if( rn < fr_i[x] && ! idone )
+					double rn_i = rand() / (double)RAND_MAX;
+					double rn_o = rand() / (double)RAND_MAX;
+
+					if( rn_i < fr_i[x] && ! idone )
 					{
 						theTriangles[t].composition.innerLeaflet[x] += bilayerComp.APL[x];
 						idone = 1;
 						a_i += bilayerComp.APL[x];
 					}
-					if( rn < fr_o[x] && ! odone )
+					if( rn_o < fr_o[x] && ! odone )
 					{
 						theTriangles[t].composition.outerLeaflet[x] += bilayerComp.APL[x];
 						odone = 1;

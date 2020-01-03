@@ -29,6 +29,7 @@ class parameterBlock
 	char *fitRho;
 	char *lipid_lib;
 	char *rxnDiffusionInfoName;
+	char *track_lipid_rho;
 	double rho;
 
 	// gather

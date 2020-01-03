@@ -777,6 +777,12 @@ int main( int argc, char **argv )
 	int tracer = 0;
 	double prev_tracerp[3] = {0,0,0};
 	double nrm_junk[3];
+	int tracer_space = 10;
+	int ntraced = 0;
+	double *tracer_tracker = (double *)malloc( sizeof(double) * 3 * tracer_space ); 
+	
+
+
 	theSimulation->allSurfaces->theSurface->theTriangles[0].composition.tracer = 1;
 	theSimulation->allSurfaces->theSurface->evaluateRNRM( theSimulation->allSurfaces->theSurface->theTriangles[0].f, 1.0/3.0, 1.0/3.0, prev_tracerp, nrm_junk, theSimulation->allSurfaces->r ); 
 
@@ -1016,7 +1022,7 @@ int main( int argc, char **argv )
 				double inv_mass = sRec->EFFM->diagonal_element[i]; 
 				double frc_k = 0.5 * kc * area * q * q * q * q;	
 				printf("Tau: %le (s)\n", tau/AKMA_TIME );
-//#define CHECK_FRC_K
+#define CHECK_FRC_K
 #ifdef CHECK_FRC_K
 				double emp_frc_k = 0;
 				double e0 = 0;
@@ -1178,12 +1184,15 @@ int main( int argc, char **argv )
 						tracerp[1] = prev_tracerp[1] + dr[1];
 						tracerp[2] = prev_tracerp[2] + dr[2];
 	
-						printf("t: %le (s) tracer %le %le %le t %d\n", cur_t, tracerp[0], tracerp[1], tracerp[2], tracer );
+						
+
+					//	printf("t: %le (s) tracer %le %le %le t %d\n", cur_t, tracerp[0], tracerp[1], tracerp[2], tracer );
 						memcpy( prev_tracerp, tracerp, sizeof(double) * 3 ); 
 					}
 
 				}	 
 			}
+
 			if( block.cyl_tension_mc_period > 0 )
 			{
 				if( global_cntr % block.cyl_tension_mc_period == 0 )
@@ -1723,6 +1732,63 @@ int main( int argc, char **argv )
 							sRec->nav_Q[Q] += 1;
 						}
 					}
+
+					if( t == 0 && block.track_lipid_rho )
+					{
+						if( block.sphere )
+						{
+							printf("Lipid rho tracking on spheres not yet implemented.\n");
+							exit(1);
+						}	
+						int use_lipid = -1;
+						for( int x = 0; x < sRec->theSurface->bilayerComp.nlipidTypes; x++ )
+						{
+							if( !strcasecmp( sRec->theSurface->bilayerComp.names[x], block.track_lipid_rho) ) 
+								use_lipid = x;
+						}
+						if( use_lipid > 0 )
+						{
+							double Lx = theSimulation->PBC_vec[0][0];
+							double Ly = theSimulation->PBC_vec[1][1];
+							printf(" LIPIDRHO(ic,is,oc,os):");
+							if( block.mode_max >= 0 || block.mode_q_max >= 0 )
+							{	
+								printf("Track rho on multi-modes NYI.\n");
+								exit(1);							
+							}
+							else
+							{
+								int nx = block.mode_x;
+								int ny = block.mode_y;
+		
+								double pq_0_o = 0;
+								double pq_0_i = 0;
+								double pq_1_o = 0;
+								double pq_1_i = 0;
+								double A = Lx*Ly;
+	
+								for( int t = 0; t < sRec->theSurface->nt; t++ )
+								{
+									int f = sRec->theSurface->theTriangles[t].f;
+
+									double rpt[3],rnrm[3];
+									sRec->theSurface->evaluateRNRM( f, 1.0/3.0, 1.0/3.0, rpt, rnrm, sRec->r );
+									double nL_o = sRec->theSurface->theTriangles[t].composition.outerLeaflet[use_lipid] / sRec->theSurface->bilayerComp.APL[use_lipid];	
+									double nL_i = sRec->theSurface->theTriangles[t].composition.innerLeaflet[use_lipid] / sRec->theSurface->bilayerComp.APL[use_lipid];	
+									pq_1_o += nL_o * sin( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
+									pq_1_i += nL_i * sin( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
+									pq_0_o += nL_o * cos( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
+									pq_0_i += nL_i * cos( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
+								}
+								pq_0_o /= A;
+								pq_0_i /= A;
+								pq_1_o /= A;
+								pq_1_i /= A;
+								printf(" %le %le %le %le", pq_0_i, pq_1_i, pq_0_o, pq_1_o );
+							}
+						}
+					}
+
 					if( t == 0 )
 						printf("\n");
 				}
@@ -1948,6 +2014,36 @@ int main( int argc, char **argv )
 		}
 #endif			
 
+
+		if( block.kinetics && block.lipid_mc_period > 0 && block.debug_diffusion)
+		{
+			if( ntraced == tracer_space )
+			{
+				tracer_space *= 2;
+				tracer_tracker = (double *)realloc( tracer_tracker, sizeof(double) * 3 * tracer_space );
+			} 
+			tracer_tracker[3*ntraced+0] = prev_tracerp[0];
+			tracer_tracker[3*ntraced+1] = prev_tracerp[1];
+			tracer_tracker[3*ntraced+2] = prev_tracerp[2];
+			
+			double *temp_diff = (double *)malloc( sizeof(double) * ntraced );
+			memset( temp_diff, 0, sizeof(double) * ntraced );
+			for( int it = 0; it < ntraced; it++ )
+			{
+				for( int it2 = it; it2 < ntraced; it2++ )
+				{
+					double dr[3] = { 
+						tracer_tracker[it2*3+0] - tracer_tracker[it*3+0],
+						tracer_tracker[it2*3+1] - tracer_tracker[it*3+1],
+						tracer_tracker[it2*3+2] - tracer_tracker[it*3+2] };
+					temp_diff[it2-it] += dr[0]*dr[0]+dr[1]*dr[1]+dr[2]*dr[2];			
+				}
+			}
+			for( int it = 0; it < ntraced; it++ )
+				printf("%.14le %.14le\n", it * block.o_lim * block.time_step, temp_diff[it] / (ntraced-it) );
+			free(temp_diff);
+			ntraced++;
+		} 
 		
 		if( block.hours > 0 )
 		{

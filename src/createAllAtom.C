@@ -50,7 +50,7 @@ struct crd_psf_pair
 	char PSFfileName[256];
 };
 void EndSegment( FILE *charmmFile, char *cur_filename, char *cur_segment, char *cur_segname,	crd_psf_pair **pairs, int *seg_cntr, int *npairs, int *npair_space, int x_leaflet,
-	int *cur_size, int *cur_natoms, int *cur_atom, int *cur_res, int *switched );
+	int *cur_size, int *cur_natoms, int *cur_atom, int *cur_res, int *switched , int gm1_switch);
 
 
 void surface::createAllAtom( parameterBlock *block )
@@ -89,7 +89,7 @@ void surface::createAllAtom( parameterBlock *block )
 		exit(1);
 	}
 	
-	fprintf(charmmFile, charmm_header );
+	fprintf(charmmFile, "%s", charmm_header );
 
 	struct atom_rec *master_at[3] = {NULL,NULL,NULL};
 	int nat[3] = {0,0,0};
@@ -1083,7 +1083,7 @@ void surface::createAllAtom( parameterBlock *block )
 	
 						if( cur_size > 0 && (!strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) || cur_res > 50 || switched) )
 							EndSegment( charmmFile, cur_filename, cur_segment, cur_segname, &pairs, &seg_cntr, &npairs, &npair_space, x_leaflet,
-									&cur_size, &cur_natoms, &cur_atom,  &cur_res, &switched );
+									&cur_size, &cur_natoms, &cur_atom,  &cur_res, &switched, !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) );
 
 #if 0
 						{	
@@ -1262,7 +1262,7 @@ void surface::createAllAtom( parameterBlock *block )
 						
 						if( cur_size > 0 && !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) )
 							EndSegment( charmmFile, cur_filename, cur_segment, cur_segname, &pairs, &seg_cntr, &npairs, &npair_space, x_leaflet,
-									&cur_size, &cur_natoms,&cur_atom,  &cur_res, &switched );
+									&cur_size, &cur_natoms,&cur_atom,  &cur_res, &switched,!strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) );
 /*						{
 							fprintf(charmmFile, 
 							"\n"
@@ -1325,7 +1325,7 @@ void surface::createAllAtom( parameterBlock *block )
 			{
 				if( cur_size > 0 )
 				EndSegment( charmmFile, cur_filename, cur_segment, cur_segname, &pairs, &seg_cntr, &npairs, &npair_space, 2 /* force rim */,
-					&cur_size, &cur_natoms, &cur_atom,  &cur_res, &switched );
+					&cur_size, &cur_natoms, &cur_atom,  &cur_res, &switched, 0 );
 				int alt_leaflet = 2;
 
 				int *leaflet = master_leaflet[alt_leaflet];
@@ -1383,7 +1383,7 @@ void surface::createAllAtom( parameterBlock *block )
 							{	
 								
 								EndSegment( charmmFile, cur_filename, cur_segment, cur_segname, &pairs, &seg_cntr, &npairs, &npair_space, x_leaflet,
-									&cur_size, &cur_natoms,&cur_atom,  &cur_res, &switched );
+									&cur_size, &cur_natoms,&cur_atom,  &cur_res, &switched, !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) );
 /*								{
 									fprintf(charmmFile, 
 									"\n"
@@ -1517,7 +1517,7 @@ void surface::createAllAtom( parameterBlock *block )
 						
 							if( cur_size > 0 && !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4) )
 							EndSegment( charmmFile, cur_filename, cur_segment, cur_segname, &pairs, &seg_cntr, &npairs, &npair_space, x_leaflet,
-									&cur_size, &cur_natoms,&cur_atom,  &cur_res, &switched );
+									&cur_size, &cur_natoms,&cur_atom,  &cur_res, &switched, !strncasecmp( at[lipid_start[l]].segid, "GLPA", 4));
 							/*{
 								fprintf(charmmFile, 
 								"\n"
@@ -1575,7 +1575,7 @@ void surface::createAllAtom( parameterBlock *block )
 				
 				if( cur_size > 0 )
 				EndSegment( charmmFile, cur_filename, cur_segment, cur_segname, &pairs, &seg_cntr, &npairs, &npair_space, x_leaflet,
-					&cur_size, &cur_natoms, &cur_atom,  &cur_res, &switched );
+					&cur_size, &cur_natoms, &cur_atom,  &cur_res, &switched, 0 );
 			}
 
 			switched = 1;
@@ -1599,7 +1599,7 @@ void surface::createAllAtom( parameterBlock *block )
 	int junk = 0;
 	if( cur_size > 0 )
 		EndSegment( charmmFile, cur_filename, cur_segment, cur_segname, &pairs, &seg_cntr, &npairs, &npair_space, junk,
-				&cur_size, &cur_natoms,&cur_atom,  &cur_res, &junk );
+				&cur_size, &cur_natoms,&cur_atom,  &cur_res, &junk, 0 );
 /*	{
 		fprintf(charmmFile, 
 		"\n"
@@ -2245,7 +2245,7 @@ void surface::createAllAtom( parameterBlock *block )
 			fprintf(charmmFile, "\n");	
 		}
 	}
-	fprintf(charmmFile, charmm_footer );
+	fprintf(charmmFile, "%s", charmm_footer );
 
 	free(regions_for_face);
 	free(tri_list);
@@ -3341,7 +3341,7 @@ void generateRimRing( surface *theSurface, double *rsurf, double **rim_triangles
 
 	
 void EndSegment( FILE *charmmFile, char *cur_filename, char *cur_segment, char *cur_segname, crd_psf_pair **pairs, int *seg_cntr, int *npairs, int *npair_space, int x_leaflet,
-	int *cur_size, int *cur_natoms, int *cur_atom, int *cur_res, int *switched )
+	int *cur_size, int *cur_natoms, int *cur_atom, int *cur_res, int *switched, int gm1_switch )
 {	
 	const char *out_in[3]= {"IN","OUT", "RIM"};
 	fprintf(charmmFile, 
@@ -3350,12 +3350,22 @@ void EndSegment( FILE *charmmFile, char *cur_filename, char *cur_segment, char *
 	"read sequence coor card unit 10\n"
 	"generate %s setup warn first none last none\n"
 	"open read unit 10 card name \"%s\"\n"
-	"read coor unit 10 card resid\n"						
-	"\n"
+	"read coor unit 10 card resid\n", cur_filename, cur_segname, cur_filename );
+							
+	if( gm1_switch )
+	{
+		fprintf(charmmFile, "patch CERB %s %d %s %d setup warn\n", cur_segname, 2, cur_segname, 1 );
+		fprintf(charmmFile, "patch 14BB %s %d %s %d setup warn\n",  cur_segname,2,  cur_segname,3 );
+		fprintf(charmmFile, "patch 14BA %s %d %s %d setup warn\n",  cur_segname,3,  cur_segname,4 );
+		fprintf(charmmFile, "patch 13BB %s %d %s %d setup warn\n",  cur_segname,4,  cur_segname,5 );
+		fprintf(charmmFile, "patch SA23AB %s %d %s %d setup warn\n",  cur_segname,3,  cur_segname,6 );
+	}
+
+	fprintf(charmmFile,	"\n"
 	"open write unit 10 card name \"%s.psf\"\n"
 	"write psf  unit 10 card\n"
-	"delete atom sele atom * * * end\n"
-	, cur_filename, cur_segname, cur_filename, cur_segname );
+	"delete atom sele atom * * * end\n",
+	 cur_segname );
 
 	FILE *crdFile = fopen( cur_filename, "w");
 	printCRDHeader( crdFile, *cur_natoms );
@@ -3398,7 +3408,7 @@ double mod_exp( double val )
 {
 	if( val > 0 )
 		return 1 + val;
-	if( val < 0 )
+	else
 		return exp(val);	
 }
 

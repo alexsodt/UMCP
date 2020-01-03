@@ -29,6 +29,8 @@ void setDefaults( parameterBlock *block )
 	const char *defaultBZ = "beta.z";
 	block->betazFile = (char *)malloc( sizeof(char) * ( strlen(defaultBZ)+1) );
 	sprintf(block->betazFile, "%s", defaultBZ );
+	
+	block->track_lipid_rho = NULL; 
 
 	block->fitRho = NULL;
 	block->fitCoupling = 1.0;
@@ -85,7 +87,6 @@ void setDefaults( parameterBlock *block )
 	block->do_ld = 0;
 	block->do_bd_membrane = 0;
 	block->do_bd_particles = 0;
-
 
 	block->do_rd = 0;
 	block->bound_sigma = 10.0;
@@ -631,6 +632,12 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 				free(block->lipid_lib);
 			block->lipid_lib = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
 			strcpy( block->lipid_lib, word2 );
+		}
+		else if( !strcasecmp( word1, "track_lipid_rho" ) )
+		{
+			free(block->track_lipid_rho);
+			block->track_lipid_rho = (char *)malloc( sizeof(char) * (1 + strlen(word2) ) );
+			strcpy( block->track_lipid_rho, word2 );
 		}
 		else if( !strcasecmp( word1, "betaz" ) )
 		{
