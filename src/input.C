@@ -101,7 +101,7 @@ void setDefaults( parameterBlock *block )
 	block->planar_topology = 0;
 	block->collect_hk = 0;
 	block->nruns = 1;
-	block->time_step = 1e-9;
+	block->time_step = -1;
 	block->debug_diffusion = 0;
 	block->kinetics = 0;
 	block->kinetics_do_phase = 0;
@@ -262,6 +262,11 @@ void setDefaults( parameterBlock *block )
 int resolveParameters( parameterBlock *block )
 {
 	int warning = 0;
+
+	if( block->time_step < 0 )
+	{	
+		block->time_step = 1e-3*(2*sqrt(65/M_PI))*(2*sqrt(65/M_PI))/(4*block->diffc);
+	}
 
 	if( block->mab_bond_k < 0 )
 		block->mab_bond_k = block->default_bond_k;

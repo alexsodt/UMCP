@@ -148,8 +148,6 @@ int main( int argc, char **argv )
 
 	printf("eta_SI: %le eta: %le (kcal/angstrom/seconds)\n", eta_SI, eta );
 //1.3e-13;
-	double dt = 1e-3*(2*sqrt(65/M_PI))*(2*sqrt(65/M_PI))/(4*lipid_DC);//block.time_step;
-	printf("timestep: %le (s)\n",dt);
 
 	fitCoupling = block.fitCoupling;
 
@@ -306,7 +304,7 @@ int main( int argc, char **argv )
 	if(do_rd)
 	{
 		theSimulation->rd = (RD *)malloc( sizeof(RD) );
-		theSimulation->rd->init(theSimulation, dt, &block );
+		theSimulation->rd->init(theSimulation, block.time_step, &block );
 		if(debug)
 			printf("debug RD 1st ncomplexes: %d\n", theSimulation->ncomplex);
 
