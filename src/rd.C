@@ -472,7 +472,8 @@ void RD::do_rd( Simulation *theSimulation )
 					registerSite( theSimulation->allComplexes[padd2], padd2, s );
 
 				double duv[2];
-				randomDirection( sRec->theSurface, sRec->r, reactant1->fs[0], reactant1->puv[0], reactant1->puv[1], binding_radius*1.03, duv );
+				// the particle is put at the binding radius times 1.003. the 0.003 fudge factor is so that errors in the metric will for sure put it outside the binding_radius.
+				randomDirection( sRec->theSurface, sRec->r, reactant1->fs[0], reactant1->puv[0], reactant1->puv[1], binding_radius*1.003, duv );
 
 				int f_1 = reactant1->fs[0];
 				int nf = f_1;
@@ -517,7 +518,6 @@ void RD::do_rd( Simulation *theSimulation )
 					reactant2->rall[1] - reactant1->rall[1],
 					reactant2->rall[2] - reactant1->rall[2] };
 				double lr = normalize(dr);
-//				printf("PLACED AT %le\n", lr );
 			}
 #endif
 		}   
