@@ -97,7 +97,7 @@ void setDefaults( parameterBlock *block )
 	block->bound_sigma = 10.0;
 
 	block->nve_switch = -1; // switch to NVE dynamics at this timestep.
-	block->gamma_langevin = 10; 
+	block->gamma_langevin = 0.001 
 	block->planar_topology = 0;
 	block->collect_hk = 0;
 	block->nruns = 1;
