@@ -277,11 +277,14 @@ int main( int argc, char **argv )
 		useSurface->new_volume( &Vi, &Vo, sRec->r, alphas, NULL ); // to test gradient. 
 		sRec->V0_i = Vi;
 		sRec->V0_o = Vo;
+		
 
 		double area0;
 		double cur_area;
 		useSurface->area(r, -1, &cur_area, &area0 );
 		printf("Surface %d area: %le area0: %le\n", sRec->id, cur_area, area0 );
+		
+		sRec->area0 = area0;
 	}
 
 	global_block = &block; //yikes
@@ -337,10 +340,6 @@ int main( int argc, char **argv )
 
 	int n = 16;
 	
-	double Vtot = 0;
-	double Vtot2 = 0;
-	double NV = 0;
-	double area0=0;
 
 	if( block.sphere )
 	{
@@ -2188,7 +2187,7 @@ int main( int argc, char **argv )
 			else
 			{	
 				double q = output_qvals[Q];
-				expected = temperature / ( kc * area0 *q*q*q*q); 
+				expected = temperature / ( kc * sRec->area0 *q*q*q*q); 
 			}
 
 			double var = av_Q2[Q] - av_Q[Q] * av_Q[Q];

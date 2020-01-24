@@ -75,6 +75,8 @@ typedef struct surface_record
 
 	double *qdot_temp;
 
+	double area0;
+
 	SparseMatrix *EFFM;
 	SparseMatrix *MMat;
 	force_set *theForceSet;
