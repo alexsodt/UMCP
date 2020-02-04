@@ -337,9 +337,11 @@ void RD::do_rd( Simulation *theSimulation )
 				bin_counts[rb] += 1;
 				p_sampled[rb] += prob;
 			}
+//			printf("debug %le %le\n", tracked[t]->tracked_info[n].curr_sep, prob);
 #ifndef DISABLE_RD
 			if(prob > rn )
 			{
+//			        printf("Woot\n");
 				tracked[t]->reacted = 1;
 				sum_prob = 0;
 				p_no_reaction = 1.0;

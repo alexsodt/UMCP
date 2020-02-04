@@ -1712,6 +1712,7 @@ void printParamBlock( parameterBlock *block )
 	printf("\tkc:        %lf kcal/mol\n", block->kc );
 	printf("Random seed: %d\n", block->random_seed );
 	printf("DC:    %le Angstrom^2/s\n", block->diffc );
+	printf("time step:    %le s\n", block->time_step );
 
 	if( block->do_ld )
 	{
