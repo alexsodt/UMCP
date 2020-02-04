@@ -2166,41 +2166,41 @@ int main( int argc, char **argv )
 		}
 	}
 
-#if 0 // pre-simulation change me!
-	if( doing_spherical_harmonics || doing_planar_harmonics )
+#if 1 // pre-simulation change me!
+	if( theSimulation->allSurfaces->doing_spherical_harmonics || theSimulation->allSurfaces->doing_planar_harmonics )
 	{
 		printf("------ Harmonic general variables ------\n");
-		for( int Q = 0; Q < NQ; Q++ )
+		for( int Q = 0; Q < theSimulation->allSurfaces->NQ; Q++ )
 		{
-			av_Q2[Q] *= scaling_factor[Q] * scaling_factor[Q];
-			av_Q[Q] *= scaling_factor[Q];
-			av_Q2[Q] /= nav_Q[Q];	
-			av_Q[Q] /= nav_Q[Q];
+			theSimulation->allSurfaces->av_Q2[Q] *= theSimulation->allSurfaces->scaling_factor[Q] * theSimulation->allSurfaces->scaling_factor[Q];
+			theSimulation->allSurfaces->av_Q[Q] *= theSimulation->allSurfaces->scaling_factor[Q];
+			theSimulation->allSurfaces->av_Q2[Q] /= theSimulation->allSurfaces->nav_Q[Q];	
+			theSimulation->allSurfaces->av_Q[Q] /= theSimulation->allSurfaces->nav_Q[Q];
 
 			double kc_app = -1;
 			double expected = 0;
-			if( doing_spherical_harmonics )
+			if( theSimulation->allSurfaces->doing_spherical_harmonics )
 			{	
-				double l = output_qvals[Q];
+				double l = theSimulation->allSurfaces->output_qvals[Q];
 				expected = temperature / ( kc * (l+2)*(l-1)*l*(l+1) ); 
 			}
 			else
 			{	
-				double q = output_qvals[Q];
-				expected = temperature / ( kc * sRec->area0 *q*q*q*q); 
+				double q = theSimulation->allSurfaces->output_qvals[Q];
+				expected = temperature / ( kc * theSimulation->allSurfaces->area0 *q*q*q*q); 
 			}
 
-			double var = av_Q2[Q] - av_Q[Q] * av_Q[Q];
+			double var = theSimulation->allSurfaces->av_Q2[Q] - theSimulation->allSurfaces->av_Q[Q] * theSimulation->allSurfaces->av_Q[Q];
 
 			kc_app = kc * (expected / var);
 
 			printf("Mode_index %d", Q );
-			if( doing_planar_harmonics )
-				printf(" q %le", output_qvals[Q] );
-			else if( doing_spherical_harmonics )
-				printf(" l %d", (int)lround(output_qvals[Q]) ); 
+			if( theSimulation->allSurfaces->doing_planar_harmonics )
+				printf(" q %le", theSimulation->allSurfaces->output_qvals[Q] );
+			else if( theSimulation->allSurfaces->doing_spherical_harmonics )
+				printf(" l %d", (int)lround(theSimulation->allSurfaces->output_qvals[Q]) ); 
 			printf("<h> %le <h^2> %le k_c_apparent %le\n",
-					av_Q[Q], av_Q2[Q], kc_app );
+					theSimulation->allSurfaces->av_Q[Q], theSimulation->allSurfaces->av_Q2[Q], kc_app );
 		}
 		printf("------ done\n");
 		

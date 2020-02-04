@@ -97,7 +97,7 @@ void setDefaults( parameterBlock *block )
 	block->bound_sigma = 10.0;
 
 	block->nve_switch = -1; // switch to NVE dynamics at this timestep.
-	block->gamma_langevin = 0.001 
+	block->gamma_langevin = 0.001;
 	block->planar_topology = 0;
 	block->collect_hk = 0;
 	block->nruns = 1;
@@ -1712,7 +1712,7 @@ void printParamBlock( parameterBlock *block )
 	printf("\tkc:        %lf kcal/mol\n", block->kc );
 	printf("Random seed: %d\n", block->random_seed );
 	printf("DC:    %le Angstrom^2/s\n", block->diffc );
-
+	printf("time-step:    %le s\n", block->time_step );
 	if( block->do_ld )
 	{
 		printf("Doing Langevin dynamics with gamma=%lf.\n", block->gamma_langevin );
