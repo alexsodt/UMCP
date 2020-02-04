@@ -1712,7 +1712,8 @@ void printParamBlock( parameterBlock *block )
 	printf("\tkc:        %lf kcal/mol\n", block->kc );
 	printf("Random seed: %d\n", block->random_seed );
 	printf("DC:    %le Angstrom^2/s\n", block->diffc );
-	print("Time-step:    %le s\n", block->time_step );
+	printf("Time-step:    %le s\n", block->time_step );
+
 	if( block->do_ld )
 	{
 		printf("Doing Langevin dynamics with gamma=%lf.\n", block->gamma_langevin );
