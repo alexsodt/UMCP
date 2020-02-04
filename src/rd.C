@@ -305,16 +305,15 @@ void RD::do_rd( Simulation *theSimulation )
 			double p0_ratio = 1.0;
 
 #ifndef DISABLE_RD
-			double pre_prob = get_2D_2D_rxn_prob(tracked[t]->tracked_info[n].curr_sep, k_on*2*binding_radius, binding_radius, D1+D2, dt, Rmax,
+			double pre_prob = get_2D_2D_rxn_prob(tracked[t]->tracked_info[n].curr_sep, 2*k_on*binding_radius, binding_radius, D1+D2, dt, Rmax,
 				prevsep, ps_prev, &p0_ratio);
 #else
 			prevsep=0;
-			double pre_prob = get_2D_2D_rxn_prob(tracked[t]->tracked_info[n].curr_sep, k_on*2*binding_radius, binding_radius, D1+D2, dt, Rmax,
+			double pre_prob = get_2D_2D_rxn_prob(tracked[t]->tracked_info[n].curr_sep, 2*k_on*binding_radius, binding_radius, D1+D2, dt, Rmax,
 				prevsep, ps_prev, &p0_ratio);
 //			double pre_prob = 0;
 #endif	
-
-
+			printf("r: %lf prob: %le\n", tracked[t]->tracked_info[n].curr_sep, pre_prob );
 			double currnorm = tracked[t]->tracked_info[n].prevnorm * p0_ratio;
 			double prob = pre_prob * currnorm;
 
@@ -350,7 +349,9 @@ void RD::do_rd( Simulation *theSimulation )
 				// binding reaction between these two complexes... 
 				// possible outcomes are to add to a previous complex (likely case with Actin polymerization) or create a new one.	
 				// for now: create new complex.
-	
+
+#define DISABLE_REACTION
+#ifndef DISABLE_REACTION	
 				pcomplex *product = loadComplex( allReactions[rxn].productName );
 				product->loadParams(params);			
 				struct surface_record *sRec = theSimulation->fetch( theSimulation->allComplexes[p]->sid[s] );
@@ -370,7 +371,7 @@ void RD::do_rd( Simulation *theSimulation )
 				
 				for( int s = 0; s < product->nsites; s++ )
 					product->rd_timestep_disabled[s] = 1;
-
+#endif
 				nreact+=1;
 			
 				break;
@@ -416,7 +417,6 @@ void RD::do_rd( Simulation *theSimulation )
 			if( rn < pr ) 
 			{
 				// creates the reactants.
-
 				double binding_radius = allReactions[r].binding_radius;
 
 				// HACK: now only working for single-site attachment.
@@ -525,6 +525,7 @@ void RD::do_rd( Simulation *theSimulation )
 		}   
 	}   
 
+
 #define RD_GM1_HACK // REMOVE THIS CODE FOR DISTRIBUTION
 
 #ifdef RD_GM1_HACK
@@ -541,7 +542,7 @@ void RD::do_rd( Simulation *theSimulation )
 			nDimer++;	
 	}	
 		
-	if( counter % 100 == 0 )
+//	if( counter % 100 == 0 )
 		printf("RDOUT %le %d %d nreact: %d ndissoc: %d\n", theSimulation->current_time, nMonomer, nDimer, nreact, ndissoc );
 	counter++;
 #endif
