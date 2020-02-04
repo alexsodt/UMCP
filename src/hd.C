@@ -1137,12 +1137,6 @@ int main( int argc, char **argv )
 				VP += theSimulation->allComplexes[c]->V(theSimulation);	
 				VP += theSimulation->allComplexes[c]->AttachV(theSimulation);	
 
-				if( VP > 1e4 )
-				{
-					VP += theSimulation->allComplexes[c]->V(theSimulation);	
-					VP += theSimulation->allComplexes[c]->AttachV(theSimulation);	
-					exit(1);
-				}
 			}
 
 
@@ -1741,58 +1735,105 @@ int main( int argc, char **argv )
 						}
 					}
 
-					if( t == 0 && block.track_lipid_rho )
+					if( t == 0 && block.track_lipid_rho && par_info.my_id == BASE_TASK )
 					{
 						if( block.sphere )
 						{
 							printf("Lipid rho tracking on spheres not yet implemented.\n");
 							exit(1);
-						}	
-						int use_lipid = -1;
-						for( int x = 0; x < sRec->theSurface->bilayerComp.nlipidTypes; x++ )
-						{
-							if( !strcasecmp( sRec->theSurface->bilayerComp.names[x], block.track_lipid_rho) ) 
-								use_lipid = x;
 						}
-						if( use_lipid > 0 )
-						{
-							double Lx = theSimulation->PBC_vec[0][0];
-							double Ly = theSimulation->PBC_vec[1][1];
-							printf(" LIPIDRHO(ic,is,oc,os):");
-							if( block.mode_max >= 0 || block.mode_q_max >= 0 )
-							{	
-								printf("Track rho on multi-modes NYI.\n");
-								exit(1);							
-							}
-							else
-							{
-								int nx = block.mode_x;
-								int ny = block.mode_y;
-		
-								double pq_0_o = 0;
-								double pq_0_i = 0;
-								double pq_1_o = 0;
-								double pq_1_i = 0;
-								double A = Lx*Ly;
-	
-								for( int t = 0; t < sRec->theSurface->nt; t++ )
-								{
-									int f = sRec->theSurface->theTriangles[t].f;
 
+						// This is a hack for right now to track the fourier modes of our explicit particles' rho.
+						if( !strcasecmp( block.track_lipid_rho, "explicit") )
+						{
+							// do explicit tracking
+							int nx = block.mode_x;
+							int ny = block.mode_y;
+			
+							double pq_0_o = 0;
+							double pq_0_i = 0;
+							double pq_1_o = 0;
+							double pq_1_i = 0;
+							double A = Lx*Ly;
+		
+							for( int c = 0; c < theSimulation->ncomplex; c++ )
+							{
+								for( int s = 0; s < theSimulation->allComplexes[c]->nattach; s++ )
+								{
+									surface_record *sRec = theSimulation->fetch(theSimulation->allComplexes[c]->sid[s]);
 									double rpt[3],rnrm[3];
-									sRec->theSurface->evaluateRNRM( f, 1.0/3.0, 1.0/3.0, rpt, rnrm, sRec->r );
-									double nL_o = sRec->theSurface->theTriangles[t].composition.outerLeaflet[use_lipid] / sRec->theSurface->bilayerComp.APL[use_lipid];	
-									double nL_i = sRec->theSurface->theTriangles[t].composition.innerLeaflet[use_lipid] / sRec->theSurface->bilayerComp.APL[use_lipid];	
-									pq_1_o += nL_o * sin( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
-									pq_1_i += nL_i * sin( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
-									pq_0_o += nL_o * cos( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
-									pq_0_i += nL_i * cos( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
+									sRec->theSurface->evaluateRNRM( theSimulation->allComplexes[c]->fs[s],
+													theSimulation->allComplexes[c]->puv[2*s+0],
+													theSimulation->allComplexes[c]->puv[2*s+1],
+													rpt,rnrm,sRec->r );
+
+									if( theSimulation->allComplexes[c]->is_inside )
+									{
+										pq_1_i += sin( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
+										pq_0_i += cos( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
+									}
+									else
+									{
+										pq_1_o += sin( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
+										pq_0_o += cos( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
+									}
 								}
-								pq_0_o /= A;
-								pq_0_i /= A;
-								pq_1_o /= A;
-								pq_1_i /= A;
-								printf(" %le %le %le %le", pq_0_i, pq_1_i, pq_0_o, pq_1_o );
+							}
+
+							pq_0_o /= A;
+							pq_0_i /= A;
+							pq_1_o /= A;
+							pq_1_i /= A;
+							printf(" %le %le %le %le", pq_0_i, pq_1_i, pq_0_o, pq_1_o );
+						}	
+						else
+						{
+							int use_lipid = -1;
+							for( int x = 0; x < sRec->theSurface->bilayerComp.nlipidTypes; x++ )
+							{
+								if( !strcasecmp( sRec->theSurface->bilayerComp.names[x], block.track_lipid_rho) ) 
+									use_lipid = x;
+							}
+							if( use_lipid > 0 )
+							{
+								double Lx = theSimulation->PBC_vec[0][0];
+								double Ly = theSimulation->PBC_vec[1][1];
+								printf(" LIPIDRHO(ic,is,oc,os):");
+								if( block.mode_max >= 0 || block.mode_q_max >= 0 )
+								{	
+									printf("Track rho on multi-modes NYI.\n");
+									exit(1);							
+								}
+								else
+								{
+									int nx = block.mode_x;
+									int ny = block.mode_y;
+			
+									double pq_0_o = 0;
+									double pq_0_i = 0;
+									double pq_1_o = 0;
+									double pq_1_i = 0;
+									double A = Lx*Ly;
+		
+									for( int t = 0; t < sRec->theSurface->nt; t++ )
+									{
+										int f = sRec->theSurface->theTriangles[t].f;
+	
+										double rpt[3],rnrm[3];
+										sRec->theSurface->evaluateRNRM( f, 1.0/3.0, 1.0/3.0, rpt, rnrm, sRec->r );
+										double nL_o = sRec->theSurface->theTriangles[t].composition.outerLeaflet[use_lipid] / sRec->theSurface->bilayerComp.APL[use_lipid];	
+										double nL_i = sRec->theSurface->theTriangles[t].composition.innerLeaflet[use_lipid] / sRec->theSurface->bilayerComp.APL[use_lipid];	
+										pq_1_o += nL_o * sin( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
+										pq_1_i += nL_i * sin( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
+										pq_0_o += nL_o * cos( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
+										pq_0_i += nL_i * cos( 2 * M_PI * nx / Lx * rpt[0] + 2*M_PI*ny/Ly*rpt[1]);
+									}
+									pq_0_o /= A;
+									pq_0_i /= A;
+									pq_1_o /= A;
+									pq_1_i /= A;
+									printf(" %le %le %le %le", pq_0_i, pq_1_i, pq_0_o, pq_1_o );
+								}
 							}
 						}
 					}
@@ -1868,9 +1909,27 @@ int main( int argc, char **argv )
 
 			if( block.record_curvature && o >= nequil  )
 			{
+				double avc_m = 0;
+				double navc_m = 0;
+				double avc_d = 0;
+				double navc_d = 0;
 				for( int c = 0; c < theSimulation->ncomplex; c++ )
-					avc[c] += theSimulation->allComplexes[c]->local_curvature( theSimulation );
-				navc+=1;
+				{
+					if( !strcasecmp( theSimulation->allComplexes[c]->complex_name, "simpleLipid" ) )
+					{
+						avc_m += theSimulation->allComplexes[c]->local_curvature( theSimulation );
+						navc_m += 1;	
+					}
+					else if( !strcasecmp( theSimulation->allComplexes[c]->complex_name, "simpleDimer" ) )
+					{
+						avc_d += theSimulation->allComplexes[c]->local_curvature( theSimulation );
+						navc_d += 1;	
+					}
+				}
+				printf("Monomer <c> %le %lf dimer <c> %le %lf\n", avc_m/navc_m, navc_m, avc_d/navc_d, navc_d );
+//				for( int c = 0; c < theSimulation->ncomplex; c++ )
+//					avc[c] += theSimulation->allComplexes[c]->local_curvature( theSimulation );
+//				navc+=1;
 			}
 
 			if( block.s_q && global_cntr % block.s_q_period == 0 && o >= nequil)
@@ -2159,10 +2218,10 @@ int main( int argc, char **argv )
 	{
 		for( int c = 0; c < theSimulation->ncomplex; c++ )
 		{
-			char *typeName = NULL;
-			theSimulation->allComplexes[c]->print_type(&typeName);
-			printf("Complex %d type %s average curvature %lf\n", c, typeName, avc[c]/(navc+1e-11) );
-			if( typeName) free(typeName);
+//			char *typeName = NULL;
+//			theSimulation->allComplexes[c]->print_type(&typeName);
+//			printf("Complex %d type %s average curvature %lf\n", c, typeName, avc[c]/(navc+1e-11) );
+//			if( typeName) free(typeName);
 		}
 	}
 
