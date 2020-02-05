@@ -1915,6 +1915,8 @@ int main( int argc, char **argv )
 				double navc_d = 0;
 				for( int c = 0; c < theSimulation->ncomplex; c++ )
 				{
+					if( theSimulation->allComplexes[c]->disabled ) continue;
+
 					if( !strcasecmp( theSimulation->allComplexes[c]->complex_name, "simpleLipid" ) )
 					{
 						avc_m += theSimulation->allComplexes[c]->local_curvature( theSimulation );
