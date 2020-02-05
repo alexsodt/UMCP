@@ -350,7 +350,7 @@ void RD::do_rd( Simulation *theSimulation )
 				// possible outcomes are to add to a previous complex (likely case with Actin polymerization) or create a new one.	
 				// for now: create new complex.
 
-#define DISABLE_REACTION
+//#define DISABLE_REACTION
 #ifndef DISABLE_REACTION	
 				pcomplex *product = loadComplex( allReactions[rxn].productName );
 				product->loadParams(params);			
