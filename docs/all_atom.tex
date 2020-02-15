@@ -1,0 +1,12 @@
+
+\section{ Creating all-atom structures from the continuum model } \label{sec:all_atom}
+
+All-atom (and molecular coarse-grained) structures (hereafter, ``molecular structure'') can be built from the continuum model by including the \code{create} command to the \code{hd} program. 
+The molecular structure is created following any requested dynamics, that is, if \code{nsteps} is greater than zero.
+Because any errors will halt the progress of molecular structure creation, it is recommended to load a restart file following dynamics.
+
+The bilayer will be created from the input \code{patchPDB} PDB file of a square patch of lipid bilayer.
+The \code{CRYST1} directive is necessary in the PDB file; if it is not present an error will terminate production.
+Optionally a protein-structure file (PSF) may be included for the PDB (with \code{patchPSF}), which will supercede the atom, residue and segment names if the PDB file format is too limiting.
+
+Invoking \code{create\_flip yes} will flip the input bilayer so that the positive $z$ bilayer will follow along the negative normal. 

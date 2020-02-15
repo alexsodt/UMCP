@@ -1,0 +1,17 @@
+time_step 		1e-12
+mesh 			planar.mesh
+sphere 			no	
+do_ld 			yes
+o_lim 			100
+nsteps 			500
+nequil			100
+movie			no	
+mode_max		1
+gamma_langevin 		5
+KA			0	
+lipid library GM1 77.5 0.05
+lipid inner GM1	        4.0
+lipid inner DOPC 	96.0
+lipid outer GM1		4.0
+lipid outer DOPC	96.0
+lipid_mc_period		10

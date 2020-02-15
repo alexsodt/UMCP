@@ -1,0 +1,17 @@
+\newsubsection{Normal modes}
+
+The mesh control points are ``generalized'' coordinates in the sense that they are not point centers of mass that directly feel force.
+Rather, they determine the mass positions through the subdivision-limit algorithm.
+Compared with the complexity of having each underlying lipid or its atoms independent entities, the use of a continuum mesh is a dramatic simplification.
+It is often convenient to add a further layer of generalization by using so-called normal modes that are linear transformations of the mesh:
+\begin{equation}
+\vek{Q}_i = N_{ij} \vek{q}_j,  
+\end{equation}
+where $\vek{Q}$ is a normal mode and $\vek{q}$ is a mesh control point. 
+Most frequently these modes are energetically decoupled at the level of the membrane elastic energy.
+Creation of the normal modes requires solving for $N_{ij}$, requiring an inverse of the transformation matrix from $\{ \vek{q}_j \}$ to $\{ \vek{Q}_i \}$.
+
+% implement cylinders too?
+The use of normal modes for spheres and planes is invoked by specifying either 
+the details of a single mode (\code{mode\_x} and \code{mode\_y}) or the lower and upper limits of modes to model (\code{mode\_min} and \code{mode\_max}).  
+For a spherical mesh, it is necessary to include the input \code{sphere yes} to invoke spherical harmonics. 

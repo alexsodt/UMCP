@@ -1,0 +1,39 @@
+
+\section{ Hydrodynamics with stochastic rotational dynamics (SRD) } \label{sec:srd}
+
+The stochastic rotational dynamics (SRD) method is activated with input command \code{do\_srd=yes}.
+
+
+\newsubsection{SRD particle/mesh collisions}
+
+Collisions between the SRD particle and the mesh are modeled at the lengthscale of the mesh spacing.
+On a {\it very} short timescale, a collision would change the momentum of only the individual mass point at the collision, after which the dynamics would be propagated outward, exciting various modes and eventually pushing the entire mass in the direction of the momentum exchange.
+In this implementation, the collision changes the momentum of only the nearest control point site.
+This assumption is consistent with the overall coarse-graining scheme in which very high frequency modes are not modeled.
+More accurate schemes could be imagined in which the trajectory following the collision more closely approximates the collision of a higher resolution mesh. 
+However, since the SRD solvent particle and its collision are themselves coarse-grained representations of finely detailed solvents, it may not be worth the effort to more closely represent what is itself not truly physical.
+
+The dynamics of a collision between two elastic particles conserves two quantities expressed as equations below: In Eq.~\ref{eq:srdmom}, the momentum directed along the axis normal to the collision interface, and in Eq.~\ref{eq:srdke}, the overall kinetic energy:
+\begin{align}
+\label{eq:srdmom}
+&\Delta \vek{p}_\textrm{SRD} + \Delta \vek{p}_i = 0 \\
+\label{eq:srdke}
+&\frac{ |\vek{p}_\textrm{SRD} + \Delta \vek{p}_\textrm{SRD}|^2}{2 m_\textrm{SRD}} +  \frac{1}{2} (\vek{p}_i + \Delta \vek{p}_i) \cdot \sum_j M_{ij}^{-1} (\vek{p}_j + \Delta \vek{p}_j \delta_{ij}) = \frac{ |\vek{p}_\textrm{SRD}|^2}{2 m_\textrm{SRD}} + \frac{1}{2} \vek{p}_i \cdot \sum_j M_{ij}^{-1} \vek{p}_{j} = 0
+\end{align}
+Here $\vek{p}_\textrm{SRD}$ is the SRD particle momentum, $\vek{p}_i$ is the momentum of the collision vertex, $m_\textrm{SRD}$ is the mass of the SRD particle, and $M^{-1}_{ij}$ is the mesh effective mass inverse matrix.
+There are two solutions to this constraint: a trivial solution in which the particles pass through each other, and the desired solution in which finite momentum is transferred between the particles.
+The equation is solved by choosing scalar parameters $\alpha_\textrm{SRD}$ and $\alpha_i$ with $\Delta \vek{p}_\textrm{SRD} = \alpha_\textrm{SRD} \vek{n}_\textrm{collision}$ and $\Delta \vek{p}_i = \alpha_\textrm{i} \vek{n}_\textrm{collision}$, where $\vek{n}_\textrm{collision}$ is the collision axis.
+The equations reduce to:
+\begin{align}
+&\alpha_\textrm{SRD} + \alpha_i = 0 \\
+&2 \alpha_\textrm{SRD}  m^{-1}_\textrm{SRD} (\vek{p}_\textrm{SRD} \cdot \vek{n}_\textrm{collision}) + \alpha_\textrm{SRD}^2 m^{-1}_\textrm{SRD} +
+\label{eq:srdfinalcol}
+2 \alpha_i \sum_{j} M^{-1}_{ij} (\vek{p}_j \cdot \vek{n}_\textrm{collision})  + \alpha_i^2 M^{-1}_{ii} =0 
+\end{align}
+Substituting in $\alpha_\textrm{SRD}=-\alpha_i$ yields for Eq.~\ref{eq:srdfinalcol}:
+\begin{align}
+2 \alpha_i (\sum_j M^{-1}_{ij} \vek{p}_j - m^{-1}_\textrm{SRD} \vek{p}_\textrm{SRD})\cdot\vek{n}_\textrm{collision} + \alpha_i^2 (m_\textrm{SRD}^{-1}+M^{-1}_{ii}) = 0 \nonumber \\
+\alpha_i = 2 \frac{ (m^{-1}_\textrm{SRD} \vek{p}_\textrm{SRD} - \sum_j M^{-1}_{ij} \vek{p}_j ) \cdot \vek{n}_\textrm{collision} } { m^{-1}_\textrm{SRD} + M^{-1}_{ii}}
+\end{align}
+%(\sum_j M^{-1}_{ij} \vek{p}_j - m^{-1}_\textrm{SRD} \vek{p}_\textrm{SRD})\cdot\vek{n}_\textrm{collision} + \alpha_i^2 (m_\textrm{SRD}^{-1}+M^{-1}_{ii})
+

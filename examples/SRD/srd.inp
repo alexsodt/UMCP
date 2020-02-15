@@ -1,0 +1,7 @@
+time_step 		1e-11
+mesh 			sphere.mesh
+sphere 			yes
+do_srd			yes	
+o_lim 			10
+nsteps 			3	
+movie			yes

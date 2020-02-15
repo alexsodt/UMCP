@@ -1,0 +1,88 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath}
+\usepackage{geometry}
+\geometry{margin=0.75in}
+
+\newcommand{\vek}[1]{\boldsymbol{#1}}          % vector symbol
+
+\begin{document}
+
+\subsection{Collective variable Brownian dynamics}
+
+Given a set of $N$ momenta $\{p_i\}$, friction coefficient $\gamma$, and effective mass matrix $\hat{M_{ij}}$, there are $N$ equations:
+\begin{equation}
+\label{eq:diffc}
+p_i'(t) = - \gamma \hat{M} \cdot \{p\} + f_i 
+\end{equation}
+A trial $a$ solution has
+\begin{align}
+\{ p \} &= \{ c_{ai}, c_{aj}, \ldots, .. c_{aN} \} \exp(-\lambda_a t) \\
+        &= \vek{c}_a \exp(-\lambda_a t)
+\end{align}
+For two solutions $a$ and $b$, a linear combination of the two would also be a solution, and so they can be assembled to reproduce arbitrary initial conditions ($\{ p(0) \}$) at $t=0$.
+
+The solution must fulfill Eq.~\ref{eq:diffc} as:
+\begin{equation}
+-\lambda_a \vek{c}_a \exp(-\lambda_a t) = -\gamma \hat{M} \cdot \vek{c}_a \exp(-\lambda_a t)
+\end{equation}
+That is:
+\begin{equation}
+\gamma \hat{M} \cdot \vek{c}_a = \lambda_a \vek{c}_a,
+\end{equation}
+which is only true for eigenvalue/eigenvector pairs $\{\lambda_a, \vek{c}_a\}$.
+
+We now introduce constant external force $\{f_i\}$:
+\begin{equation}
+\label{eq:diffc2}
+p_i'(t) = - \gamma \hat{M} \cdot \{p_j\} + f_i 
+\end{equation}
+and attempt the trial solution:
+\begin{align}
+\{ p \} &= \{ c_{ai}, c_{aj}, \ldots, .. c_{aN} \} \exp(-\lambda_a t) + \vek{k} \\
+        &= \vek{c}_a \exp(-\lambda_a t) + \vek{k}
+\end{align}
+where $\vek{k}$ is of length $N$.
+The solution is as before but now with
+\begin{equation}
+\gamma \hat{M} \cdot \vek{k} = \vek{f}
+\end{equation}
+
+\subsection{Molecular justification for $\gamma$}
+
+The surface is formed of many molecular units $\{ r_i \}$ with mass $m_i$.
+The microscopic Langevin equation for unit $i$ is:
+\begin{equation}
+\label{eq:microl}
+m v_i'(t) = -\gamma v_i(t) + f, 
+\end{equation}
+with $f$ including a random force.
+The factor $\gamma$ (units mass $\times$ time$^{-1}$) specifies the magnitude of the frictional force, typically interpreted as a collision rate.
+However, the propagation of these units collectively is accomplished with collective variables $\{ q \}$, here the control points of the mesh.
+The points $\{ r_i \}$ and thus their velocities are functions of the generalized coordinates:
+\begin{equation}
+v_i = \sum_j \frac{\partial r_i}{\partial q_j} \dot{q}_j
+\end{equation}
+Inserting this expression into Eq.~\ref{eq:microl} yields:
+\begin{equation}
+m_i \sum_j \frac{\partial r_i}{\partial q_j} \ddot{q}_j = -\gamma \sum_j \frac{\partial r_i}{\partial q_j} \dot{q}_j + f_i 
+\end{equation}
+where with the subdivision limit algorithm the surface position is proportional to the mesh control points and so second derivatives only enter for $\ddot{q}$.
+With
+\begin{equation}
+\dot{q}_i = \sum_j M^{-1}_{ij} p_j 
+\end{equation}
+this transforms to
+\begin{equation}
+m_i \sum_j \frac{\partial r_i}{\partial q_j} \sum_{k} M^{-1}_{jk} \dot{p}_k = -\gamma \sum_j \frac{\partial r_i}{\partial q_j} \sum_k M^{-1}_{jk} p_k
+\end{equation}
+As there are many sites $\{ r_i \}$, this equation is an over-determined system of differential equations for the momenta $\{p_k(t)\}$.
+\end{document}
+
+
+
+
+
+
+
+
+

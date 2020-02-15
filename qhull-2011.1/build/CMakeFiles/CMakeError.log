@@ -1,0 +1,41 @@
+Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+Compiler: /usr/bin/g++ 
+Build flags: 
+Id flags: 
+
+The output was:
+1
+CMakeCCompilerId.c:2:3: error: #error "A C++ compiler has been selected for C."
+CMakeCCompilerId.c:76: warning: deprecated conversion from string constant to ‘char*’
+CMakeCCompilerId.c:166: warning: deprecated conversion from string constant to ‘char*’
+
+
+Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+Compiler: /usr/bin/g++ 
+Build flags: 
+Id flags: -c
+
+The output was:
+1
+CMakeCCompilerId.c:2:3: error: #error "A C++ compiler has been selected for C."
+CMakeCCompilerId.c:76: warning: deprecated conversion from string constant to ‘char*’
+CMakeCCompilerId.c:166: warning: deprecated conversion from string constant to ‘char*’
+
+
+Determining if the C compiler works failed with the following output:
+Change Dir: /u/alex/Projects/cecam_examples/hex/qhull-2011.1/build/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/gmake "cmTryCompileExec/fast"
+gmake[1]: Entering directory `/u/alex/Projects/cecam_examples/hex/qhull-2011.1/build/CMakeFiles/CMakeTmp'
+/usr/bin/gmake -f CMakeFiles/cmTryCompileExec.dir/build.make CMakeFiles/cmTryCompileExec.dir/build
+gmake[2]: Entering directory `/u/alex/Projects/cecam_examples/hex/qhull-2011.1/build/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /u/alex/Projects/cecam_examples/hex/qhull-2011.1/build/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building C object CMakeFiles/cmTryCompileExec.dir/testCCompiler.c.o
+/usr/bin/g++    -o CMakeFiles/cmTryCompileExec.dir/testCCompiler.c.o   -c /u/alex/Projects/cecam_examples/hex/qhull-2011.1/build/CMakeFiles/CMakeTmp/testCCompiler.c
+/u/alex/Projects/cecam_examples/hex/qhull-2011.1/build/CMakeFiles/CMakeTmp/testCCompiler.c:2:3: error: #error "The CMAKE_C_COMPILER is set to a C++ compiler"
+gmake[2]: *** [CMakeFiles/cmTryCompileExec.dir/testCCompiler.c.o] Error 1
+gmake[2]: Leaving directory `/u/alex/Projects/cecam_examples/hex/qhull-2011.1/build/CMakeFiles/CMakeTmp'
+gmake[1]: *** [cmTryCompileExec/fast] Error 2
+gmake[1]: Leaving directory `/u/alex/Projects/cecam_examples/hex/qhull-2011.1/build/CMakeFiles/CMakeTmp'
+
+

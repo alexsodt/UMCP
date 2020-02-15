@@ -1,0 +1,15 @@
+
+\newsection{ Membrane and particle dynamics } \label{sec:dynamics}
+
+\newsubsection{Local metric}
+
+The local metric of the membrane relates changes in a particle's surface coordinates $u$ and $v$ to changes in its three dimensional Cartesian vector. 
+
+\newsubsection{Irregular mesh points}
+
+An irregular mesh point has valence not equal to six.
+At an irregular mesh point the metric and some related properties (curvature) diverge.
+Note that the tangent plane does not.
+Nevertheless this is a challenge for dynamics because critical quantities ($\dot{u}$, $\dot{v}$, $c(u,v)$) are changing rapidly with time.
+The solution currently adopted is to split timesteps as necessary, on a particle-by-particle basis, as they approach irregular vertices.
+Not all quantities are recomputed during the time splitting, only those that do not require interaction with other particles. 

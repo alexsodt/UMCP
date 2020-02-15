@@ -1,0 +1,25 @@
+
+\newsection{ Pressure/tension control } \label{sec:npt}
+
+Changes in the periodic boundary dimension are controlled using a vector of parameters $\vek{\alpha}$ that scales the coordinates from the original PBCs:
+\begin{equation}
+\vek{r}' = \{ r_x \alpha_x, r_y \alpha_y, r_z \alpha_z \}
+\end{equation} 
+Naturally the periodic cell dimensions are changed by the same values of $\alpha$.
+
+Changing the value of $\alpha_x$ changes the shape of the underlying mesh, as well as the positions of all attached particles.
+Not only is the potential energy changed, but the kinetic energy as well.
+
+The kinetic energy $T$ is computed as
+\begin{equation}
+T = \frac{1}{2} \sum_i p_i \dot{q}_i
+\end{equation}
+where $p_i$ and $q_i$ are the conjugate momentum and coordinate of degree-of-freedom $i$, which might be a single Cartesian (e.g. $x$) or surface coordinate (e.g. $u$).
+The quantity $\dot{q}_i$ is computed as $\hat{M}^{-1} \cdot \vek{p}$.
+The matrix $\hat{M}$ is the same for each Cartesian dimension.
+It is computed initially with $\vek{\alpha}=\{1,1,1\}$, scales as $\alpha^2$, as it is the outer product of $\frac{\vek{\partial r}}{\partial q_i}$ with itself.
+Changing $\vek{\alpha}$ thus changes $T$ for the system and so $T$ must be considered when computing the probability $p$ of a Monte Carlo move attempt in $\alpha$:
+\begin{equation}
+p = \exp{-\beta (V_\textrm{new}-V_\textrm{old}+T_\textrm{new}-T_\textrm{old})}
+\end{equation} 
+where $\beta$ is the inverse temperature, $V$ is the potential energy, and subscripts label the quantities before and after the attempted move. 

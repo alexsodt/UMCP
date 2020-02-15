@@ -1,0 +1,63 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include "interp.h"
+#include "pcomplex.h"
+void surface::saveRestart( FILE *theFile, double *rsurf, double *pp, pcomplex **allComplexes, int ncomplex )
+{
+	char *buf;
+
+	saveRestart( &buf, rsurf, pp, allComplexes, ncomplex );
+
+	fprintf(theFile, "%s", buf );
+
+	free(buf);
+}
+
+void surface::saveRestart( char **buf, double *rsurf, double *pp, pcomplex **allComplexes, int ncomplex )
+{
+	int buffer_size = 4096;
+	int put = 0;
+
+	char *theBuffer = (char *)malloc( sizeof(char) * buffer_size );
+	char *tbuf = (char *)malloc( sizeof(char) * 4096 );
+	for( int v = 0; v < nv+1; v++ )
+	{
+		sprintf( tbuf, "%lf %lf %lf %lf %lf %lf\n", rsurf[3*v+0], rsurf[3*v+1], rsurf[3*v+2], pp[3*v+0], pp[3*v+1], pp[3*v+2] );
+
+		if( put + strlen(tbuf) >= buffer_size )
+		{
+			buffer_size *= 2;
+			buffer_size += strlen(tbuf);
+
+			theBuffer = (char *)realloc( theBuffer, buffer_size ); 
+		}
+
+		strcpy( theBuffer+put, tbuf );
+
+		put += strlen(tbuf);
+	}
+
+	for( int c = 0; c < ncomplex; c++ )
+	{
+		// save at least 4096 characters for each complex.
+
+		int len = 0;
+		int tries = 0;
+
+		while( tries < 3 && allComplexes[c]->saveComplex( theBuffer + put, &len, buffer_size - put ))
+ 		{
+			buffer_size *= 2;
+
+			theBuffer = (char *)realloc( theBuffer, buffer_size ); 
+
+			tries++;
+		}
+
+		put += len;
+	}
+
+	free(tbuf);
+
+	*buf = theBuffer;
+}
