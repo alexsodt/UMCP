@@ -13,6 +13,7 @@
 #include "globals.h"
 #include "rd.h"
 #include "M_matrix.h"
+#include "maxk.h"
 
 //#define DISABLE_POINT_GRADIENT_DEBUG
 
@@ -464,11 +465,11 @@ double pcomplex::update_dH_dq( Simulation *theSimulation, double time_step, doub
 	if( nattach > 0  )
 	{	
 
-		double surfacer_g[3*nattach];
-		double surfacen_g[3*nattach];
+		double surfacer_g[3*nsites];
+		double surfacen_g[3*nsites];
 
-		memset( surfacer_g, 0, sizeof(double)*3*nattach);
-		memset( surfacen_g, 0, sizeof(double)*3*nattach);
+		memset( surfacer_g, 0, sizeof(double)*3*nsites);
+		memset( surfacen_g, 0, sizeof(double)*3*nsites);
 
 		double pg[2*nattach];
 		memset( pg, 0, sizeof(double) * 2 * nattach );
@@ -791,6 +792,13 @@ double pcomplex::update_dH_dq( Simulation *theSimulation, double time_step, doub
 			free(d_P_duv);
 			free(C_iu);
 		}
+			
+		for( int a = nattach; a < nsites; a++ )
+		{
+			save_grad[3*a+0] += surfacer_g[3*a+0];	
+			save_grad[3*a+1] += surfacer_g[3*a+1];	
+			save_grad[3*a+2] += surfacer_g[3*a+2];	
+		}			
 	}
 
 	return time_step;
@@ -1297,7 +1305,7 @@ void pcomplex::init( double *r )
 	bound = 0;
 }
 
-void pcomplex::init( surface *theSurface, double *rsurf, int f, double u, double v )
+void pcomplex::init( Simulation *theSimulation, surface *theSurface, double *rsurf, int f, double u, double v )
 {
 	base_init();
 
@@ -1522,6 +1530,8 @@ pcomplex *loadComplex( const char *name )
 
 	if( !strcasecmp( name, "NBAR" ) )
 		the_complex = new NBAR;
+	else if( !strcasecmp( name, "syt7" ) )
+		the_complex = new syt7;
 	else if( !strcasecmp( name, "dimer" ) )
 		the_complex = new dimer;
 	else if( !strcasecmp( name, "MAB" ) )
@@ -1575,17 +1585,22 @@ double pcomplex::grad( Simulation *theSimulation, double *surface_g, double *par
 	return 0;
 }
 
-void surface::loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterBlock *block )
+void Simulation::loadComplexes( parameterBlock *block )
 {
+	surface *theSurface = allSurfaces->theSurface;
+	surface_record *baseRec = allSurfaces;
+
+	int nv = theSurface->nv;
+
 	int nspace = 1;
-	(*allComplexes) = (pcomplex **)malloc( sizeof(pcomplex *) );
+	allComplexes = (pcomplex **)malloc( sizeof(pcomplex *) );
 
 	double **M;
 	int mlow = 5;
 	int mhigh = 7;
 	getM( &M, &mlow, &mhigh );
 	double *rsurf = (double *)malloc( sizeof(double) * ( 3*nv+3) );
-	get(rsurf);
+	theSurface->get(rsurf);
 
 	rsurf[3*nv+0] = 1.0;
 	rsurf[3*nv+1] = 1.0;
@@ -1595,13 +1610,13 @@ void surface::loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterB
 
 	double the_area, area0;
 	
-	area( rsurf, -1, &the_area, &area0 ); 
+	theSurface->area( rsurf, -1, &the_area, &area0 ); 
 
-	double vol_inside = volume(rsurf);
-	double total_volume = cellVolume();	
+	double vol_inside = theSurface->volume(rsurf);
+	double total_volume = theSurface->cellVolume();	
 	double vol_outside = total_volume - vol_inside;
 
-	*ncomplex = 0;
+	ncomplex = 0;
 
 	for( complex_record *rec = block->complex_records; rec; rec = rec->next )
 	{
@@ -1668,7 +1683,7 @@ void surface::loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterB
 					double ucol,vcol;
 					double dummy;
 
-					if( withinBoxedSurface( tp, &fcol, &ucol, &vcol, M, mlow, mhigh, &dummy ) )
+					if( theSurface->withinBoxedSurface( tp, &fcol, &ucol, &vcol, M, mlow, mhigh, &dummy ) )
 					{
 						if( test == -1 )
 							io_check = 1;
@@ -1684,15 +1699,15 @@ void surface::loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterB
 			prot->loadParams(block);
 			prot->init(tp); 
 		
-			if( *ncomplex  == nspace )
+			if( ncomplex  == nspace )
 			{
 				nspace *= 2;
-				*allComplexes = (pcomplex **)realloc( *allComplexes, sizeof(pcomplex *) * nspace );
+				allComplexes = (pcomplex **)realloc( allComplexes, sizeof(pcomplex *) * nspace );
 			}	
 		
-			(*allComplexes)[*ncomplex] = prot;
-			prot->my_id = *ncomplex;
-			(*ncomplex)++;
+			(allComplexes)[ncomplex] = prot;
+			prot->my_id = ncomplex;
+			(ncomplex)++;
 		}
 		
 		int nsurf_tot = num_inside_surf + num_outside_surf + num_anywhere_surf;
@@ -1702,7 +1717,15 @@ void surface::loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterB
 			int f;
 			double u,v;
 		
-			randomPointOnSurface( &f, &u, &v );			
+			theSurface->randomPointOnSurface( &f, &u, &v );			
+
+			if( rec->saddle )
+			{
+				max_gauss_c( theSurface, &f, &u, &v, 1000, rsurf );	
+				// from this random point, move to maximize negative gaussian curvature.
+			}
+
+
 
 			pcomplex *prot = loadComplex( rec->name );
 
@@ -1712,21 +1735,21 @@ void surface::loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterB
 			else
 				prot->move_outside();
 
-			prot->init(this, rsurf, f,u,v); 				 
+			prot->init(this, theSurface, rsurf, f,u,v); 				 
 
 			for( int t = 0; t < prot->nattach; t++ )
-				prot->sid[t] = surface_id; 
+				prot->sid[t] = baseRec->id; 
 
-			if( *ncomplex  == nspace )
+			if( ncomplex  == nspace )
 			{
 				nspace *= 2;
-				*allComplexes = (pcomplex **)realloc( *allComplexes, sizeof(pcomplex *) * nspace );
+				allComplexes = (pcomplex **)realloc( allComplexes, sizeof(pcomplex *) * nspace );
 			}	
 
-			(*allComplexes)[*ncomplex] = prot;
-			prot->my_id = *ncomplex;
+			(allComplexes)[ncomplex] = prot;
+			prot->my_id = ncomplex;
 
-			(*ncomplex)++;
+			(ncomplex)++;
 		}
 
 	}	
@@ -1777,22 +1800,22 @@ void simpleBound::loadParams( parameterBlock *block )
 
 
 
-void simpleLipid::init( surface *theSurface, double *rsurf, int f, double u, double v )
+void simpleLipid::init(  Simulation *theSimulation,surface *theSurface, double *rsurf, int f, double u, double v )
 {
-	pcomplex::init( theSurface, rsurf, f, u, v );
+	pcomplex::init( theSimulation, theSurface, rsurf, f, u, v );
 
 	p_c0[0] = c0_val;
 }
 
-void simpleDimer::init( surface *theSurface, double *rsurf, int f, double u, double v )
+void simpleDimer::init(  Simulation *theSimulation,surface *theSurface, double *rsurf, int f, double u, double v )
 {
-	simpleLipid::init( theSurface, rsurf, f, u, v );
+	simpleLipid::init( theSimulation, theSurface, rsurf, f, u, v );
 
 	p_c0[0] = c0_val;
 	p_area[0] = 2 * default_particle_area;
 }
 
-void simpleBound::init( surface *theSurface, double *rsurf, int f, double u, double v )
+void simpleBound::init(  Simulation *theSimulation,surface *theSurface, double *rsurf, int f, double u, double v )
 {
 	base_init();
 
@@ -2108,7 +2131,7 @@ double pcomplex::AttachV( Simulation *theSimulation )
 	{
 		struct surface_record *sRec = theSimulation->fetch(sid[s]);
 		double k;
-		double curv = sRec->theSurface->c( fs[s],puv[2*s+0], puv[2*s+1], sRec->r, &k);
+		double curv = sRec->theSurface->c( grad_fs[s],grad_puv[2*s+0], grad_puv[2*s+1], sRec->r, &k);
 
 
 		pot += 0.5 * kc * p_area[s] * ( curv - p_c0[s]) * (curv - p_c0[s]); 
@@ -2618,4 +2641,7 @@ void pcomplex::uncache(void)
 	memcpy(      rall, cache_rall, sizeof(double) * 3 * nsites );
 }
 
+void pcomplex::writeStructure( Simulation *theSimulation, atom_rec **at_out, int *nat_out)
+{
+}
 

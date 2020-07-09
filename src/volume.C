@@ -1823,7 +1823,8 @@ void drawVMDArrow( FILE *theFile, double *from, double *to )
 		printf("Debug.\n");
 	}
 }	
-					
+
+/*					
 void fillcp( double *der, double *r )
 { // fast is the vector component that we are differentiating
   // slow is the vector component that we are differentiating wrt
@@ -1857,6 +1858,7 @@ void fillcpder( double *der, double *dr,
 	der[18+3*wrt+1] += sign * dr[2+3]; 	
 	der[18+3*wrt+2] += sign * dr[2+6]; 	
 }
+*/
 
 /* derivative of the area of a triangle defined by r1,r2,r3, dnrm is the nrm deriv, fac is leading fac */
 				

@@ -22,6 +22,75 @@ The choice of timestep is critical for computing proper ensembles.
 If the timestep is too large, the system will be unstable and program execution will halt.
 The option \code{timestep\_analysis=yes} provides a rough estimate of a proper timescale for dynamics.
 
+If \code{timestep} is not specified, it defaults to
+\begin{equation}
+\textrm{\code{timestep}} = 10^{-3} \frac{65\textrm{ \AA}^2}{\pi \textrm{\code{diffc}}}
+\end{equation}
+where \code{diffc} is the diffusion constant in \AA$^2 s^{-1}$.
+
+\subsubsection{Thermostatting: Langevin dynamics}
+
+\begin{bcomment}{Langevin Dynamics}
+Langevin dynamics is frequently selected as a model of implicit solvent.
+The solvent degrees of freedom are not modeled.
+In this framework, the effect of solvent is reduced to a random force that bumps those degrees of freedom that are modeled (for example, the membrane).
+These random forces impart thermal energy into the system.
+Viscosity of the solvent is modeled by a friction coefficient the reduces the momentum of the modeled degrees of freedom.
+A balance between viscosity and the random force ensures the correct temperature and Boltzmann ensemble.
+It can thus be chosen to model solvent or used as a simple thermostat to maintain temperature.
+The mathematics of Langevin dynamics are discussed in~\cref{sec:langevin}
+\end{bcomment}
+
+Temperature can be controlled through the simultaneous application of a noise force and friction applied to the surface and particle momenta.
+In the low friction limit, this corresponds to Newtonian mechanics.
+In high friction limit, this corresponds to Brownian dynamics.
+The friction coefficient is set using the \code{gamma\_langevin} parameter, which sets $\gamma$ to be this fraction of the timestep $\tau$.
+That is,
+\begin{equation}
+\gamma = \frac{\textrm{\code{gamma\_langevin}}}{\tau} 
+\end{equation} 
+
+\subsubsection{Thermostatting: Brownian dynamics}
+
+\begin{bcomment}{Brownian Dynamics}
+Brownian dynamics is equivalent to Langevin dynamics in the high friction limit.
+For a given timestep, solvent and frictional forces are sufficient to decorrelate velocities over the timestep.
+As a result, a degree-of-freedom ``hops'' from one value to the next depending on noise and whatever potential energies are driving motion.
+This model is consistent with a diffusion constant as an external parameter, rather than one that emerges from the underlying dynamics.  
+The mathematics of Brownian dynamics are discussed in~\cref{sec:brownian}.
+\end{bcomment}
+
+An isothermal ensemble can also be determined with Brownian dynamics.
+To activate Brownian dynamics for particles, use \code{do\_bd\_particles yes}.
+To activate Brownian dynamics for the membrane, use \code{do\_bd\_membrane yes}.
+
+\subsubsection{Membrane kinetics}
+
+Well-defined kinetics can be activated when membrane modes are used by specifying \code{kinetics yes}.
+Currently this requires the use of membrane modes, and is limited to slightly perturbed sphere and planar systems. 
+
+\subsubsection{Using an area compressibility modulus, $K_A$}
+
+\begin{bcomment}{The area compressibility modulus}
+The energy (per area) of a membrane patch experiencing area strain $\epsilon$
+\begin{equation}
+\epsilon = \frac{A-A_0}{A_0},
+\end{equation}
+determined from its instantaneous area $A$ and resting area $A_0$, is
+\begin{equation}
+\bar{E}_A = \frac{K_A}{2} \epsilon^2.
+\end{equation}
+\end{bcomment}
+
+The specification of the area compressibility modulus of the mesh is a key point.
+Applying a target area to each mesh triangle prevents a catastrophe of the in-plane kinetic energy of the mesh control points.
+Membrane curvature should be insensitive to this in-plane motion, yet it will destroy the ability of the mesh to represent complex objects.
+Furthermore, these motions do not model true membrane degrees of freedom.
+By specifying the area compressibility modulus, in-plane motion of the control points models thickness/area fluctuations of the membrane.
+
+With normal modes, in-plane motion is completely supressed and thus there is no reason to use $K_A$.
+In this case it should be set to zero (the default with modes activated).
+
 \newsubsection{Loading a simulation state}
 
 Dynamics and minimization can be restarted by loading a save file.

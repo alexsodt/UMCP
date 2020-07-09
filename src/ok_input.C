@@ -97,7 +97,7 @@ void setDefaults( parameterBlock *block )
 	block->bound_sigma = 10.0;
 
 	block->nve_switch = -1; // switch to NVE dynamics at this timestep.
-	block->gamma_langevin = 0.001;
+	block->gamma_langevin = 0.001; 
 	block->planar_topology = 0;
 	block->collect_hk = 0;
 	block->nruns = 1;
@@ -1628,14 +1628,13 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 			char *word3 = (char *)malloc( sizeof(char) * (strlen(buffer)+1) );	
 			char *word4 = (char *)malloc( sizeof(char) * (strlen(buffer)+1) );	
 			char *word5 = (char *)malloc( sizeof(char) * (strlen(buffer)+1) );	
-			char *word6 = (char *)malloc( sizeof(char) * (strlen(buffer)+1) );	
 
-			int nr = sscanf( buffer, "%s %s %s %s %s %s", word1, word2, word3, word4, word5, word6 );
+			int nr = sscanf( buffer, "%s %s %s %s %s", word1, word2, word3, word4, word5 );
 
 			if( nr < 4 )
 			{
 				printf("Syntax error in ``add'' command.\n");
-				printf("add COMPLEX nbound|nsolution|coverage|concentration value [inside|outside] [mod]\n");
+				printf("add COMPLEX nbound|nsolution|coverage|concentration value [inside|outside]\n");
 					exit(1);
 			}
 
@@ -1669,31 +1668,12 @@ int getInput( const char **argv, int argc, parameterBlock *block)
 					exit(1);
 				}
 			}
-			
-			rec->saddle = 0;
-
-			if( nr >= 6 )
-			{
-				
-				if( !strcasecmp( word6, "saddle") ) 
-					rec->saddle = 1;
-				else
-				{
-					printf("Error interpreting optional mod sub-command '%s' in command '%s'.\n", word6, buffer );
-					exit(1);
-				}
-			}
 
 			if( fabs( value -uvalue) > 1e-10 )
 			{
 				printf("ERROR. likely floating point/integer error for command '%s'.\n", buffer );
 				exit(1);
 			}
-
-			free(word3);
-			free(word4);
-			free(word5);
-			free(word6);
 		}
 		else
 		{
@@ -1732,7 +1712,6 @@ void printParamBlock( parameterBlock *block )
 	printf("\tkc:        %lf kcal/mol\n", block->kc );
 	printf("Random seed: %d\n", block->random_seed );
 	printf("DC:    %le Angstrom^2/s\n", block->diffc );
-	printf("Time-step:    %le s\n", block->time_step );
 
 	if( block->do_ld )
 	{

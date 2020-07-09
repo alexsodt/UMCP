@@ -1284,9 +1284,9 @@ int surface::loadLattice( const char *fileName, double noise, surface *copyFrom 
 		}
 		if( nfields >= 5 )
 		{
-			if( val < 5 || val > 7 )
+			if( val < 3 || val > 10 )
 			{
-				printf("The valence of any point currently must be between 5 and 7.\n");
+				printf("The valence of any point currently must be between 3 and 10.\n");
 				exit(1);
 			}
 			if( val > MAX_VALENCE )

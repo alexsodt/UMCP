@@ -2293,7 +2293,7 @@ int main( int argc, const char **argv )
 							if( apair->aqueous_id == i && apair->state == STATE_IN_COMPLEX )
 								p = apair->surface_id;
 						}
-						temp_complexes[i]->init(sub_surface, r, pfaces[p], puv[2*p+0], puv[2*p+1] );
+						temp_complexes[i]->init(theSimulation, sub_surface, r, pfaces[p], puv[2*p+0], puv[2*p+1] );
 					}
 					else
 						temp_complexes[i]->init(aqueous_r+3*i);

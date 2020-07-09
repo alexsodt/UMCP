@@ -54,7 +54,8 @@ void l_bfgs_setup( int use_m, // the number of back vectors
 
 	back_s = (double *)malloc( sizeof(double) * n * use_m ); 
 	back_y = (double *)malloc( sizeof(double) * n * use_m ); 
-
+	memset( back_s, 0, sizeof(double) * n * use_m );
+	memset( back_y, 0, sizeof(double) * n * use_m );
 	local_bfgs_f = f;
 	local_bfgs_fdf = fdf;
 	q = (double *)malloc( sizeof(double) * n );
@@ -125,7 +126,7 @@ int l_bfgs_iteration( double *place )
 			back_y[vec_rotor[0]*n+j] = q[j] - last_g[j];	 
 			back_s[vec_rotor[0]*n+j] = cur_x[j] - last_x[j];
 		}
-
+		
 		double dp = 0;
 
 		for( int j = 0; j < n; j++ )
@@ -135,6 +136,8 @@ int l_bfgs_iteration( double *place )
 		if( fabs(dp) < 1e-40 )
 		{
 //			printf("Terminating: dp: %.14le\n", dp );
+			memcpy( last_x, cur_x, sizeof(double) * n );
+			memcpy( last_g, q, sizeof(double) * n );
 
 			return 0;
 		}

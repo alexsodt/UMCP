@@ -1,0 +1,219 @@
+%\documentclass[11pt,notitlepage]{revtex4}
+\documentclass[11pt]{article}
+\usepackage{geometry}
+\usepackage[bottom]{footmisc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{comment}
+\usepackage{etoolbox}
+\usepackage{tcolorbox}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage[scaled=1]{helvet}
+\usepackage{setspace}
+\usepackage{wrapfig}
+\usepackage{newfloat}
+\usepackage{mdframed}
+\usepackage{cleveref}
+\usepackage{calc}
+\usepackage{regexpatch}
+\usepackage{ifxetex,ifluatex}
+\usepackage{multicol}
+%\usepackage[resetlabels]{multibib}
+\usepackage{filecontents}
+\usepackage{tocloft}
+\geometry{margin=0.75in}
+
+  \newenvironment{bcomment}[1]{%
+%    {\def\cl@bgcolor{gray!12}}
+    \mdfsetup{skipabove=12pt,frametitlealignment=\centering,skipbelow=12pt,frametitleaboveskip=12pt,frametitlebelowskip=12pt,innerbottommargin=12pt,hidealllines=true,frametitlefont=\bfseries\color{darkgray}}
+    \begin{mdframed}
+	[frametitle=\MakeUppercase{#1},
+	backgroundcolor=gray!12]
+%      \setlist[itemize]{label=$\Box$,leftmargin=*}
+  }{\end{mdframed}}
+
+
+\newcommand{\vek}[1]{\boldsymbol{#1}}          % vector symbol
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\diff}{\textrm{d}}
+\newcommand{\kT}{k_B T}
+%%%%%%%%%
+\newcounter{command}
+\renewcommand\thecommand{C\,\arabic{command}}
+\setcounter{command}{0}
+\newenvironment{command}[1][]{\refstepcounter{command}\ttfamily \\  >~}{\hfill\commandfmt\\}
+\newcommand{\commandfmt}{(\thecommand)}
+%%%%%%
+
+%%%%%%%%%
+%\newenvironment{icommand}[1][]{\refstepcounter{icommand}\ttfamily \\  \%~}{\hfill\icommandfmt\\}
+%%%%%%
+  
+%\newcounter{icommand}
+%\renewcommand\theicommand{I\,\arabic{icommand}}
+%\setcounter{icommand}{0}
+%\newenvironment{icommand}[1][]{%
+%   \mdfsetup{skipabove=12pt,innertopmargin=6pt,innerbottommargin=6pt,skipbelow=12pt,hidealllines=true}
+%    \refstepcounter{icommand} \ttfamily
+%    \begin{mdframed}[backgroundcolor=blue!5]
+%  }
+%{\hfill
+%\icommandfmt
+%\end{mdframed}
+%}
+%\newcommand{\icommandfmt}{(\theicommand)}
+
+\tcbset{parskip/.style={before={\par\pagebreak[0]\smallskip\parindent=0pt}, after={}}}
+
+\newcounter{icommand}
+\renewcommand\theicommand{I\,\arabic{icommand}}
+\setcounter{icommand}{0}
+\newenvironment{icommand}[1][]{%
+    \refstepcounter{icommand} \ttfamily
+    \begin{tcolorbox}[before={\par\pagebreak[0]\smallskip\parindent=0pt},after={}]
+    \begin{minipage}{0.9\textwidth}
+  }
+{
+\end{minipage}
+\hfill
+\icommandfmt
+\end{tcolorbox}
+}
+\newcommand{\icommandfmt}{(\theicommand)}
+
+
+%\usepackage[hmargin=0.75in,vmargin=0.75in,paperheight=11in,paperwidth=8.5in]{geometry}
+%
+%\usepackage{multirow}
+%\usepackage{dcolumn}% Align table columns on decimal point
+%\usepackage{bm}% bold math
+%\usepackage{amssymb}   % for math
+%\usepackage{float}
+
+\patchcmd{\section}
+  {\centering}
+  {\raggedright}
+  {}
+  {}
+\patchcmd{\subsection}
+  {\centering}
+  {\raggedright}
+  {}
+  {}
+
+\patchcmd{\subsubsection}
+  {\centering}
+  {\raggedright}
+  {}
+  {}
+
+
+\begin{document}
+\bibliographystyle{unsrt}
+
+\pagenumbering{roman}
+
+
+\title{ Documentation for UMCP continuum modeling software}
+
+\maketitle
+
+\tableofcontents
+
+\clearpage
+
+\pagenumbering{arabic}
+
+\input{preamble.tex}
+
+\input{introduction.tex}
+
+\input{running.tex}
+
+\input{lipid_composition.tex}
+
+% Momentum and kinetic energy conserving dynamics
+
+\input{hamiltonian.tex}
+
+\input{dynamics.tex}
+
+\input{timescales.tex}
+
+\input{all_atom.tex}
+
+% Ensembles, thermostatting and hydrodynamics.
+
+\input{npt.tex}
+\input{srd.tex}
+
+\newpage
+
+\newcommand{\listSetupOptionName}{Options: System setup}
+\newlistof{optionSummarysetup}{setupopts}{\listSetupOptionName}
+\newcommand{\listDynamicsOptionName}{Options: Dynamics}
+\newlistof{optionSummarydynamics}{dynamicsopts}{\listDynamicsOptionName}
+\newcommand{\listRxnOptionName}{Options: Reaction diffusion}
+\newlistof{optionSummaryrxn}{rxnopts}{\listRxnOptionName}
+\newcommand{\listMiscOptionName}{Options: Miscellaneous}
+\newlistof{optionSummarymisc}{miscopts}{\listMiscOptionName}
+
+% setup, dynamics, misc, rxn
+
+\newenvironment{optionSummary}[3]{
+%    {\def\cl@bgcolor{gray!12}}
+    \mdfsetup{skipabove=0pt,skipbelow=0pt,frametitleaboveskip=0pt,frametitlebelowskip=5pt,innerbottommargin=0pt,hidealllines=true,frametitlefont=\bfseries\color{darkgray}}
+    \begin{mdframed}
+	[frametitle=\begin{flushleft}Option:~\MakeLowercase{\code{#1}}\\Default:~\MakeLowercase{\code{#2}}\end{flushleft},
+	backgroundcolor=white]
+%      \setlist[itemize]{label=$\Box$,leftmargin=*}
+     \refstepcounter{optionSummary#3}
+     \addcontentsline{#3opts}{#3option}{\protect#1}
+  }{\par\begin{flushleft}\hrulefill\end{flushleft}\end{mdframed}}
+
+
+ \renewcommand{\cftoptionSummarysetupfont}{\bf}
+ \renewcommand{\cftoptionSummarysetupaftersnum}{}
+ \renewcommand{\cftoptionSummarysetupaftersnumb}{}
+ \renewcommand{\cftoptionSummarysetupleader}{\cftdotfill{\cftoptionSummarysetupdotsep}}
+ \renewcommand{\cftoptionSummarysetupdotsep}{\cftdotsep}
+ \renewcommand{\cftoptionSummarysetuppagefont}{}
+ \renewcommand{\cftoptionSummarysetupafterpnum}{}
+ \renewcommand{\cftoptionSummarysetuppresnum}{SOMETHING }
+
+\renewcommand{\cftsetupoptstitlefont}{\Large\bf}
+\renewcommand{\cftdynamicsoptstitlefont}{\Large\bf}
+\renewcommand{\cftrxnoptstitlefont}{\Large\bf}
+\renewcommand{\cftmiscoptstitlefont}{\Large\bf}
+
+\section{Input options}
+
+
+\begin{multicols}{2}
+\listofoptionSummarysetup
+\end{multicols}
+
+\begin{multicols}{2}
+\listofoptionSummarydynamics
+\end{multicols}
+
+
+\begin{multicols}{2}
+\listofoptionSummaryrxn
+\end{multicols}
+
+\begin{multicols}{2}
+\listofoptionSummarymisc
+\end{multicols}
+
+\input{options.tex}
+
+
+\section{Bibliography}
+\bibliography{docs}
+
+\end{document}
+
+
+

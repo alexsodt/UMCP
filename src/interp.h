@@ -34,6 +34,7 @@ int loadLattice( const char *fileName, double noise );
 
 #define N_BLOCK_QUANTITIES 1
 
+struct Simulation;
 
 typedef struct
 {
@@ -437,6 +438,7 @@ struct surface
 	double dG( int f, double u, double v, double grad[5], double *r );
 	void get_pt_coeffs( int f, double u, double v, double *coeffs, int *coord_list, int *ncoords );
         void get_pt_dcoeffs( int f, double u, double v, double *coeffs, int *coord_list, int *ncoords );
+	void d_c_duv( double *r, int f, double u, double v, double d_c1_duv[2], double d_c2_duv[2] );
 
 	/* gradFetch gets the mesh derivatives of r, n, and c1+c2 */
 	double gradFetch( int f, double u, double v, double *r, 
@@ -495,7 +497,6 @@ struct surface
 	void testFAP( int f, double u, double v, double *dp, double *effM );
 
 	void wrapPBC( double *dr, double *alphas=NULL );
-	void loadComplexes( pcomplex ***allComplexes, int *ncomplex, parameterBlock *block );
 	void minimize( double *r, pcomplex **allComplexes, int ncomplex, int do_freeze_membrane = 0 );
 	void debug_dynamics( double *r, force_set *theForceSet, double *Minv, pcomplex **allComplexes, int ncomplex );
 	void timestep_analysis( double *r, force_set *theForceSet, double *Minv, pcomplex **allComplexes, int ncomplex, double approx_timestep );
@@ -535,7 +536,8 @@ struct surface
 	void getRegions( int *regions, int nregions );
 	void readLipidComposition( FILE *inputFile );
 	void debugDeformation( double *r);
-	void createAllAtom( parameterBlock *block );
+	// MOVE THIS TO simulation alex:
+	void createAllAtom( Simulation *theSimulation, parameterBlock *block, pcomplex **allComplexes, int ncomplex );
 	int evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf, int leaflet, double strain, 
 	double *dx_duv=NULL, double *dy_duv=NULL, double w_use=1.0, double w_rim=0.0, double *rimp=NULL, double *rimn = NULL );
 	int simple_evaluate_at( double eval[3], double dr[3], int f, double *u, double *v, double *rsurf, int leaflet, double strain, 

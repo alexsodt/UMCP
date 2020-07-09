@@ -4,6 +4,8 @@
 #include "interp.h"
 #include "input.h"
 
+struct atom_rec;
+
 #define __pcomplexh__
 
 #define DEBUG_OFF	0
@@ -76,7 +78,7 @@ struct pcomplex
 	virtual int getNBonds( void ) { return 0; };
 	virtual void putBonds( int *bond_list );
 
-	virtual void init( surface *theSurface, double *, int f, double u, double v ); 
+	virtual void init( Simulation *theSimulation, surface *theSurface, double *, int f, double u, double v ); 
 	virtual void init( double *r ); 
 
 	virtual void bind( int f, double u, double v );
@@ -133,6 +135,7 @@ struct pcomplex
 	void evaluate_momentum( surface *theSurface, double *rsurf, double *pout );
 	double local_curvature( Simulation *theSimulation);
 	void print_type( char **outp );
+	virtual void writeStructure( Simulation *theSimulation, struct atom_rec **at, int *nat );
 
 
 	void disable( void) { disabled = 1; }
@@ -160,20 +163,20 @@ struct simpleLipid : pcomplex
 {
 	double c0_val;
 	void loadParams( parameterBlock *block );
-	virtual void init( surface *theSurface, double *, int f, double u, double v ); 
+	virtual void init(  Simulation *theSimulation,surface *theSurface, double *, int f, double u, double v ); 
 };
 
 struct simpleBound : simpleLipid
 {
 	double bound_sigma;
 	void loadParams( parameterBlock *block );
-	virtual void init( surface *theSurface, double *, int f, double u, double v ); 
+	virtual void init(  Simulation *theSimulation,surface *theSurface, double *, int f, double u, double v ); 
 };
 
 struct simpleDimer : simpleLipid
 {
 	void loadParams( parameterBlock *block );
-	virtual void init( surface *theSurface, double *, int f, double u, double v ); 
+	virtual void init(  Simulation *theSimulation,surface *theSurface, double *, int f, double u, double v ); 
 };
 
 struct NBAR : pcomplex
@@ -186,7 +189,7 @@ struct NBAR : pcomplex
 	double phi_0;
 
 
-	void init( surface *, double *rsurf, int f, double u, double v ); 
+	void init( Simulation *theSimulation, surface *, double *rsurf, int f, double u, double v ); 
 	void init( double *r );
 	void bind( int f, double u, double v);
 	void unbind( void );
@@ -203,11 +206,31 @@ struct NBAR : pcomplex
 	void move_outside(void);	
 };
 
+struct syt7 : pcomplex
+{
+
+	void init( Simulation *theSimulation, surface *, double *rsurf, int f, double u, double v ); 
+	void init( double *r );
+	void bind( int f, double u, double v);
+	void unbind( void );
+	void loadParams( parameterBlock *block );
+	
+	int getNBonds( void );
+	void putBonds( int *bond_list );
+
+	double V( Simulation *theSimulation );
+	double grad( Simulation *theSimulation, double *surface_g, double *particle_g );
+
+	void writeStructure( Simulation *theSimulation, struct atom_rec **at, int *nat );
+	void move_inside(void);
+	void move_outside(void);	
+};
+
 struct dimer : pcomplex
 {
 	double bond_length;
 	double bond_k;
-	void init( surface *, double *rsurf, int f, double u, double v ); 
+	void init( Simulation *theSimulation, surface *, double *rsurf, int f, double u, double v ); 
 	void init( double *r );
 	void loadParams( parameterBlock *block );
 	
@@ -246,7 +269,7 @@ struct elasticCrowder : pcomplex
 	double att_sigma_inner;
 	double crowder_mass;
 
-	void init( surface *, double *rsurf, int f, double u, double v ); 
+	void init( Simulation *theSimulation, surface *, double *rsurf, int f, double u, double v ); 
 	void loadParams( parameterBlock * block );
 	int isElastic(void) { return 1; }	
 	void move_inside( void );

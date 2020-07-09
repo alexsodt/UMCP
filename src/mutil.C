@@ -929,3 +929,108 @@ double dihe( double *r1, double *r2, double *r3, double *r4 )
               double phi = atan2( arg1, arg2 );
                       return phi;
 }
+
+void fillcp( double *der, double *r )
+{ // fast is the vector component that we are differentiating
+  // slow is the vector component that we are differentiating wrt
+	der[0] = 0;
+	der[1] = -r[2];
+	der[2] =  r[1];
+	der[3] =  r[2];
+	der[4] =  0;
+	der[5] = -r[0];
+	der[6] = -r[1];
+	der[7] =  r[0];
+	der[8] = 0;
+}
+
+void fillcpder( double *der, double *dr, 
+		int wrt,
+		double sign
+		)
+{
+	// what we are differentiating is slow (n_x, n_y, n_z)
+	// what we are differentiating wrt is fast.
+	// dnrmx, dr_x
+
+	der[3*wrt+0] += sign * dr[0]; 	// x_comp
+	der[3*wrt+1] += sign * dr[3]; 	
+	der[3*wrt+2] += sign * dr[6]; 	
+	der[9+3*wrt+0] += sign * dr[1+0];   // y_comp	
+	der[9+3*wrt+1] += sign * dr[1+3]; 	
+	der[9+3*wrt+2] += sign * dr[1+6]; 	
+	der[18+3*wrt+0] += sign * dr[2+0];  // z_comp	
+	der[18+3*wrt+1] += sign * dr[2+3]; 	
+	der[18+3*wrt+2] += sign * dr[2+6]; 	
+}
+
+// middle coordinate is the cp center.
+void normal_cp_der( double *r1, double *r2, double *r3, double dnrm[27] )
+{				
+	double dA[9];
+
+	double dr12[3] = { r2[0]-r1[0],r2[1]-r1[1],r2[2]-r1[2]};
+	double dr32[3] = { r3[0]-r1[0],r3[1]-r1[1],r3[2]-r1[2]};
+	double unrm[3];
+	cross( dr12, dr32, unrm );
+
+	memset( dnrm, 0, sizeof(double) * 27 );
+
+	// derivative of a cross product with a vector wrt the other: 
+
+	double d_cp1_dr[9], d_cp2_dr[9], d_cp3_dr[9];
+
+	fillcp( d_cp1_dr, r1 );
+	fillcp( d_cp2_dr, r2 );
+	fillcp( d_cp3_dr, r3 );
+
+	// (r2-r1) x ( r3-r1) 
+	//  r2 x r3 - r1 x r3 - r2 x r1 
+
+	// first, fill the derivative wrt the numerator.
+	// r2 x r3 
+	fillcpder( dnrm, d_cp3_dr, 1, +1 );
+	fillcpder( dnrm, d_cp2_dr, 2, -1 ); //right side cross product gets neg
+
+	// - r1 x r3
+	fillcpder( dnrm, d_cp3_dr, 0, -1 ); 
+	fillcpder( dnrm, d_cp1_dr, 2, +1 ); 
+	
+	// - r2 x r1
+	fillcpder( dnrm, d_cp1_dr, 1, -1 );
+	fillcpder( dnrm, d_cp2_dr, 0, +1 );
+
+	// that's the numerator (the derivative of unrm)
+	double d_nrm_len[9];
+	memset( d_nrm_len, 0, sizeof(double) * 9 );
+	
+	double l = unrm[0]*unrm[0]+unrm[1]*unrm[1]+unrm[2]*unrm[2];
+
+	// d_nrm_len is the derivative of unrm . unrm
+	for( int p = 0; p < 3; p++ )
+	for( int c = 0; c < 3; c++ )
+	{
+		d_nrm_len[p*3+c] = 2 * unrm[0] * dnrm[0 +3*p+c] +
+			           2 * unrm[1] * dnrm[9 +3*p+c] +	 
+			           2 * unrm[2] * dnrm[18+3*p+c];
+
+		dA[p*3+c] = 0.5*d_nrm_len[p*3+c]/(2*sqrt(l));
+	}
+
+	// the normalization factor:
+	for( int t = 0; t < 27; t++ )
+		dnrm[t] /= sqrt(l);
+	// that completes the derivative of the numerator.
+
+
+	// denominator:
+	for( int nc = 0; nc < 3; nc++ )
+	for( int pc = 0; pc < 3; pc++ )
+	for( int p  = 0; p  < 3; p++ )
+	{
+		// nc: the cartesian comp of the norm.
+		//  p: which vector
+		// pc: cartesian comp of that vector
+		dnrm[nc*9+p*3+pc] +=  unrm[nc] * (-1.0/2.0) * pow(l,-3.0/2.0) * d_nrm_len[p*3+pc];	 
+	}
+}

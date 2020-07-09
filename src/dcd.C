@@ -711,7 +711,14 @@ void loadPSFfromPDB( FILE *theFile )
 		if( feof(theFile) ) break;
 
 		if( !strncasecmp( buffer, "ATOM",4) ) 
-			local_nat++;
+		{
+			struct atom_rec at_temp;
+			readATOM( buffer, &at_temp );
+
+			if( at_temp.altloc != 'B' )
+				local_nat++;
+			at_temp.zap();
+		}
 	}
 
 	rewind(theFile);
@@ -740,7 +747,8 @@ void loadPSFfromPDB( FILE *theFile )
 
 			readATOM( buffer, &lat );
 
-		
+			if( lat.altloc == 'B' )
+				continue;
 	
 			res_name[x] = (char *)malloc( sizeof(char) * ( strlen(lat.resname) +1 ) );
 			at_name[x] = (char *)malloc( sizeof(char) * ( strlen(lat.atname) +1 ) );
@@ -1457,6 +1465,9 @@ void loadPDB( FILE *theFile, struct atom_rec *at)
                 if( !strncasecmp( buffer, "ATOM", 4 ) )
                 {    
                         readATOM( buffer, at+a );
+			
+			if( at[a].altloc == 'B' )
+				continue;
 
 			if( res_name && res_name[a])
 			{

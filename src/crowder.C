@@ -9,7 +9,7 @@
 extern double lipid_DC;
 extern double solution_DC;
 
-void elasticCrowder::init( surface *theSurface, double *rsurf, int f, double u, double v )
+void elasticCrowder::init( Simulation *theSimulation, surface *theSurface, double *rsurf, int f, double u, double v )
 {
 	base_init();
 

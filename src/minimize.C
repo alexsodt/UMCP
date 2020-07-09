@@ -17,8 +17,7 @@ static int do_freeze_membrane = 0;
 static pcomplex **min_complexes;
 extern double VA,VC;
 double VV = 0;
-extern double water_KV;
-Simulation *min_simulation = NULL;
+extern double water_KV;Simulation *min_simulation = NULL;
 static double cur_rho_thickness[2] = { 15.0, 15.0 };
 
 #define FIT_RHO_ONE_THICKNESS
@@ -236,7 +235,13 @@ double surface_fdf( double *p, double *g)
 				min_complexes[c]->save_grad[2*a+0] += point_grad[0];		
 				min_complexes[c]->save_grad[2*a+1] += point_grad[1];		
 			}
-			
+
+			for( int a = min_complexes[c]->nattach; a < min_complexes[c]->nsites; a++ )
+			{
+				min_complexes[c]->save_grad[3*a+0] += rg[3*a+0];	
+				min_complexes[c]->save_grad[3*a+1] += rg[3*a+1];	
+				min_complexes[c]->save_grad[3*a+2] += rg[3*a+2];	
+			}			
 		}
 	
 		v += min_complexes[c]->AttachG( min_simulation, min_complexes[c]->save_grad );
@@ -584,7 +589,6 @@ void Simulation::minimize( int freeze_membrane  )
 	int use_m = nsteps;
 	if( use_m > num_params )
 		use_m = num_params;
-	printf("Here we go.\n");	
 	double e_init = surface_f(p);
 //	full_fd_test(p);
 	printf("Entering minimize with e_init: %le\n", e_init );
@@ -614,7 +618,7 @@ void Simulation::minimize( int freeze_membrane  )
 	rms /= num_params;
 	rms = sqrt(rms);
 
-	fd_test(p);
+//	full_fd_test(p);
 
 	printf("Minimize: VG: %.14le VV: %.14le VA: %lf VC: %lf VV: %lf grad rms %le\n", v, e, VA, VC, VV, rms );
 

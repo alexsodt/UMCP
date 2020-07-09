@@ -28,5 +28,12 @@ int nearInteriorPointOnTriangle( double *test_pt, double *vert1, double *vert2, 
 int line_segment_triangle_intersection( double *r1, double *r2, double *v1, double *v2, double *v3, double fudge=0 );
 double segmentSegmentDist( double *r1A, double *r1B, double *r2A, double *r2B, double *t1_out, double *t2_out);
 double dihe( double *r1, double *r2, double *r3, double *r4 ); 
+void normal_cp_der( double *r2, double *r1, double *r3, double nrm_der[27] );
+void fillcpder( double *der, double *dr, 
+		int wrt,
+		double sign
+		);
+void fillcp( double *der, double *r );
+
 
 #endif

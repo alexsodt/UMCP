@@ -10,7 +10,6 @@
 #include "parallel.h"
 #include <string.h>
 #include "simulation.h"
-void loadBetaZ( const char *fileName, int load_to_spline );
 
 static int N_Z_BINS = 100;
 static double MINZ = -75;

@@ -355,7 +355,7 @@ void RD::do_rd( Simulation *theSimulation )
 				pcomplex *product = loadComplex( allReactions[rxn].productName );
 				product->loadParams(params);			
 				struct surface_record *sRec = theSimulation->fetch( theSimulation->allComplexes[p]->sid[s] );
-				product->init( sRec->theSurface, sRec->r, theSimulation->allComplexes[p]->fs[s], theSimulation->allComplexes[p]->puv[2*s+0], theSimulation->allComplexes[p]->puv[2*s+1] );
+				product->init( theSimulation, sRec->theSurface, sRec->r, theSimulation->allComplexes[p]->fs[s], theSimulation->allComplexes[p]->puv[2*s+0], theSimulation->allComplexes[p]->puv[2*s+1] );
 				product->copyParentParameters( theSimulation->allComplexes[p] );
 				for( int s = 0; s < product->nattach; s++ )
 					product->sid[s] = sRec->id;
@@ -440,8 +440,8 @@ void RD::do_rd( Simulation *theSimulation )
 
 				int rd_blocked = 0;
 
-				reactant1->init( sRec->theSurface, sRec->r, theSimulation->allComplexes[p]->fs[s], theSimulation->allComplexes[p]->puv[2*s+0], theSimulation->allComplexes[p]->puv[2*s+1] );
-				reactant2->init( sRec->theSurface, sRec->r, theSimulation->allComplexes[p]->fs[s], theSimulation->allComplexes[p]->puv[2*s+0], theSimulation->allComplexes[p]->puv[2*s+1] );
+				reactant1->init( theSimulation, sRec->theSurface, sRec->r, theSimulation->allComplexes[p]->fs[s], theSimulation->allComplexes[p]->puv[2*s+0], theSimulation->allComplexes[p]->puv[2*s+1] );
+				reactant2->init( theSimulation, sRec->theSurface, sRec->r, theSimulation->allComplexes[p]->fs[s], theSimulation->allComplexes[p]->puv[2*s+0], theSimulation->allComplexes[p]->puv[2*s+1] );
 
 				reactant1->copyParentParameters( theSimulation->allComplexes[p] );
 				reactant2->copyParentParameters( theSimulation->allComplexes[p] );

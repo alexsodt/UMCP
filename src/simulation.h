@@ -149,6 +149,7 @@ typedef struct Simulation
 	// GATHER
 	double nearCurvature(double*rpt, double *cout, double *kout, double *dp_out, double *dz_out, int *leaflet_out);
 	void gather( parameterBlock *block );
+	void loadComplexes( parameterBlock *block );
 } Simulation;
 
 

@@ -298,7 +298,7 @@ int main( int argc, char **argv )
 	
 	// for now we are putting all complexes on the first surface.
 	
-	theSurface1->loadComplexes( &(theSimulation->allComplexes), &(theSimulation->ncomplex), &block ); 
+	theSimulation->loadComplexes( &block ); 
 	theSimulation->ncomplexSpace = theSimulation->ncomplex;
 
 	// for now only collect kc info from first surface.
@@ -2278,7 +2278,7 @@ int main( int argc, char **argv )
 	if( block.create_all_atom )
 	{
 		printf("WARNING: creating all atom from the first surface.\n");
-		theSimulation->allSurfaces->theSurface->createAllAtom(  &block );
+		theSimulation->allSurfaces->theSurface->createAllAtom(  theSimulation, &block, theSimulation->allComplexes, theSimulation->ncomplex );
 	}
 /*	FILE *saveFile = fopen("file.save", "w");
 

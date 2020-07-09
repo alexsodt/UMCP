@@ -3,8 +3,8 @@
 #include "M_matrix.h"
 #include <string.h>
 static double **M = NULL;
-static int mlow = 5;
-static int mhigh = 7;
+static int mlow = 3;
+static int mhigh = 10;
 void generateSubdivisionMatrices( double **M, int mlow, int mhigh );
 
 void getM( double ***M_out, int *mlow_out, int *mhigh_out )

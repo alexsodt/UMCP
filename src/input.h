@@ -7,6 +7,7 @@ struct complex_record
 	int inside_outside;
 	int nbound;
 	int nsolution;
+	int saddle; // move to a saddle point of the membrane
 	double coverage;
 	double concentration;
 

@@ -75,7 +75,7 @@ void NBAR::init( double *r )
 
 // initialize the BAR domain on the membrane.
 
-void NBAR::init( surface *theSurface, double *rsurf, int f, double u, double v )
+void NBAR::init(Simulation *theSimulalation, surface *theSurface, double *rsurf, int f, double u, double v )
 {
 	base_init();
 
