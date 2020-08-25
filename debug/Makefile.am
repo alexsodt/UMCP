@@ -6,8 +6,8 @@ bin_PROGRAMS = hd.dbg makeHexSquare.dbg min.dbg subdivide.dbg scale.dbg icosahed
 noinst_LIBRARIES = libinterp.a
 
 AM_CPPFLAGS = -include ../config.h -include ../src/local_config.h $(AM_INCLUDE) 
-AM_CFLAGS = -g -pg
-AM_CXXFLAGS = -g -pg
+AM_CFLAGS = -g 
+AM_CXXFLAGS = -g 
 
 SRC_DIR = ../src
 
