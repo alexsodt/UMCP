@@ -1,0 +1,7 @@
+mesh pore.mesh
+nmin 0
+nsteps 100
+o_lim 100
+time_step 1e-12
+kv 0.06
+movie yes

@@ -1,0 +1,9 @@
+mesh join.mesh
+nmin 3
+nsteps 0
+o_lim 1
+time_step 1e-20
+movie no
+kv	0.06
+#KA	0
+minimizeResetG	yes
