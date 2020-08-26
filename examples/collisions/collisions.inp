@@ -1,0 +1,14 @@
+time_step 1e-11
+jobname collisions
+add crowder nbound 500 outside
+planar_topology no
+mesh cyl300.mesh
+do_ld no 
+o_lim  100
+nmin  1
+nsteps 500 
+crowder_r 25
+crowder_bond_k 0.1
+crowder_mass 1e7
+KA	0.2
+movie yes
