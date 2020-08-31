@@ -23,9 +23,21 @@ If the timestep is too large, the system will be unstable and program execution 
 The option \code{timestep\_analysis=yes} provides a rough estimate of a proper timescale for dynamics.
 
 \newsubsection{Input File}
-The input file contains all of the initial information for the simulation to start. At a bare minimum this file must contain [] to be properly read into the program. [Explain why.] Additional parameters for further customization can be found in section 10. Below is an example input file of a [whatever type it is] simulation. \\ 
+The input file contains all of the initial information for the simulation to start. 
+While the input file itself is not technically required (default options will be used), a small set of minimum parameters are typically specified. 
+These include the name of the mesh file, the time step, and the number of minimization and/or dynamics steps to compute.
+Additional parameters for further customization can be found in section 10. 
+Below is an example input file of a simulation in which 10 steps of minimization are followed by 100 steps of dynamics. \\ 
+The timesteps are broken up into \code{nouter} ``outer'' loops (in which, for example, the trajectory is written) of \code{ninner} ``inner'' loops. 
 
-[picture of Example]
+%% 
+
+\begin{icommand}
+mesh	planar.mesh 	\\
+nmin	10 		\\
+nouter	100 		\\
+ninner  1
+\end{icommand}
 
 \newsubsection{Running from Input File}
 Simulations are running using the \code{hd.opt} program, which [explain what it is]. It is located in the \code{UMCP/optimized} folder. \\
