@@ -1,23 +1,79 @@
+/* config.h.in.  Generated from configure.ac by autoheader.  */
 
-// header input manually generated.
+/* Defining latex package available */
+#undef HAVE_LATEX_AMSMATH
 
+/* Defining latex package available */
+#undef HAVE_LATEX_CALC
+
+/* Defining latex package available */
+#undef HAVE_LATEX_CLEVEREF
+
+/* Defining latex package available */
+#undef HAVE_LATEX_COMMENT
+
+/* Defining latex package available */
+#undef HAVE_LATEX_ETOOLBOX
+
+/* Defining latex package available */
+#undef HAVE_LATEX_FILECONTENTS
+
+/* Defining latex package available */
+#undef HAVE_LATEX_FOOTMISC
+
+/* Defining latex package available */
+#undef HAVE_LATEX_GRAPHICX
+
+/* Defining latex package available */
+#undef HAVE_LATEX_HELVET
+
+/* Defining latex package available */
+#undef HAVE_LATEX_IFLUATEX
+
+/* Defining latex package available */
+#undef HAVE_LATEX_MDFRAMED
+
+/* Defining latex package available */
+#undef HAVE_LATEX_NEWFLOAT
+
+/* Defining latex package available */
+#undef HAVE_LATEX_REGEXPATCH
+
+/* Defining latex package available */
+#undef HAVE_LATEX_SETSPACE
+
+/* Defining latex package available */
+#undef HAVE_LATEX_TCOLORBOX
+
+/* Defining latex package available */
+#undef HAVE_LATEX_WRAPFIG
+
+/* Defining latex package available */
+#undef HAVE_LATEX_XCOLOR
+
+/* "Using pdflatex" */
 #undef HAVE_PDFLATEX
 
-#undef HAVE_LATEX_FOOTMISC
-#undef HAVE_LATEX_AMSMATH 
-#undef HAVE_LATEX_GRAPHICX
-#undef HAVE_LATEX_XCOLOR
-#undef HAVE_LATEX_COMMENT
-#undef HAVE_LATEX_ETOOLBOX
-#undef HAVE_LATEX_TCOLORBOX
-#undef HAVE_LATEX_HELVET
-#undef HAVE_LATEX_SETSPACE
-#undef HAVE_LATEX_WRAPFIG
-#undef HAVE_LATEX_NEWFLOAT
-#undef HAVE_LATEX_MDFRAMED
-#undef HAVE_LATEX_CLEVEREF
-#undef HAVE_LATEX_CALC
-#undef HAVE_LATEX_REGEXPATCH
-#undef HAVE_LATEX_FILECONTENTS
-#undef HAVE_LATEX_IFXETEX
-#undef HAVE_LATEX_IFLUATEX
+/* Name of package */
+#undef PACKAGE
+
+/* Define to the address where bug reports for this package should be sent. */
+#undef PACKAGE_BUGREPORT
+
+/* Define to the full name of this package. */
+#undef PACKAGE_NAME
+
+/* Define to the full name and version of this package. */
+#undef PACKAGE_STRING
+
+/* Define to the one symbol short name of this package. */
+#undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
+/* Define to the version of this package. */
+#undef PACKAGE_VERSION
+
+/* Version number of package */
+#undef VERSION

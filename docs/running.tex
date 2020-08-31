@@ -22,6 +22,25 @@ The choice of timestep is critical for computing proper ensembles.
 If the timestep is too large, the system will be unstable and program execution will halt.
 The option \code{timestep\_analysis=yes} provides a rough estimate of a proper timescale for dynamics.
 
+\newsubsection{Input File}
+The input file contains all of the initial information for the simulation to start. At a bare minimum this file must contain [] to be properly read into the program. [Explain why.] Additional parameters for further customization can be found in section 10. Below is an example input file of a [whatever type it is] simulation. \\ 
+
+[picture of Example]
+
+\newsubsection{Running from Input File}
+Simulations are running using the \code{hd.opt} program, which [explain what it is]. It is located in the \code{UMCP/optimized} folder. \\
+
+Ex: For an input file called \code{input.inp} located in \code{UMCP/examples/test}, the syntax for running the simulation is \\
+\code{> ../../optimized/hd.opt input.inp}
+
+\newsubsection{Simulation Output}
+While the simulation is running, it will generate output at the beginning, and at each time step. 
+
+[Describe output and variable meanings]
+
+[Maybe insert picture of example output]
+
+
 \newsubsection{Loading a simulation state}
 
 Dynamics and minimization can be restarted by loading a save file.

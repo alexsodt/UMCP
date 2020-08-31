@@ -1,0 +1,35 @@
+\contentsline {section}{\numberline {1}Introduction}{1}% 
+\contentsline {section}{\numberline {2} Running dynamics: \texttt {\MakeLowercase {hd}} }{1}% 
+\contentsline {subsection}{\numberline {2.1}Dynamics options and parameters }{1}% 
+\contentsline {subsection}{\numberline {2.2}Input File}{1}% 
+\contentsline {subsection}{\numberline {2.3}Running from Input File}{1}% 
+\contentsline {subsection}{\numberline {2.4}Simulation Output}{2}% 
+\contentsline {subsection}{\numberline {2.5}Loading a simulation state}{2}% 
+\contentsline {section}{\numberline {3} Setting the bilayer lipid composition }{2}% 
+\contentsline {section}{\numberline {4} Hamiltonian and Lagrangian dynamics }{3}% 
+\contentsline {subsection}{\numberline {4.1}Lagrangian mechanics}{3}% 
+\contentsline {subsection}{\numberline {4.2}Hamiltonian dynamics}{3}% 
+\contentsline {subsection}{\numberline {4.3}Particle on the membrane surface}{4}% 
+\contentsline {subsection}{\numberline {4.4}Propagating particle momenta $p$ }{5}% 
+\contentsline {subsection}{\numberline {4.5}The effective mass matrix is banded; its inverse is short-ranged }{5}% 
+\contentsline {subsection}{\numberline {4.6}Normal modes}{5}% 
+\contentsline {subsection}{\numberline {4.7}Langevin dynamics}{6}% 
+\contentsline {section}{\numberline {5} Membrane and particle dynamics }{6}% 
+\contentsline {subsection}{\numberline {5.1}Local metric}{6}% 
+\contentsline {subsection}{\numberline {5.2}Irregular mesh points}{6}% 
+\contentsline {section}{\numberline {6} Timescales }{6}% 
+\contentsline {subsection}{\numberline {6.1}Langevin dynamics}{6}% 
+\contentsline {subsection}{\numberline {6.2}Brownian dynamics}{7}% 
+\contentsline {subsubsection}{\numberline {6.2.1}Brownian dynamics with collective variables}{8}% 
+\contentsline {subsection}{\numberline {6.3}Membrane relaxation timescales}{8}% 
+\contentsline {section}{\numberline {7} Creating all-atom structures from the continuum model }{8}% 
+\contentsline {section}{\numberline {8} Pressure/tension control }{9}% 
+\contentsline {section}{\numberline {9} Hydrodynamics with stochastic rotational dynamics (SRD) }{9}% 
+\contentsline {subsection}{\numberline {9.1}SRD particle/mesh collisions}{9}% 
+\contentsline {section}{\numberline {10}Input options}{10}% 
+\contentsline {subsection}{\numberline {10.1}System construction options}{10}% 
+\contentsline {subsection}{\numberline {10.2}Dynamics options}{11}% 
+\contentsline {subsection}{\numberline {10.3}Reaction diffusion options}{12}% 
+\contentsline {subsection}{\numberline {10.4}Miscellaneous options}{12}% 
+\contentsline {subsection}{\numberline {10.5}All-atom/coarse-grain molecular construction options}{12}% 
+\contentsline {section}{\numberline {11}Bibliography}{14}% 
